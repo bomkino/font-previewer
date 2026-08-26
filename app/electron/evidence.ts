@@ -251,7 +251,7 @@ async function installedCatalogAudit(window: BrowserWindow): Promise<Record<stri
       pageBounded: response.imports.length <= 40,
       studyUnchanged: beforeStudy >= 0 && beforeStudy === afterStudy,
       rendered: document.querySelectorAll('.catalog-results .catalog-source').length,
-      pathLeak: /(?:file:\/\/|\/home\/|\/Users\/|[A-Za-z]:\\\\)/.test(serialized),
+      pathLeak: serialized.includes('file://') || serialized.includes('/home/') || serialized.includes('/Users/') || /[A-Za-z]:\\\\/.test(serialized),
       opaquePreviewUrls: response.imports.every((item) => !item.binding.previewUrl || item.binding.previewUrl.startsWith('pitch-font://asset/')),
       previewAvailable: Boolean(preview),
       fontLoaded,
