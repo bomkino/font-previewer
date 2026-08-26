@@ -872,7 +872,7 @@ private final class MacEvidenceRunner {
         throw P1MacHostError.timedOut(label)
     }
 
-    private func waitFor(_ label: String, source: () -> String) async throws {
+    private func waitFor(_ label: String, source: @escaping () -> String) async throws {
         try await waitFor(label) { [unowned self] in
             do { return try await self.callPage(source()) as? Bool == true }
             catch { return false }
