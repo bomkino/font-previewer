@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useReducer,
   useRef,
@@ -138,12 +139,28 @@ export default function App() {
   const [newStudyPack, setNewStudyPack] = useState<RecipePack>("film-tv");
   const [titleDraft, setTitleDraft] = useState(session.document.title);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const pendingWorkspaceFocusRef = useRef(false);
   const newStudyDialogRef = useRef<HTMLElement>(null);
   const newStudyReturnFocusRef = useRef<HTMLElement | null>(null);
   const index = useStudyIndex(session.document);
   const fontStates = useFontRegistry(session);
 
   useEffect(() => setTitleDraft(session.document.title), [session.document.id, session.document.title]);
+
+  const requestWorkspaceFocus = useCallback(() => {
+    pendingWorkspaceFocusRef.current = true;
+    requestAnimationFrame(() => {
+      if (!pendingWorkspaceFocusRef.current || !headingRef.current) return;
+      pendingWorkspaceFocusRef.current = false;
+      headingRef.current.focus();
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!pendingWorkspaceFocusRef.current || !headingRef.current) return;
+    pendingWorkspaceFocusRef.current = false;
+    headingRef.current.focus();
+  });
 
   const dispatch = useCallback<Dispatch<StudyCommand>>((command) => {
     historyDispatch({ type: "command", command });
@@ -210,12 +227,13 @@ export default function App() {
         return;
       }
       const opened = createSession(response.document, response.bindings);
+      pendingWorkspaceFocusRef.current = true;
       historyDispatch({ type: "replace", session: opened });
       setShowWelcome(false);
       setNotice(response.migratedFrom ? `Study migrated from schema v${response.migratedFrom}. Save to commit v4.` : response.warnings[0] ?? "Study opened.");
-      requestAnimationFrame(() => headingRef.current?.focus());
+      requestWorkspaceFocus();
     });
-  }, [host, runTask]);
+  }, [host, requestWorkspaceFocus, runTask]);
 
   const saveStudy = useCallback((saveAs: boolean) => {
     void runTask(saveAs ? "Saving Study As" : "Saving Study", async () => {
@@ -337,6 +355,7 @@ export default function App() {
       setHostName(response.capabilities.host);
       if (response.recovery) {
         const recovered = createSession(response.recovery.document, response.recovery.bindings, response.recovery.workspace, response.recovery.revision);
+        pendingWorkspaceFocusRef.current = true;
         historyDispatch({
           type: "replace",
           session: {
@@ -347,14 +366,14 @@ export default function App() {
         setRecoveryAvailable(true);
         setShowWelcome(false);
         setNotice(response.recovery.revision > response.recovery.intentionallySavedRevision ? "Recovered unsaved work." : "Recovered last Study state.");
-        requestAnimationFrame(() => headingRef.current?.focus());
+        requestWorkspaceFocus();
       }
       const probe = await host.request({ type: "probe", serial: 1 });
       if (active && probe.type === "probe-result") setHostName(probe.host);
       if (active) setLaunchReady(true);
     });
     return () => { active = false; };
-  }, [host, runTask]);
+  }, [host, requestWorkspaceFocus, runTask]);
 
   useEffect(() => host.onMenuCommand(handleMenu), [handleMenu, host]);
 
@@ -458,8 +477,9 @@ export default function App() {
   }, [dispatch, saveStudy]);
 
   const setStage = (stage: Stage) => {
+    pendingWorkspaceFocusRef.current = true;
     dispatch({ type: "set-stage", stage });
-    requestAnimationFrame(() => headingRef.current?.focus());
+    requestWorkspaceFocus();
   };
   const activeComparison = session.workspace.activeComparisonId
     ? session.document.comparisonSets.find((comparison) => comparison.id === session.workspace.activeComparisonId)

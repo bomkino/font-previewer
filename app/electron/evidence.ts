@@ -300,6 +300,9 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   const loaded = new Promise<void>((resolveLoaded) => options.window.webContents.once("did-finish-load", () => resolveLoaded()));
   options.window.webContents.reload();
   await withTimeout("recovery reload", loaded, 20_000);
+  await settle(options.window, 500);
+  trace.reloadBoot = await inspectWorkspace(options.window);
+  await writeFile(join(output, "reload-boot.json"), `${JSON.stringify(trace.reloadBoot, null, 2)}\n`, { mode: 0o600 });
   await waitFor(options.window, "recovered Studio", `document.querySelector('#workspace-heading') && document.querySelector('.host-probe')?.textContent?.includes('electron') && document.activeElement?.id === 'workspace-heading'`, 20_000);
   const afterReload = await inspectWorkspace(options.window);
   trace.reloadRecovery = { before: beforeReload, after: afterReload };

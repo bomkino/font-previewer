@@ -206,6 +206,9 @@ jobs:
             .nativeMenu.installed == true and
             .nativeMenu.import == true and
             .nativeMenu.undo == true and
+            .nativePanel.opened >= 1 and
+            .nativePanel.cancelled >= 1 and
+            .nativePanelFocus == "import-fonts-button" and
             .security.attempts == .security.rejected and
             .security.nodeUnavailable == true and
             .keyboardAccessibility.forwardWrap == true and

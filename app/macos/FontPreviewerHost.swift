@@ -318,11 +318,11 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
 
     private func configureMenu() {
         let root = NSMenu()
-        let appItem = NSMenuItem(); let appMenu = NSMenu(title: "Font Previewer")
+        let appItem = NSMenuItem(title: "Font Previewer", action: nil, keyEquivalent: ""); let appMenu = NSMenu(title: "Font Previewer")
         appMenu.addItem(withTitle: "About Font Previewer", action: nil, keyEquivalent: "")
         appMenu.addItem(.separator()); appMenu.addItem(withTitle: "Quit Font Previewer", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu; root.addItem(appItem)
-        let fileItem = NSMenuItem(); let file = NSMenu(title: "File")
+        let fileItem = NSMenuItem(title: "File", action: nil, keyEquivalent: ""); let file = NSMenu(title: "File")
         addMenu(file, "New Study", "n", [], #selector(newStudyMenu(_:)), "font-previewer-new")
         addMenu(file, "Open Study…", "o", [], #selector(openStudyMenu(_:)), "font-previewer-open")
         file.addItem(.separator())
@@ -334,22 +334,22 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         addMenu(file, "Export Handoff…", "e", [], #selector(exportMenu(_:)), "font-previewer-export")
         file.addItem(.separator()); file.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         fileItem.submenu = file; root.addItem(fileItem)
-        let editItem = NSMenuItem(); let edit = NSMenu(title: "Edit")
+        let editItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: ""); let edit = NSMenu(title: "Edit")
         addMenu(edit, "Undo Study Change", "z", [], #selector(undoStudyMenu(_:)), "font-previewer-undo")
         addMenu(edit, "Redo Study Change", "Z", [.command, .shift], #selector(redoStudyMenu(_:)), "font-previewer-redo")
         edit.addItem(.separator())
         edit.addItem(NSMenuItem(title: "Cut", action: Selector(("cut:")), keyEquivalent: "x")); edit.addItem(NSMenuItem(title: "Copy", action: Selector(("copy:")), keyEquivalent: "c")); edit.addItem(NSMenuItem(title: "Paste", action: Selector(("paste:")), keyEquivalent: "v")); edit.addItem(NSMenuItem(title: "Select All", action: Selector(("selectAll:")), keyEquivalent: "a"))
         edit.addItem(.separator()); addMenu(edit, "Mark Candidate Keep", "k", [.command, .shift], #selector(keepMenu(_:)), "font-previewer-keep"); addMenu(edit, "Next Unreviewed Candidate", "u", [.command, .shift], #selector(nextMenu(_:)), "font-previewer-next")
         editItem.submenu = edit; root.addItem(editItem)
-        let navigateItem = NSMenuItem(); let navigate = NSMenu(title: "Navigate")
+        let navigateItem = NSMenuItem(title: "Navigate", action: nil, keyEquivalent: ""); let navigate = NSMenu(title: "Navigate")
         for (index, stage) in ["review", "compare", "system", "handoff"].enumerated() {
             let item = NSMenuItem(title: "\(index + 1) — \(stage.prefix(1).uppercased())\(stage.dropFirst())", action: #selector(stageMenu(_:)), keyEquivalent: String(index + 1)); item.target = self; item.representedObject = stage; navigate.addItem(item)
         }
         navigateItem.submenu = navigate; root.addItem(navigateItem)
-        let viewItem = NSMenuItem(); let view = NSMenu(title: "View")
+        let viewItem = NSMenuItem(title: "View", action: nil, keyEquivalent: ""); let view = NSMenu(title: "View")
         addMenu(view, "Reload Studio Safely", "r", [.command, .shift], #selector(reloadMenu(_:)), "font-previewer-reload")
         view.addItem(NSMenuItem(title: "Enter Full Screen", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")); viewItem.submenu = view; root.addItem(viewItem)
-        let windowItem = NSMenuItem(); let windowMenu = NSMenu(title: "Window")
+        let windowItem = NSMenuItem(title: "Window", action: nil, keyEquivalent: ""); let windowMenu = NSMenu(title: "Window")
         windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m"); windowMenu.addItem(withTitle: "Bring All to Front", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
         windowItem.submenu = windowMenu; root.addItem(windowItem); NSApp.windowsMenu = windowMenu; NSApp.mainMenu = root
     }
@@ -690,6 +690,11 @@ private final class MacEvidenceRunner {
         try await wait("Studio") { try await self.bool("window.fontPreviewerHost && document.querySelector('#workspace-heading') && document.querySelector('.host-probe')?.textContent?.includes('wkwebview')") }
         var trace: [String: Any] = ["generatedAt": ISO8601DateFormatter().string(from: Date()), "host": "wkwebview", "initial": try await inspect(), "nativeMenu": ["installed": NSApp.mainMenu != nil, "import": NSApp.mainMenu?.item(withTitle: "File")?.submenu?.item(withTitle: "Import Sources…") != nil, "undo": NSApp.mainMenu?.item(withTitle: "Edit")?.submenu?.item(withTitle: "Undo Study Change") != nil]]
         try await host.snapshot(to: output.appendingPathComponent("01-review.png"))
+        _ = try await host.evaluate("document.querySelector('#import-fonts-button')?.focus(); true")
+        try performMenu("File", "Import Sources…")
+        try await wait("native Import panel") { self.host.panelOpened > 0 && self.host.panelCancelled > 0 }
+        try await wait("native Import focus restoration") { try await self.bool("document.activeElement?.id==='import-fonts-button'") }
+        trace["nativePanelFocus"] = "import-fonts-button"
         trace["keyboardAccessibility"] = try await keyboardAccessibilityAudit()
         host.sendMenu(["type": "mark-keep"]); try await wait("Keep") { try await self.bool("document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label') === 'Keep'") }
         host.sendMenu(["type": "undo-study"]); try await wait("Undo") { try await self.bool("document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label') === 'Unreviewed'") }; host.sendMenu(["type": "redo-study"]); try await wait("Redo") { try await self.bool("document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label') === 'Keep'") }
@@ -705,7 +710,12 @@ private final class MacEvidenceRunner {
         trace["hostCounters"] = ["rejectedRequests": host.rejectedRequests, "menuCommands": host.menuCommands, "navigationRejections": host.navigationRejections, "popupRejections": host.popupRejections, "processTerminations": host.processTerminations]
         try JSONSerialization.data(withJSONObject: trace, options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("run.json"), options: [.atomic])
         let security = trace["security"] as? [String: Any]; let semantics = trace["semantics"] as? [String: Any]; let keyboard = trace["keyboardAccessibility"] as? [String: Any]
-        guard security?["attempts"] as? Int == security?["rejected"] as? Int, security?["nodeUnavailable"] as? Bool == true, semantics?["unnamed"] as? Int == 0, semantics?["duplicateIds"] as? Int == 0, keyboard?["forwardWrap"] as? Bool == true, keyboard?["backwardWrap"] as? Bool == true, keyboard?["candidateUnchanged"] as? Bool == true, keyboard?["trayUnchanged"] as? Bool == true, keyboard?["returnFocus"] as? Bool == true else { throw HostError.unavailable("Evidence assertions failed") }
+        guard security?["attempts"] as? Int == security?["rejected"] as? Int, security?["nodeUnavailable"] as? Bool == true, semantics?["unnamed"] as? Int == 0, semantics?["duplicateIds"] as? Int == 0, keyboard?["forwardWrap"] as? Bool == true, keyboard?["backwardWrap"] as? Bool == true, keyboard?["candidateUnchanged"] as? Bool == true, keyboard?["trayUnchanged"] as? Bool == true, keyboard?["returnFocus"] as? Bool == true, host.panelOpened > 0, host.panelCancelled > 0 else { throw HostError.unavailable("Evidence assertions failed") }
+    }
+    private func performMenu(_ menuTitle: String, _ itemTitle: String) throws {
+        guard let menu = NSApp.mainMenu?.item(withTitle: menuTitle)?.submenu, let item = menu.item(withTitle: itemTitle) else { throw HostError.unavailable("Missing native menu item \(menuTitle) → \(itemTitle)") }
+        let index = menu.index(of: item); guard index >= 0 else { throw HostError.unavailable("Detached native menu item \(itemTitle)") }
+        menu.performActionForItem(at: index)
     }
     private func keyboardAccessibilityAudit() async throws -> [String: Any] {
         _ = try await host.evaluate("document.querySelector('#import-fonts-button')?.focus(); true")
