@@ -495,6 +495,7 @@ function Inspector({ study, selected, dispatch }: InspectorProps) {
       <label className="field-label">
         <span>Specimen copy</span>
         <textarea
+          id="specimen-copy-editor"
           value={study.copy}
           maxLength={240}
           rows={4}
@@ -783,6 +784,7 @@ export default function App() {
             {bridgeMetric === undefined ? "" : ` · ${bridgeMetric.toFixed(1)} ms`}
           </span>
           <button
+            id="import-fonts-button"
             type="button"
             className="quiet-button"
             onClick={() => void requestHost({ type: "native-undo" })}
