@@ -356,7 +356,9 @@ private struct SpecimenControls: View {
                             get: { model.study.alignment },
                             set: model.setAlignment
                         )) {
-                            ForEach(TextAlignment.allCases) { alignment in Text(alignment.label).tag(alignment) }
+                            ForEach(FontPreviewerCore.TextAlignment.allCases) { alignment in
+                                Text(alignment.label).tag(alignment)
+                            }
                         }
                         .labelsHidden()
                         .frame(width: 115)

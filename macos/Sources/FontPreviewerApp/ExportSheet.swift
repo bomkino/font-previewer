@@ -58,23 +58,27 @@ struct ExportSheet: View {
                     .disabled(!formats.contains(.png) && !formats.contains(.pdf))
                 }
 
-                Section("Privacy & source files") {
-                    Toggle("Include absolute source paths in JSON", isOn: $includeAbsolutePaths)
-                        .toggleStyle(.checkbox)
-                    Text("Off by default. Relative project data and local folder names stay out of the handoff.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    Toggle("Copy source font files into export", isOn: $includeFontCopies)
-                        .toggleStyle(.checkbox)
-                    if includeFontCopies {
-                        Toggle("I have permission to copy these font files", isOn: $acknowledgedCopyPermission)
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Include absolute source paths in JSON", isOn: $includeAbsolutePaths)
                             .toggleStyle(.checkbox)
-                            .foregroundStyle(acknowledgedCopyPermission ? .primary : .orange)
-                        Text("The app cannot determine licence terms. This copies files; it does not grant redistribution rights.")
+                        Text("Off by default. Relative project data and local folder names stay out of the handoff.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+
+                        Toggle("Copy source font files into export", isOn: $includeFontCopies)
+                            .toggleStyle(.checkbox)
+                        if includeFontCopies {
+                            Toggle("I have permission to copy these font files", isOn: $acknowledgedCopyPermission)
+                                .toggleStyle(.checkbox)
+                                .foregroundStyle(acknowledgedCopyPermission ? .primary : .orange)
+                            Text("The app cannot determine licence terms. This copies files; it does not grant redistribution rights.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                } header: {
+                    Text("Privacy & source files")
                 }
             }
             .formStyle(.grouped)
