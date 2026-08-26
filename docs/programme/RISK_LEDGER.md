@@ -17,5 +17,9 @@
 | R-013 | Handoff lacks renderer identity and reconstruction depth | current JSON/Markdown omits Render Profile, Recipes, Scenes, exact Font Uses, findings, checksums | High | P8 reconstruction gate and Handoff contract |
 | R-014 | UI and domain state live in one large `AppModel` | 643-line main-actor model owns documents, import, review, filters, watching, export, and autosave | Medium | Extract only through validated deep seams during tracer work; no architecture gardening |
 | R-015 | Mac minimum and architecture policy conflict | reference says macOS 13 and permits x86_64; programme leads with macOS 14 and Apple silicon only | Decision blocker | P6 evidence and accepted platform ADR |
+| R-016 | P1 desktop evidence is blocked in the current workspace | no display server or Orca; D-Bus socket creation is denied; macOS/WKWebView is absent | Decision blocker | Run the P1 fixture on displayed Linux with Orca and on macOS with WKWebView/VoiceOver before D01 |
+| R-017 | P1 reload checkpoint is not a production durability design | Variant A writes the validated `StudySession` to renderer `localStorage` | Data-loss blocker for production | Replace only after D03 accepts Host mirror, recovery location, and intentional Save barrier |
+| R-018 | Full shared Studio has non-trivial UI surface | P1 runtime is 3,019 lines, including 1,095 lines of CSS and an 825-line prototype App | Medium | Use P1 task evidence to accept/narrow/reject workspace ownership; do not promote prototype structure into production |
+| R-019 | Electron 44 binary acquisition is explicit | npm package no longer downloads the binary during postinstall | Build reproducibility | Keep exact package lock and `electron:install` command; cache and verify binary in future CI/package ticket |
 
 Judgement note: severity reflects product harm, not implementation difficulty.

@@ -22,6 +22,11 @@ Start here:
 - [`docs/programme/handover/00_MASTER_HANDOFF.md`](docs/programme/handover/00_MASTER_HANDOFF.md) — product authority
 - [`AGENTS.md`](AGENTS.md) — repository working rules
 
+Current prototype:
+
+- [`prototypes/p1-shared-studio/README.md`](prototypes/p1-shared-studio/README.md) — Variant A implementation for D01 workspace ownership
+- [`prototypes/p1-shared-studio/REPORT.md`](prototypes/p1-shared-studio/REPORT.md) — evidence, failed gates, and next experiment
+
 ## Preserved reference
 
 `macos/` contains the native CoreText reference extracted from [`bomkino/pitch-deck-tools`](https://github.com/bomkino/pitch-deck-tools) at:

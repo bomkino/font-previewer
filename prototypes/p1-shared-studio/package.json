@@ -1,0 +1,29 @@
+{
+  "name": "@font-previewer/p1-shared-studio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Throwaway P1 prototype testing full shared-Studio workspace ownership.",
+  "main": "dist-electron/electron/main.js",
+  "scripts": {
+    "build": "npm run check && npm run test && vite build && tsc -p tsconfig.electron.json && vite build --config vite.preload.config.ts",
+    "check": "tsc --noEmit",
+    "dev": "vite --host 127.0.0.1",
+    "electron": "electron .",
+    "electron:install": "install-electron",
+    "test": "tsc -p tsconfig.test.json && node --test .test-dist/tests/*.test.js"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5",
+    "@types/node": "24.13.3",
+    "@vitejs/plugin-react": "6.1.0",
+    "electron": "44.0.0",
+    "typescript": "7.0.2",
+    "vite": "8.2.2"
+  }
+}

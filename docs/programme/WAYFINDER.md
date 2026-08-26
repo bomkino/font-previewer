@@ -72,8 +72,16 @@ Environment limits:
 
 - Linux x86_64 workspace is available.
 - Node.js 24.19.0, npm 11.9.0, and pnpm 11.19.0 are available.
-- Swift, Rust, CMake, Ninja, Electron, and a local macOS runtime are unavailable.
+- Swift, Rust, CMake, Ninja, a display server, Orca, and a local macOS runtime are unavailable.
+- Electron `44.0.0` can be resolved and compiled, but `app.whenReady()` did not complete in this workspace, which has no display server and denies D-Bus socket creation.
 - Mac build, WKWebView, VoiceOver, signing, and visual claims require external macOS evidence.
+
+Current P1 result:
+
+- Variant A exists and passes type, domain, protocol, SSR surface, build, SBOM, and npm-audit gates.
+- One renderer-owned `StudySession` drives the workspace; the Host retains only privileged Source Bindings and native operations.
+- The bridge carries narrow commands and opaque Source IDs, never paths or mirrored UI state.
+- No workspace ADR is accepted. Displayed Linux, Orca, Mac/WKWebView, native dialog/menu, focus, reload, and visual-quality evidence remain mandatory.
 
 ## Decision discipline
 

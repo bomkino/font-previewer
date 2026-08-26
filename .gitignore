@@ -13,9 +13,11 @@ output/
 # Shared Studio / Electron output
 node_modules/
 dist/
+dist-electron/
 coverage/
 .vite/
 .cache/
+.test-dist/
 
 # Local studies, sources, exports, and client material
 private/
