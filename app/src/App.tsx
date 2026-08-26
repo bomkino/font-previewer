@@ -434,6 +434,14 @@ export default function App() {
   }, [launchReady, mirror, session]);
 
   useEffect(() => {
+    if (!launchReady || showWelcome || document.activeElement !== document.body) return;
+    const frame = requestAnimationFrame(() => {
+      if (document.activeElement === document.body) headingRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [launchReady, session.document.id, showWelcome]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const primary = event.metaKey || event.ctrlKey;
       if (primary && event.key.toLocaleLowerCase() === "s") {
