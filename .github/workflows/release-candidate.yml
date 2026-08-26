@@ -76,6 +76,11 @@ jobs:
           jq -e '
             .securityAudit.invalidRequests == .securityAudit.rejected and
             .securityAudit.nodeUnavailable == true and
+            .keyboardAccessibility.forwardWrap == true and
+            .keyboardAccessibility.backwardWrap == true and
+            .keyboardAccessibility.candidateUnchanged == true and
+            .keyboardAccessibility.trayUnchanged == true and
+            .keyboardAccessibility.returnFocus == true and
             (.semanticAudit.unnamed | length) == 0 and
             (.semanticAudit.duplicateIds | length) == 0 and
             .reloadRecovery.after.activeElement == "workspace-heading" and
@@ -197,6 +202,11 @@ jobs:
             .nativeMenu.undo == true and
             .security.attempts == .security.rejected and
             .security.nodeUnavailable == true and
+            .keyboardAccessibility.forwardWrap == true and
+            .keyboardAccessibility.backwardWrap == true and
+            .keyboardAccessibility.candidateUnchanged == true and
+            .keyboardAccessibility.trayUnchanged == true and
+            .keyboardAccessibility.returnFocus == true and
             .semantics.unnamed == 0 and
             .semantics.duplicateIds == 0 and
             .reload.after.activeElement == "workspace-heading" and

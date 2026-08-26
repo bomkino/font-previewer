@@ -293,6 +293,8 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         webView.allowsBackForwardNavigationGestures = false
         webView.allowsMagnification = true
         webView.underPageBackgroundColor = NSColor(calibratedWhite: 0.96, alpha: 1)
+        webView.setAccessibilityLabel("Font Previewer Studio")
+        webView.setAccessibilityHelp("Review fonts, compare Candidates, build a typography System, and export a Handoff.")
         webView.translatesAutoresizingMaskIntoConstraints = false
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1_500, height: 980), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "Font Previewer"
@@ -670,6 +672,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { processTerminations += 1; webView.reload() }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        window.makeFirstResponder(webView)
         guard !evidenceStarted, let output = ProcessInfo.processInfo.environment[evidenceEnvironmentKey] else { return }
         evidenceStarted = true; let runner = MacEvidenceRunner(host: self, output: URL(fileURLWithPath: output, isDirectory: true)); evidenceRunner = runner; runner.start()
     }
@@ -686,6 +689,7 @@ private final class MacEvidenceRunner {
         try await wait("Studio") { try await self.bool("window.fontPreviewerHost && document.querySelector('#workspace-heading') && document.querySelector('.host-probe')?.textContent?.includes('wkwebview')") }
         var trace: [String: Any] = ["generatedAt": ISO8601DateFormatter().string(from: Date()), "host": "wkwebview", "initial": try await inspect(), "nativeMenu": ["installed": NSApp.mainMenu != nil, "import": NSApp.mainMenu?.item(withTitle: "File")?.submenu?.item(withTitle: "Import Sources…") != nil, "undo": NSApp.mainMenu?.item(withTitle: "Edit")?.submenu?.item(withTitle: "Undo Study Change") != nil]]
         try await host.snapshot(to: output.appendingPathComponent("01-review.png"))
+        trace["keyboardAccessibility"] = try await keyboardAccessibilityAudit()
         host.sendMenu(["type": "mark-keep"]); try await wait("Keep") { try await self.bool("document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label') === 'Keep'") }
         host.sendMenu(["type": "undo-study"]); try await wait("Undo") { try await self.bool("document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label') === 'Unreviewed'") }; host.sendMenu(["type": "redo-study"]); try await wait("Redo") { try await self.bool("document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label') === 'Keep'") }
         trace["afterMenuUndoRedo"] = try await inspect()
@@ -699,8 +703,18 @@ private final class MacEvidenceRunner {
         trace["nativePanel"] = ["opened": host.panelOpened, "cancelled": host.panelCancelled]
         trace["hostCounters"] = ["rejectedRequests": host.rejectedRequests, "menuCommands": host.menuCommands, "navigationRejections": host.navigationRejections, "popupRejections": host.popupRejections, "processTerminations": host.processTerminations]
         try JSONSerialization.data(withJSONObject: trace, options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("run.json"), options: [.atomic])
-        let security = trace["security"] as? [String: Any]; let semantics = trace["semantics"] as? [String: Any]
-        guard security?["attempts"] as? Int == security?["rejected"] as? Int, security?["nodeUnavailable"] as? Bool == true, semantics?["unnamed"] as? Int == 0, semantics?["duplicateIds"] as? Int == 0 else { throw HostError.unavailable("Evidence assertions failed") }
+        let security = trace["security"] as? [String: Any]; let semantics = trace["semantics"] as? [String: Any]; let keyboard = trace["keyboardAccessibility"] as? [String: Any]
+        guard security?["attempts"] as? Int == security?["rejected"] as? Int, security?["nodeUnavailable"] as? Bool == true, semantics?["unnamed"] as? Int == 0, semantics?["duplicateIds"] as? Int == 0, keyboard?["forwardWrap"] as? Bool == true, keyboard?["backwardWrap"] as? Bool == true, keyboard?["candidateUnchanged"] as? Bool == true, keyboard?["trayUnchanged"] as? Bool == true, keyboard?["returnFocus"] as? Bool == true else { throw HostError.unavailable("Evidence assertions failed") }
+    }
+    private func keyboardAccessibilityAudit() async throws -> [String: Any] {
+        _ = try await host.evaluate("document.querySelector('#import-fonts-button')?.focus(); true")
+        host.sendMenu(["type": "new-study"])
+        try await wait("New Study dialog") { try await self.bool("document.querySelector('.new-study-dialog') && document.activeElement?.closest('.new-study-dialog')") }
+        let trap = try await host.evaluate("(()=>{const d=document.querySelector('.new-study-dialog');const f=[...d.querySelectorAll(\"button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex='-1'])\")];const first=f[0],last=f.at(-1);last.focus();last.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));const forwardWrap=document.activeElement===first;first.focus();first.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));return {forwardWrap,backwardWrap:document.activeElement===last}})()") as? [String: Any] ?? [:]
+        _ = try await host.evaluate("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})); true")
+        try await wait("New Study close") { try await self.bool("!document.querySelector('.new-study-dialog') && document.activeElement?.id==='import-fonts-button'") }
+        let collision = try await host.evaluate("(async()=>{const s=document.querySelector('.stage-nav [aria-current=\"step\"]');const beforeCandidate=document.querySelector('.candidate-row[aria-current=\"true\"]')?.textContent;const beforeTray=document.querySelectorAll('.tray-item').length;s.focus();s.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));s.dispatchEvent(new KeyboardEvent('keydown',{key:' ',code:'Space',bubbles:true,cancelable:true}));await new Promise(r=>requestAnimationFrame(r));return {candidateUnchanged:beforeCandidate===document.querySelector('.candidate-row[aria-current=\"true\"]')?.textContent,trayUnchanged:beforeTray===document.querySelectorAll('.tray-item').length,returnFocus:document.activeElement===s}})()") as? [String: Any] ?? [:]
+        return trap.merging(collision) { _, right in right }
     }
     private func inspect() async throws -> [String: Any] { (try await host.evaluate("(()=>({heading:document.querySelector('#workspace-heading')?.textContent?.replace(/\\s+/g,' ').trim()??null,stage:document.querySelector('.stage-nav [aria-current=\"step\"]')?.textContent?.replace(/\\s+/g,' ').trim()??null,reviewState:document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label')??null,activeElement:document.activeElement?.id||document.activeElement?.tagName||null,durability:document.querySelector('.document-title > span:last-child')?.textContent?.trim()??null}))()")) as? [String: Any] ?? [:] }
     private func bool(_ expression: String) async throws -> Bool { (try await host.evaluate("Boolean(\(expression))")) as? Bool == true }

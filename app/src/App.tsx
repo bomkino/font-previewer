@@ -104,6 +104,10 @@ function editableTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
 }
 
+function interactiveTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && Boolean(target.closest("a, button, summary, [role='button'], [role='radio']"));
+}
+
 function statusLabel(session: StudySession, recoveryAvailable: boolean | undefined): string {
   if (session.revision === session.intentionallySavedRevision) return "Saved";
   if (session.revision > session.acknowledgedRevision) return "Saving recovery…";
@@ -134,6 +138,8 @@ export default function App() {
   const [newStudyPack, setNewStudyPack] = useState<RecipePack>("film-tv");
   const [titleDraft, setTitleDraft] = useState(session.document.title);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const newStudyDialogRef = useRef<HTMLElement>(null);
+  const newStudyReturnFocusRef = useRef<HTMLElement | null>(null);
   const index = useStudyIndex(session.document);
   const fontStates = useFontRegistry(session);
 
@@ -271,7 +277,11 @@ export default function App() {
     setNotice("New Study ready. Import Sources to begin.");
   }, []);
 
-  const newStudy = useCallback(() => setNewStudyOpen(true), []);
+  const closeNewStudy = useCallback(() => setNewStudyOpen(false), []);
+  const newStudy = useCallback(() => {
+    newStudyReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setNewStudyOpen(true);
+  }, []);
   const loadSample = useCallback(() => {
     historyDispatch({ type: "replace", session: createFixtureSession() });
     setShowWelcome(false);
@@ -358,6 +368,42 @@ export default function App() {
   }), [dispatch, host]);
 
   useEffect(() => {
+    if (!newStudyOpen) return;
+    const dialog = newStudyDialogRef.current;
+    const returnTarget = newStudyReturnFocusRef.current;
+    if (!dialog) return;
+    const focusableSelector = "button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex='-1'])";
+    const handleDialogKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeNewStudy();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = [...dialog.querySelectorAll<HTMLElement>(focusableSelector)].filter((element) => !element.hidden);
+      if (!focusable.length) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable.at(-1)!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleDialogKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleDialogKeyDown);
+      requestAnimationFrame(() => (returnTarget?.isConnected ? returnTarget : headingRef.current)?.focus());
+    };
+  }, [closeNewStudy, newStudyOpen]);
+
+  useEffect(() => {
     if (!launchReady || session.revision <= session.acknowledgedRevision) return;
     const timer = window.setTimeout(() => {
       void mirror(session).catch((cause) => {
@@ -381,7 +427,7 @@ export default function App() {
         historyDispatch({ type: event.shiftKey ? "redo" : "undo" });
         return;
       }
-      if (editableTarget(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (editableTarget(event.target) || interactiveTarget(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
       const candidateId = sessionRef.current.workspace.selectedCandidateId;
       if (["0", "1", "2", "3"].includes(event.key) && candidateId) {
         const reviewState = ({ "0": "unreviewed", "1": "keep", "2": "maybe", "3": "reject" } as const)[event.key as "0" | "1" | "2" | "3"];
@@ -442,11 +488,11 @@ export default function App() {
       {busyTask ? <div className="task-status" role="status"><span aria-hidden="true" />{busyTask}…</div> : null}
       {error ? <div className="error-banner" role="alert"><span>{error}</span><button type="button" aria-label="Dismiss error" onClick={() => setError("")}>×</button></div> : null}
       {newStudyOpen ? (
-        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setNewStudyOpen(false); }}>
-          <section className="new-study-dialog" role="dialog" aria-modal="true" aria-labelledby="new-study-heading">
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeNewStudy(); }}>
+          <section ref={newStudyDialogRef} className="new-study-dialog" role="dialog" aria-modal="true" aria-labelledby="new-study-heading" aria-describedby="new-study-description" tabIndex={-1}>
             <p className="section-kicker">New Study</p>
             <h2 id="new-study-heading">Choose the pressure first.</h2>
-            <p>Recipes shape the first review pass. They never lock the Study.</p>
+            <p id="new-study-description">Recipes shape the first review pass. They never lock the Study.</p>
             <label className="field-label"><span>Study title</span><input autoFocus value={newStudyTitle} onChange={(event) => setNewStudyTitle(event.target.value)} /></label>
             <fieldset className="recipe-pack-grid"><legend>Recipe pack</legend>{([
               ["film-tv", "Film / TV", "Titles, loglines, bios, captions, legal"],
@@ -455,7 +501,7 @@ export default function App() {
               ["blank", "Blank", "One neutral specimen; build from zero"],
             ] as const).map(([value, label, detail]) => <label key={value}><input type="radio" name="recipe-pack" value={value} checked={newStudyPack === value} onChange={() => setNewStudyPack(value)} /><span><strong>{label}</strong><small>{detail}</small></span></label>)}</fieldset>
             {session.revision > session.intentionallySavedRevision ? <p className="unsaved-warning">The current Study has intentionally unsaved changes. Its latest recovery remains available until this new Study is edited.</p> : null}
-            <div className="dialog-actions"><button type="button" className="quiet-button" onClick={() => setNewStudyOpen(false)}>Cancel</button><button type="button" className="primary-button" onClick={() => { startStudy(newStudyPack, newStudyTitle.trim() || undefined); setNewStudyOpen(false); }}>Create Study</button></div>
+            <div className="dialog-actions"><button type="button" className="quiet-button" onClick={closeNewStudy}>Cancel</button><button type="button" className="primary-button" onClick={() => { startStudy(newStudyPack, newStudyTitle.trim() || undefined); closeNewStudy(); }}>Create Study</button></div>
           </section>
         </div>
       ) : null}

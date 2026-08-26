@@ -158,6 +158,48 @@ async function semanticAudit(window: BrowserWindow): Promise<Record<string, unkn
   })()`, true));
 }
 
+async function keyboardAccessibilityAudit(window: BrowserWindow, sendMenuCommand: (command: MenuCommand) => void): Promise<Record<string, unknown>> {
+  await window.webContents.executeJavaScript(`(() => {
+    const trigger = document.querySelector('#import-fonts-button');
+    if (!(trigger instanceof HTMLButtonElement)) throw new Error('Missing modal return target');
+    trigger.focus();
+  })()`, true);
+  sendMenuCommand({ type: "new-study" });
+  await waitFor(window, "New Study dialog", `document.querySelector('.new-study-dialog') && document.activeElement?.closest('.new-study-dialog')`);
+  const trap = await window.webContents.executeJavaScript(`(() => {
+    const dialog = document.querySelector('.new-study-dialog');
+    if (!(dialog instanceof HTMLElement)) throw new Error('Missing New Study dialog');
+    const focusable = [...dialog.querySelectorAll("button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex='-1'])")];
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (!(first instanceof HTMLElement) || !(last instanceof HTMLElement)) throw new Error('Dialog has no focus path');
+    last.focus();
+    last.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+    const forwardWrap = document.activeElement === first;
+    first.focus();
+    first.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }));
+    return { forwardWrap, backwardWrap: document.activeElement === last };
+  })()`, true) as Record<string, unknown>;
+  await window.webContents.executeJavaScript(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`, true);
+  await waitFor(window, "New Study close", `!document.querySelector('.new-study-dialog') && document.activeElement?.id === 'import-fonts-button'`);
+  const collision = await window.webContents.executeJavaScript(`(async () => {
+    const stage = document.querySelector('.stage-nav [aria-current="step"]');
+    if (!(stage instanceof HTMLButtonElement)) throw new Error('Missing active stage');
+    const beforeCandidate = document.querySelector('.candidate-row[aria-current="true"]')?.textContent;
+    const beforeTray = document.querySelectorAll('.tray-item').length;
+    stage.focus();
+    stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    stage.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true, cancelable: true }));
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    return {
+      candidateUnchanged: beforeCandidate === document.querySelector('.candidate-row[aria-current="true"]')?.textContent,
+      trayUnchanged: beforeTray === document.querySelectorAll('.tray-item').length,
+      returnFocus: document.activeElement === stage,
+    };
+  })()`, true) as Record<string, unknown>;
+  return { ...trap, ...collision };
+}
+
 async function securityAudit(window: BrowserWindow): Promise<Record<string, unknown>> {
   return withTimeout("security audit", window.webContents.executeJavaScript(`(async () => {
     const invalid = [
@@ -214,6 +256,7 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   };
 
   await capture(options.window, join(output, "01-review.png"));
+  trace.keyboardAccessibility = await keyboardAccessibilityAudit(options.window, options.sendMenuCommand);
   options.sendMenuCommand({ type: "mark-keep" });
   await waitFor(options.window, "native Keep command", `document.querySelector('.candidate-row[aria-current="true"] .review-glyph')?.getAttribute('aria-label') === 'Keep'`);
   trace.afterNativeKeep = await inspectWorkspace(options.window);
@@ -277,8 +320,10 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
 
   const audit = trace.semanticAudit as { unnamed?: unknown[]; duplicateIds?: unknown[] };
   const security = trace.securityAudit as { invalidRequests?: number; rejected?: number; nodeUnavailable?: boolean };
+  const keyboard = trace.keyboardAccessibility as Record<string, boolean>;
   if (audit.unnamed?.length || audit.duplicateIds?.length) throw new Error("Semantic accessibility audit failed.");
   if (security.invalidRequests !== security.rejected || !security.nodeUnavailable) throw new Error("Host security audit failed.");
+  if (!keyboard.forwardWrap || !keyboard.backwardWrap || !keyboard.candidateUnchanged || !keyboard.trayUnchanged || !keyboard.returnFocus) throw new Error("Keyboard accessibility audit failed.");
   if (afterReload.activeElement !== "workspace-heading" || afterReload.reviewState !== "Keep") throw new Error("Reload recovery or focus restoration failed.");
   await checksumEvidence(output);
 }
