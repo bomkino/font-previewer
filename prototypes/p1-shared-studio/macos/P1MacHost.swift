@@ -8,6 +8,8 @@ import WebKit
 private let hostBridgeWorldName = "FontPreviewerHostBridge"
 private let hostBridgeWorld = WKContentWorld.world(name: hostBridgeWorldName)
 private let hostBridgeHandlerName = "fontPreviewerHost"
+private let studioScheme = "font-previewer"
+private let studioHost = "studio"
 
 private let isolatedBridgeSource = #"""
 (() => {
@@ -136,6 +138,94 @@ private enum P1MacHostError: LocalizedError {
     }
 }
 
+private final class LocalStudioSchemeHandler: NSObject, WKURLSchemeHandler {
+    private let rootURL: URL
+    private let maximumResourceBytes = 2 * 1024 * 1024
+
+    init(rootURL: URL) {
+        self.rootURL = rootURL.resolvingSymlinksInPath().standardizedFileURL
+    }
+
+    func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
+        guard let requestURL = urlSchemeTask.request.url,
+              requestURL.scheme == studioScheme,
+              requestURL.host == studioHost,
+              requestURL.user == nil,
+              requestURL.password == nil,
+              requestURL.port == nil,
+              requestURL.query == nil,
+              let decodedPath = requestURL.path.removingPercentEncoding
+        else {
+            reject(urlSchemeTask, code: .badURL)
+            return
+        }
+
+        let relativePath = decodedPath == "/" ? "index.html" : String(decodedPath.drop(while: { $0 == "/" }))
+        guard !relativePath.isEmpty,
+              !relativePath.split(separator: "/").contains("..")
+        else {
+            reject(urlSchemeTask, code: .noPermissionsToReadFile)
+            return
+        }
+
+        let fileURL = rootURL.appendingPathComponent(relativePath).resolvingSymlinksInPath().standardizedFileURL
+        guard fileURL.path.hasPrefix(rootURL.path + "/"),
+              let values = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+              values.isRegularFile == true,
+              let size = values.fileSize,
+              size >= 0,
+              size <= maximumResourceBytes,
+              let data = try? Data(contentsOf: fileURL, options: [.mappedIfSafe])
+        else {
+            reject(urlSchemeTask, code: .fileReadNoSuchFile)
+            return
+        }
+
+        let response = URLResponse(
+            url: requestURL,
+            mimeType: mimeType(for: fileURL.pathExtension),
+            expectedContentLength: data.count,
+            textEncodingName: textEncoding(for: fileURL.pathExtension)
+        )
+        urlSchemeTask.didReceive(response)
+        urlSchemeTask.didReceive(data)
+        urlSchemeTask.didFinish()
+        if ProcessInfo.processInfo.environment["P1_MAC_EVIDENCE_DIR"] != nil {
+            fputs("[p1 mac scheme] served \(relativePath) (\(data.count) bytes)\n", stderr)
+        }
+    }
+
+    func webView(_ webView: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {}
+
+    private func reject(_ task: WKURLSchemeTask, code: URLError.Code) {
+        if ProcessInfo.processInfo.environment["P1_MAC_EVIDENCE_DIR"] != nil {
+            fputs("[p1 mac scheme] rejected \(task.request.url?.absoluteString ?? "missing URL")\n", stderr)
+        }
+        task.didFailWithError(URLError(code))
+    }
+
+    private func mimeType(for pathExtension: String) -> String {
+        switch pathExtension.lowercased() {
+        case "html": return "text/html"
+        case "js", "mjs": return "text/javascript"
+        case "css": return "text/css"
+        case "json", "map": return "application/json"
+        case "png": return "image/png"
+        case "svg": return "image/svg+xml"
+        case "woff": return "font/woff"
+        case "woff2": return "font/woff2"
+        default: return "application/octet-stream"
+        }
+    }
+
+    private func textEncoding(for pathExtension: String) -> String? {
+        switch pathExtension.lowercased() {
+        case "html", "js", "mjs", "css", "json", "map", "svg": return "utf-8"
+        default: return nil
+        }
+    }
+}
+
 @main
 private struct P1MacHostMain {
     @MainActor
@@ -166,6 +256,7 @@ private final class P1MacHostDelegate: NSObject, NSApplicationDelegate, NSWindow
 
     private var window: NSWindow!
     private var studioRootURL: URL!
+    private var studioSchemeHandler: LocalStudioSchemeHandler!
     private var evidenceRunner: MacEvidenceRunner?
     private var evidenceStarted = false
     private var sourceBindings: [String: URL] = [:]
@@ -217,6 +308,8 @@ private final class P1MacHostDelegate: NSObject, NSApplicationDelegate, NSWindow
         configuration.websiteDataStore = .nonPersistent()
         configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+        studioSchemeHandler = LocalStudioSchemeHandler(rootURL: studioRootURL)
+        configuration.setURLSchemeHandler(studioSchemeHandler, forURLScheme: studioScheme)
 
         webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = self
@@ -249,7 +342,10 @@ private final class P1MacHostDelegate: NSObject, NSApplicationDelegate, NSWindow
         window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        webView.loadFileURL(index, allowingReadAccessTo: studioRootURL)
+        guard let studioURL = URL(string: "\(studioScheme)://\(studioHost)/index.html") else {
+            throw P1MacHostError.missingStudio
+        }
+        webView.load(URLRequest(url: studioURL))
     }
 
     private func configureMenu() {
@@ -499,10 +595,7 @@ private final class P1MacHostDelegate: NSObject, NSApplicationDelegate, NSWindow
     }
 
     private func isAllowedLocalURL(_ url: URL) -> Bool {
-        guard url.isFileURL else { return false }
-        let candidate = url.resolvingSymlinksInPath().standardizedFileURL.path
-        let root = studioRootURL.path
-        return candidate == root || candidate.hasPrefix(root + "/")
+        url.scheme == studioScheme && url.host == studioHost && url.user == nil && url.password == nil && url.port == nil
     }
 
     func webView(
@@ -796,7 +889,8 @@ private final class MacEvidenceRunner {
             "reloadItemPresent": host.reloadMenuItem != nil,
         ]
         trace["security"] = [
-            "bundledLocalContentOnly": host.webView.url?.isFileURL == true,
+            "bundledLocalContentOnly": host.webView.url?.scheme == studioScheme && host.webView.url?.host == studioHost,
+            "readOnlyCustomScheme": "\(studioScheme)://\(studioHost)",
             "persistentWebsiteData": false,
             "namedContentWorld": hostBridgeWorldName,
             "rejectedBridgeRequests": host.rejectedRequestCount,
