@@ -7,7 +7,15 @@ on:
       - prototype/p1-full-shared-studio
     paths:
       - ".github/workflows/p1-linux-evidence.yml"
-      - "prototypes/p1-shared-studio/**"
+      - "prototypes/p1-shared-studio/electron/**"
+      - "prototypes/p1-shared-studio/scripts/**"
+      - "prototypes/p1-shared-studio/src/**"
+      - "prototypes/p1-shared-studio/tests/**"
+      - "prototypes/p1-shared-studio/index.html"
+      - "prototypes/p1-shared-studio/package.json"
+      - "prototypes/p1-shared-studio/package-lock.json"
+      - "prototypes/p1-shared-studio/tsconfig*.json"
+      - "prototypes/p1-shared-studio/vite*.ts"
 
 permissions:
   contents: read

@@ -12,7 +12,7 @@ The product journey is **Review → Compare → System → Handoff**. It imports
 
 Current milestone: **R0 — evidence and architecture decisions**.
 
-No release is ready. The preserved macOS reference is useful evidence, but it does not yet implement the two-client product model and its current baseline CI is red. Production work remains blocked until the required R0 decisions and Contract Freeze A are complete.
+No release is ready. The preserved macOS reference now passes its tests, native smoke run, packaging, re-extraction, property-list, and ad-hoc signature checks in macOS CI. The isolated Variant A branch also passes its automated displayed-Linux Electron evidence flow. Neither result completes the two-client product model: D01 remains open for native-control use, assistive-technology traversal, and a Mac shared-Studio experiment, and production work remains blocked until the required R0 decisions and Contract Freeze A are complete.
 
 Start here:
 
@@ -25,7 +25,7 @@ Start here:
 Current prototype:
 
 - [`prototypes/p1-shared-studio/README.md`](prototypes/p1-shared-studio/README.md) — Variant A implementation for D01 workspace ownership
-- [`prototypes/p1-shared-studio/REPORT.md`](prototypes/p1-shared-studio/REPORT.md) — evidence, failed gates, and next experiment
+- [`prototypes/p1-shared-studio/REPORT.md`](prototypes/p1-shared-studio/REPORT.md) — verified evidence, remaining limits, and next experiment
 
 ## Preserved reference
 

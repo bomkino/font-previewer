@@ -4,6 +4,8 @@
 **Date:** 2026-08-26  
 **Public seam:** repository evidence
 
+> **Post-reconciliation update — 2026-08-27:** the standalone public repository now exists at `bomkino/font-previewer`. macOS Actions run `33008885071` repairs and verifies the preserved reference build, tests, smoke executable, package, re-extraction, property list, ad-hoc signature, and artifacts. Linux Actions run `33010127784` verifies the isolated P1 shared-Studio prototype under Electron, Xvfb, and D-Bus. The capability table below records the D00 environment at reconciliation time; current truth lives in `STATUS.md` and the P1 report.
+
 ## 1. Baseline
 
 ```text
@@ -18,7 +20,7 @@ The standalone repository was created by filtering `tools/font-previewer` histor
 
 The extraction preserves 27 Font Previewer commits, including the browser experiments and the native rewrite. It is materially better than a snapshot copy because decisions and hot spots remain inspectable.
 
-## 2. Capability check
+## 2. Capability check at reconciliation
 
 | Capability | Result | Evidence / limit |
 |---|---|---|
@@ -26,7 +28,7 @@ The extraction preserves 27 Font Previewer commits, including the browser experi
 | Create local branches, commits, and artifacts | Yes | standalone repository on `codex/d00-reconciliation` |
 | Read GitHub CI, jobs, and logs | Yes | run `32954024459`, job `98131604888` |
 | Write existing connected repositories | Technically exposed | not used; source repository must remain untouched during spin-out |
-| Create a new GitHub repository through connector | No exposed operation | standalone Git history prepared locally; visibility and publication remain owner gates |
+| Create a new GitHub repository through connector | No exposed operation at D00 | standalone Git history was prepared locally; the owner later created and authorized the public destination |
 | Run macOS builds/tests | No | workspace is Linux x86_64; no macOS runtime or Swift toolchain |
 | Run current portable Swift tests locally | No | `swift: command not found` |
 | Run Linux/Studio JavaScript work | Yes | Node.js 24.19.0, npm 11.9.0, pnpm 11.19.0 |

@@ -7,9 +7,9 @@
 - reference SHA: `be77221cb7cb809fdf119945f3fee3d2e1e72ed6`
 - standalone extracted SHA: `f89cde8c3e6e347e29829e5bcd7ee59160d7b3ad`
 - working branch: `prototype/p1-full-shared-studio`
-- latest verified shared SHA: none
-- latest verified Mac SHA: none; baseline CI is red
-- latest verified Linux SHA: none; P1 Electron shell compiles, but no desktop runtime evidence exists
+- latest verified shared-runtime SHA: `0623d98c3f9895be30c596dd7dcc988b73dce7bf`
+- latest verified Mac SHA: `d0d3cf9a4b1e6839021f562c6ec88e99f8f0b302`
+- latest verified Linux run: `33010127784`; displayed Electron evidence is green
 
 ## Current milestone
 
@@ -18,7 +18,7 @@ R0 — evidence and architecture decisions.
 ## Current frontier
 
 - D00 / P0 reconciliation: complete at `c707590`.
-- D01 / P1 workspace ownership: Variant A implemented on an isolated prototype branch; decision evidence remains incomplete.
+- D01 / P1 workspace ownership: Variant A passes automated displayed-Linux evidence; Mac shared-Studio and assistive-technology evidence remain incomplete.
 - D02 / P2 rendering research may proceed independently, but no renderer decision is accepted.
 
 ## Claimed work
@@ -26,7 +26,8 @@ R0 — evidence and architecture decisions.
 - Primary agent claims D01 / P1 on `prototype/p1-full-shared-studio`.
 - Scope: Variant A, a full shared Studio, using the canonical 24-Candidate fixture and a narrow Electron HostBridge.
 - Implemented evidence: explicit Source/Binding/Face/Candidate/Font Use model, semantic command tests, recovery validation, runtime-validated bridge, secure Electron shell, native menu/dialog routes, four-stage Studio, and dependency SBOM.
-- Decision remains open until Mac/WKWebView, displayed Linux/Electron, native menu/dialog, reload, focus, input-latency, and VoiceOver/Orca evidence are recorded.
+- Linux automation now records native menu structure, semantic commands, undo, Compare/System/Handoff composition, bridge and input latency, actual reload recovery, focus restoration, screenshots, and the Chromium accessibility tree.
+- Decision remains open until actual native menu/dialog use, interactive Orca, Mac/WKWebView, and VoiceOver evidence are recorded.
 
 ## Open decisions
 
@@ -62,40 +63,43 @@ R0 — evidence and architecture decisions.
 - `evidence/D00/2026-08-26/fixture-manifest.json`
 - `evidence/D00/2026-08-26/reference-output-index.json`
 - `evidence/D00/2026-08-26/repository-inventory.json`
-- GitHub Actions run `32954024459`: failed at Swift compilation for reference SHA.
+- GitHub Actions run `33008885071`: Mac reference tests, smoke, packaging, re-extraction, plist, signature, and artifacts pass.
+- GitHub Actions run `33010127784`: P1 Linux typecheck, 10 tests, builds, displayed Electron task flow, recovery, accessibility tree, and artifact upload pass.
 - Source equivalence check: extracted `macos/` tree matches the reference subtree.
 - `prototypes/p1-shared-studio/REPORT.md`
 - `evidence/P1/2026-08-27/environment.json`
 - `evidence/P1/2026-08-27/verification.json`
-- `.github/workflows/p1-linux-evidence.yml` is SHA-pinned and ready for manual dispatch after repository creation; it has not run.
+- `evidence/P1/2026-08-27/linux-electron-run-33010127784/` preserves five screenshots, the 608-node accessibility tree, structured trace, metadata, and checksums.
 - 10 public-seam/domain/protocol tests pass; renderer and Electron TypeScript builds pass.
 - CycloneDX 1.6 SBOM contains 81 resolved components; npm audit reports zero known vulnerabilities.
 
 ## Risks changed
 
-- Increased: reference branch was described as working, but current reference SHA does not compile in macOS CI.
-- Increased: no committed redistributable font corpus, Study file, screenshot, or successful output artifact exists at the reference SHA.
+- Reduced: reference Swift 6 compile failures are repaired; Mac CI now produces verified app and smoke artifacts.
+- Reduced: displayed Linux evidence now covers composition, latency, undo, reload, focus, and accessibility semantics.
 - Clarified: current schema collapses Source, Face, Candidate, and Font Use and defaults imports to Maybe.
 - Clarified: current autosave writes the intentional document; it is not crash recovery.
 - Reduced: standalone history extraction preserves the reference implementation without changing the source repository.
 - Reduced: P1 does not repeat the reference domain collapse; Font Use and Source Binding are explicit and separately validated.
 - Reduced: Electron renderer has no Node access, uses context isolation and sandboxing, and receives no source path.
-- Increased: P1 cannot reach a displayed Linux session, D-Bus, Orca, macOS, or WKWebView in this workspace; full-Studio acceptance is therefore unproven.
+- Increased: the first Linux evidence run exposed an Electron ESM ready deadlock; fixed without weakening the product sandbox.
+- Increased then reduced: reload initially lost keyboard focus; the final run hard-asserts restored workspace focus.
+- Remaining: interactive Orca, actual OS menu/dialog use, WKWebView, Mac shared-Studio quality, and VoiceOver remain unproven.
 - Clarified: renderer `localStorage` is a prototype reload checkpoint, not the accepted D03 recovery architecture.
 
 ## Packages
 
-- Mac: none verified at the reference SHA.
-- Linux: P1 shell compiles with Electron `44.0.0`; package launch reaches the main process but desktop readiness is blocked by the environment.
+- Mac: verified ad-hoc app ZIP and native smoke artifacts from run `33008885071`; this is CI evidence, not a public release.
+- Linux: Electron `44.0.0` P1 evidence build verified under Ubuntu 24.04, Xvfb, and isolated D-Bus; this is a prototype, not a package candidate.
 
 ## Owner gates
 
-- New GitHub repository visibility remains unselected.
+- Standalone repository is public at `bomkino/font-previewer`.
 - No merge, public release, deployment, signing identity use, or source-font delivery authorized.
-- Repository creation is not exposed by the connected GitHub API surface; local standalone history is prepared first.
+- P1 remains isolated on `prototype/p1-full-shared-studio`; no D01 ADR has been accepted.
 
 ## Latest update
 
 - date: 2026-08-27
 - author: primary agent
-- summary: P1 Variant A is green at type, domain, protocol, SSR surface, build, dependency, and static security gates. D01 stays open because native runtime, screen-reader, focus, reload, and Mac quality gates could not be exercised here.
+- summary: standalone repository is live; Mac reference CI and automated displayed-Linux P1 evidence are green. Variant A survives Linux focus, recovery, latency, visual, and semantic-accessibility gates. D01 stays open for actual native controls, Orca, WKWebView, macOS quality, and VoiceOver.

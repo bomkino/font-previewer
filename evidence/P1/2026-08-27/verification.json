@@ -1,8 +1,11 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "verified_at": "2026-08-27",
+  "repository": "bomkino/font-previewer",
   "branch": "prototype/p1-full-shared-studio",
   "base_sha": "c707590",
+  "local_verified_sha": "9351d2a",
+  "remote_verified_sha": "0623d98c3f9895be30c596dd7dcc988b73dce7bf",
   "results": {
     "renderer_typecheck": "pass",
     "electron_typecheck": "pass",
@@ -10,21 +13,22 @@
       "status": "pass",
       "passed": 10,
       "failed": 0,
-      "duration_ms": 115.851754
+      "ci_duration_ms": 133.10108
     },
     "renderer_build": {
       "status": "pass",
-      "duration_ms": 385,
       "html_bytes": 720,
       "css_bytes": 15312,
-      "javascript_bytes": 219006
+      "javascript_bytes": 219059,
+      "javascript_gzip_kb": 67.59
     },
     "sandboxed_preload_build": {
       "status": "pass",
-      "duration_ms": 17,
       "commonjs_bytes": 2629,
       "residual_esm_import": false,
-      "external_modules": ["electron"]
+      "external_modules": [
+        "electron"
+      ]
     },
     "sbom": {
       "status": "pass",
@@ -46,12 +50,79 @@
       "deliberate_hold": {
         "package": "@types/node",
         "installed": "24.13.3",
-        "latest": "26.3.0",
+        "latest_at_review": "26.3.0",
         "reason": "Align type declarations with the Node 24 runtime."
       }
     },
     "git_diff_check": "pass"
   },
-  "native_runtime_evidence": "blocked; see environment.json",
-  "decision": "D01 remains open"
+  "linux_native_runtime": {
+    "status": "pass",
+    "workflow_run_id": 33010127784,
+    "workflow_job_id": 98313927154,
+    "artifact_id": 9622173630,
+    "artifact_digest": "sha256:86af413d98ccf3c0fa420d259947909c0c4bc16df25bf31664f87e7d0878248c",
+    "environment": {
+      "runner": "ubuntu-24.04",
+      "architecture": "x64",
+      "node": "24.18.1",
+      "electron": "44.0.0",
+      "chrome": "152.0.7977.54",
+      "display": "Xvfb",
+      "dbus": "isolated session"
+    },
+    "screenshots": 5,
+    "native_menu": {
+      "installed": true,
+      "undo_role_present": true,
+      "import_item_present": true,
+      "semantic_keep_item_present": true
+    },
+    "bridge_round_trip_ms": {
+      "samples": 40,
+      "minimum": 0.1,
+      "median": 0.2,
+      "p95": 0.3,
+      "maximum": 1.0
+    },
+    "input_to_frame_ms": {
+      "samples": 20,
+      "minimum": 3.3,
+      "median": 16.6,
+      "p95": 17.3,
+      "maximum": 17.5
+    },
+    "edit_then_native_undo": "pass",
+    "reload_recovery": {
+      "status": "pass",
+      "duration_ms": 217.722,
+      "stage_preserved": true,
+      "revision_preserved": true,
+      "workspace_focus_restored": true
+    },
+    "accessibility_tree": {
+      "status": "pass-with-limit",
+      "nodes": 608,
+      "unnamed_interactive_nodes": 0,
+      "named_navigation": "Study stages",
+      "named_main": "Handoff readiness",
+      "named_complementary_regions": 2,
+      "limit": "Chromium accessibility tree captured; no interactive Orca or VoiceOver traversal."
+    }
+  },
+  "mac_reference": {
+    "status": "pass",
+    "remote_verified_sha": "d0d3cf9a4b1e6839021f562c6ec88e99f8f0b302",
+    "workflow_run_id": 33008885071,
+    "app_artifact_digest": "sha256:70df77891d6152c82f829b4da27ad82c80d69d14ec4804e59f075fae43f0aff3",
+    "smoke_artifact_digest": "sha256:2a945d0087c59c728c6986763feca24636b11bdee6404a05724ba787916ced24"
+  },
+  "remaining_limits": [
+    "Linux evidence used an automated Xvfb session, not an attended product-quality review.",
+    "The actual native Import dialog and OS menu were not clicked by a human; their routes and menu items were inspected and semantic commands were exercised.",
+    "No interactive Orca traversal has run.",
+    "No WKWebView Host, macOS shared-Studio visual review, or VoiceOver traversal exists.",
+    "Fixture font names are architectural test data; P1 does not prove cross-engine typography fidelity."
+  ],
+  "decision": "D01 remains open; Linux evidence supports Variant A, while Mac shared-Studio and assistive-technology vetoes remain untested."
 }

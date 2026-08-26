@@ -1,0 +1,120 @@
+{
+  "generatedAt": "2026-08-26T20:23:43.058Z",
+  "platform": "linux",
+  "architecture": "x64",
+  "versions": {
+    "node": "24.18.1",
+    "acorn": "8.16.0",
+    "ada": "3.4.4",
+    "amaro": "1.1.9",
+    "ares": "1.34.6",
+    "brotli": "1.2.0",
+    "cldr": "48.0",
+    "icu": "78.2",
+    "llhttp": "9.4.3",
+    "merve": "1.2.2",
+    "modules": "149",
+    "napi": "10",
+    "nbytes": "0.1.4",
+    "ncrypto": "0.0.1",
+    "nghttp2": "1.69.0",
+    "nghttp3": "",
+    "ngtcp2": "",
+    "openssl": "0.0.0",
+    "simdjson": "4.6.4",
+    "simdutf": "7.7.0",
+    "sqlite": "3.53.1",
+    "tz": "2025c",
+    "undici": "7.29.0",
+    "unicode": "17.0",
+    "uv": "1.52.1",
+    "uvwasi": "0.0.23",
+    "v8": "15.2.124.13-electron.0",
+    "zlib": "1.3.2.1-motley",
+    "zstd": "1.6.0",
+    "electron": "44.0.0",
+    "chrome": "152.0.7977.54"
+  },
+  "initial": {
+    "heading": "Form follows attention.",
+    "selected": "○Aperture SansLight · Variable instance",
+    "revision": "revision 0",
+    "reviewState": "○ unreviewed",
+    "activeElement": "BODY",
+    "stage": "01 Review",
+    "storedBytes": 6067
+  },
+  "nativeMenu": {
+    "installed": true,
+    "undoRolePresent": true,
+    "importItemPresent": true,
+    "semanticKeepItemPresent": true
+  },
+  "afterNativeMenuCommand": {
+    "heading": "Form follows attention.",
+    "selected": "+Aperture SansLight · Variable instance",
+    "revision": "revision 1",
+    "reviewState": "+ keep",
+    "activeElement": "BODY",
+    "stage": "01 Review",
+    "storedBytes": 6061
+  },
+  "bridgeRoundTrip": {
+    "samples": 40,
+    "minimumMs": 0.1,
+    "medianMs": 0.2,
+    "p95Ms": 0.3,
+    "maximumMs": 1
+  },
+  "inputToFrame": {
+    "samples": 20,
+    "minimumMs": 3.3,
+    "medianMs": 16.6,
+    "p95Ms": 17.3,
+    "maximumMs": 17.5
+  },
+  "editAndUndo": {
+    "before": "Form follows attention.",
+    "afterInsert": "Form follows attention. undo-probe",
+    "afterUndo": "Form follows attention."
+  },
+  "compare": {
+    "heading": "Compare set",
+    "selected": "+Aperture SansLight · Variable instanceDisplay",
+    "revision": "revision 27",
+    "reviewState": null,
+    "activeElement": "workspace-heading",
+    "stage": "02 Compare",
+    "storedBytes": 6253
+  },
+  "focusAfterStageChange": {
+    "heading": "Type system",
+    "selected": "+Aperture SansLight · Variable instanceDisplay",
+    "revision": "revision 28",
+    "reviewState": null,
+    "activeElement": "workspace-heading",
+    "stage": "03 System",
+    "storedBytes": 6252
+  },
+  "reload": {
+    "durationMs": 217.722,
+    "before": {
+      "heading": "Handoff readiness",
+      "selected": "+Aperture SansLight · Variable instanceDisplay",
+      "revision": "revision 29",
+      "reviewState": null,
+      "activeElement": "workspace-heading",
+      "stage": "04 Handoff",
+      "storedBytes": 6253
+    },
+    "after": {
+      "heading": "Handoff readiness",
+      "selected": "+Aperture SansLight · Variable instanceDisplay",
+      "revision": "revision 29",
+      "reviewState": null,
+      "activeElement": "workspace-heading",
+      "stage": "04 Handoff",
+      "storedBytes": 6253
+    }
+  }
+}
