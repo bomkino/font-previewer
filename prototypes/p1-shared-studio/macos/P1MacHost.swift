@@ -374,6 +374,13 @@ private final class P1MacHostDelegate: NSObject, NSApplicationDelegate, NSWindow
         }
     }
 
+    func performMenuItem(_ item: NSMenuItem) {
+        guard let menu = item.menu else { return }
+        let index = menu.index(of: item)
+        guard index >= 0 else { return }
+        menu.performActionForItem(at: index)
+    }
+
     private func performNativeUndo() {
         window.makeFirstResponder(webView)
         if webView.undoManager?.canUndo == true {
@@ -590,14 +597,14 @@ private final class MacEvidenceRunner {
 
         try await snapshot("01-review.png")
 
-        host.keepMenuItem.performClick(nil)
+        host.performMenuItem(host.keepMenuItem)
         try await waitFor("native Keep menu command") {
             #"return document.querySelector('.state-pill')?.textContent?.toLowerCase().includes('keep') ?? false;"#
         }
         trace["afterNativeMenuCommand"] = try await inspectWorkspace()
 
         _ = try await callPage(#"const button = document.querySelector('#import-fonts-button'); if (!button) return false; button.focus(); return document.activeElement === button;"#)
-        host.importMenuItem.performClick(nil)
+        host.performMenuItem(host.importMenuItem)
         try await waitFor("native import panel completion") { [unowned self] in
             self.host.panelOpenedCount > 0 && self.host.panelCancelledCount > 0
         }
@@ -690,17 +697,18 @@ private final class MacEvidenceRunner {
         """#) as? String
         try await settle(100)
         let editAfterInsert = try await callPage(#"return document.querySelector('#specimen-copy-editor')?.value ?? null;"#) as? String
-        host.undoMenuItem.performClick(nil)
+        host.performMenuItem(host.undoMenuItem)
         try await settle(120)
         let editAfterUndo = try await callPage(#"return document.querySelector('#specimen-copy-editor')?.value ?? null;"#) as? String
         guard let editBefore, editAfterInsert != editBefore, editAfterUndo == editBefore else {
             throw P1MacHostError.invalidJavaScriptResult("native undo")
         }
-        trace["editAndUndo"] = [
+        let editAndUndo: [String: Any] = [
             "before": editBefore,
             "afterInsert": editAfterInsert ?? NSNull(),
             "afterUndo": editAfterUndo ?? NSNull(),
         ]
+        trace["editAndUndo"] = editAndUndo
 
         _ = try await callPage(#"""
         const select = [...document.querySelectorAll('.field-label select')].at(-1);
@@ -727,7 +735,7 @@ private final class MacEvidenceRunner {
 
         let beforeReload = try await inspectWorkspace()
         let reloadStarted = ProcessInfo.processInfo.systemUptime
-        host.reloadMenuItem.performClick(nil)
+        host.performMenuItem(host.reloadMenuItem)
         try await waitFor("Studio reload") {
             #"return Boolean(window.fontPreviewerHost && document.querySelector('#workspace-heading') && document.activeElement?.id === 'workspace-heading');"#
         }

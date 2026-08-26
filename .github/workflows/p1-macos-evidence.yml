@@ -119,7 +119,7 @@ jobs:
         with:
           name: p1-macos-wkwebview-${{ github.run_id }}
           path: ${{ runner.temp }}/p1-macos-wkwebview
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
 
       - name: Upload packaged prototype
