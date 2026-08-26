@@ -206,25 +206,26 @@ async function createWindow(): Promise<BrowserWindow> {
 
 ipcMain.handle("host:request", handleHostRequest);
 
-await app.whenReady();
-if (evidenceDirectory) console.error("[p1 evidence] Electron ready");
-session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
-session.defaultSession.setPermissionCheckHandler(() => false);
-Menu.setApplicationMenu(buildMenu());
-const firstWindow = await createWindow();
-if (evidenceDirectory) {
-  try {
+// Electron's ESM loader can deadlock when app.whenReady() is awaited at module top level.
+// Keep lifecycle startup on the promise continuation so the first event-loop tick can finish.
+void app.whenReady().then(async () => {
+  if (evidenceDirectory) console.error("[p1 evidence] Electron ready");
+  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
+  session.defaultSession.setPermissionCheckHandler(() => false);
+  Menu.setApplicationMenu(buildMenu());
+  const firstWindow = await createWindow();
+  if (evidenceDirectory) {
     await runEvidenceFlow({
       window: firstWindow,
       outputDirectory: evidenceDirectory,
       sendMenuCommand,
     });
     app.exit(0);
-  } catch (error) {
-    console.error(error);
-    app.exit(1);
   }
-}
+}).catch((error: unknown) => {
+  console.error(error);
+  app.exit(1);
+});
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) void createWindow();
