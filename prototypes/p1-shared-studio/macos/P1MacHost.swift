@@ -852,12 +852,29 @@ private final class MacEvidenceRunner {
         const name = (element) => {
           const labelledBy = element.getAttribute('aria-labelledby');
           if (labelledBy) return labelledBy.split(/\s+/).map((id) => document.getElementById(id)?.textContent ?? '').join(' ').trim();
-          return (element.getAttribute('aria-label') || element.textContent || element.getAttribute('title') || '').trim();
+          const implicitLabels = 'labels' in element && element.labels
+            ? [...element.labels].map((label) => label.textContent ?? '').join(' ').trim()
+            : '';
+          return (
+            element.getAttribute('aria-label') ||
+            implicitLabels ||
+            element.textContent ||
+            element.getAttribute('title') ||
+            element.getAttribute('placeholder') ||
+            element.getAttribute('alt') ||
+            ''
+          ).trim();
         };
-        const unnamed = controls.filter((element) => !name(element)).length;
+        const unnamed = controls.filter((element) => !name(element));
         return JSON.stringify({
           interactiveElements: controls.length,
-          unnamedInteractiveElements: unnamed,
+          unnamedInteractiveElements: unnamed.length,
+          unnamedDetails: unnamed.map((element) => ({
+            tag: element.tagName,
+            id: element.id || null,
+            className: element.className || null,
+            type: element.getAttribute('type'),
+          })),
           landmarks: {
             banner: document.querySelectorAll('header').length,
             navigation: document.querySelectorAll('nav').length,
