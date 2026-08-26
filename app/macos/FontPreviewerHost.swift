@@ -220,7 +220,7 @@ private struct FontPreviewerHostMain {
 }
 
 @MainActor
-private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, @preconcurrency WKNavigationDelegate, @preconcurrency WKUIDelegate, @preconcurrency WKScriptMessageHandlerWithReply {
+private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandlerWithReply {
     fileprivate var webView: WKWebView!
     fileprivate var window: NSWindow!
     fileprivate var panelOpened = 0
@@ -431,29 +431,31 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
 
     private func validJSON(_ value: Any, maximum: Int) -> Bool { (try? JSONSerialization.data(withJSONObject: value)).map { $0.count <= maximum } ?? false }
 
-    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {
-        guard message.name == bridgeHandlerName, message.frameInfo.isMainFrame, message.world.name == bridgeWorldName, let request = parseRequest(message.body) else { rejectedRequests += 1; replyHandler(nil, HostError.invalidRequest.localizedDescription); return }
-        switch request {
-        case .getLaunchState: replyHandler(launchState(), nil)
-        case .openImport: presentImport(replyHandler)
-        case .scanInstalled(let query, let cursor, let limit, let refresh): replyHandler(catalogResult(query: query, cursor: cursor, limit: limit, refresh: refresh), nil)
-        case .openStudy: presentOpenStudy(replyHandler)
-        case .mirrorStudy(let document, let workspace, let revision):
-            guard mirroredDocument?["id"] as? String != document["id"] as? String || revision >= mirroredRevision else { replyHandler(nil, "Rejected stale recovery revision."); return }
-            let promotedCatalogBindings = promoteCatalogBindings(document)
-            if mirroredDocument?["id"] as? String != document["id"] as? String { intentionallySavedRevision = 0 }
-            mirroredDocument = document; mirroredWorkspace = workspace; mirroredRevision = revision
-            do { if promotedCatalogBindings { try persistLocalState() }; try persistRecovery(); replyHandler(["type": "mirror-ack", "revision": revision, "recoveryPersisted": true], nil) }
-            catch { replyHandler(nil, error.localizedDescription) }
-        case .saveStudy(let document, let revision, let saveAs): presentSave(document, revision, saveAs, replyHandler)
-        case .exportHandoff(let document, let revision, let preferences, let permission): presentExport(document, revision, preferences, permission, replyHandler)
-        case .relinkSource(let id): presentRelink(id, replyHandler)
-        case .revealSource(let id):
-            guard let url = sourceBindings[id] else { replyHandler(nil, "Source is not locally bound."); return }
-            NSWorkspace.shared.activateFileViewerSelecting([url]); replyHandler(["type": "ack", "action": "reveal-source"], nil)
-        case .nativeUndo: window.makeFirstResponder(webView); if webView.undoManager?.canUndo == true { webView.undoManager?.undo() }; replyHandler(["type": "ack", "action": "native-undo"], nil)
-        case .reloadStudio: replyHandler(["type": "ack", "action": "reload-studio"], nil); DispatchQueue.main.asyncAfter(deadline: .now() + 0.025) { [weak self] in self?.webView.reload() }
-        case .probe(let serial): replyHandler(["type": "probe-result", "serial": serial, "host": "wkwebview"], nil)
+    nonisolated func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage, replyHandler: @escaping (Any?, String?) -> Void) {
+        MainActor.assumeIsolated {
+            guard message.name == bridgeHandlerName, message.frameInfo.isMainFrame, message.world.name == bridgeWorldName, let request = parseRequest(message.body) else { rejectedRequests += 1; replyHandler(nil, HostError.invalidRequest.localizedDescription); return }
+            switch request {
+            case .getLaunchState: replyHandler(launchState(), nil)
+            case .openImport: presentImport(replyHandler)
+            case .scanInstalled(let query, let cursor, let limit, let refresh): replyHandler(catalogResult(query: query, cursor: cursor, limit: limit, refresh: refresh), nil)
+            case .openStudy: presentOpenStudy(replyHandler)
+            case .mirrorStudy(let document, let workspace, let revision):
+                guard mirroredDocument?["id"] as? String != document["id"] as? String || revision >= mirroredRevision else { replyHandler(nil, "Rejected stale recovery revision."); return }
+                let promotedCatalogBindings = promoteCatalogBindings(document)
+                if mirroredDocument?["id"] as? String != document["id"] as? String { intentionallySavedRevision = 0 }
+                mirroredDocument = document; mirroredWorkspace = workspace; mirroredRevision = revision
+                do { if promotedCatalogBindings { try persistLocalState() }; try persistRecovery(); replyHandler(["type": "mirror-ack", "revision": revision, "recoveryPersisted": true], nil) }
+                catch { replyHandler(nil, error.localizedDescription) }
+            case .saveStudy(let document, let revision, let saveAs): presentSave(document, revision, saveAs, replyHandler)
+            case .exportHandoff(let document, let revision, let preferences, let permission): presentExport(document, revision, preferences, permission, replyHandler)
+            case .relinkSource(let id): presentRelink(id, replyHandler)
+            case .revealSource(let id):
+                guard let url = sourceBindings[id] else { replyHandler(nil, "Source is not locally bound."); return }
+                NSWorkspace.shared.activateFileViewerSelecting([url]); replyHandler(["type": "ack", "action": "reveal-source"], nil)
+            case .nativeUndo: window.makeFirstResponder(webView); if webView.undoManager?.canUndo == true { webView.undoManager?.undo() }; replyHandler(["type": "ack", "action": "native-undo"], nil)
+            case .reloadStudio: replyHandler(["type": "ack", "action": "reload-studio"], nil); DispatchQueue.main.asyncAfter(deadline: .now() + 0.025) { [weak self] in self?.webView.reload() }
+            case .probe(let serial): replyHandler(["type": "probe-result", "serial": serial, "host": "wkwebview"], nil)
+            }
         }
     }
 
@@ -772,14 +774,16 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     private func addRecent(_ url: URL) { recentDocuments = [url] + recentDocuments.filter { $0 != url }; recentDocuments = Array(recentDocuments.prefix(10)); try? persistLocalState() }
 
     private func allowedLocalURL(_ url: URL) -> Bool { url.scheme == studioScheme && url.host == studioHost && url.user == nil && url.password == nil && url.port == nil }
-    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) { guard action.targetFrame?.isMainFrame != false, let url = action.request.url, allowedLocalURL(url) else { navigationRejections += 1; decisionHandler(.cancel); return }; decisionHandler(.allow) }
-    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? { popupRejections += 1; return nil }
-    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { processTerminations += 1; webView.reload() }
+    nonisolated func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) { MainActor.assumeIsolated { guard action.targetFrame?.isMainFrame != false, let url = action.request.url, allowedLocalURL(url) else { navigationRejections += 1; decisionHandler(.cancel); return }; decisionHandler(.allow) } }
+    nonisolated func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? { MainActor.assumeIsolated { popupRejections += 1; return nil as WKWebView? } }
+    nonisolated func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { MainActor.assumeIsolated { processTerminations += 1; webView.reload() } }
 
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        window.makeFirstResponder(webView)
-        guard !evidenceStarted, let output = ProcessInfo.processInfo.environment[evidenceEnvironmentKey] else { return }
-        evidenceStarted = true; let runner = MacEvidenceRunner(host: self, output: URL(fileURLWithPath: output, isDirectory: true)); evidenceRunner = runner; runner.start()
+    nonisolated func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        MainActor.assumeIsolated {
+            window.makeFirstResponder(webView)
+            guard !evidenceStarted, let output = ProcessInfo.processInfo.environment[evidenceEnvironmentKey] else { return }
+            evidenceStarted = true; let runner = MacEvidenceRunner(host: self, output: URL(fileURLWithPath: output, isDirectory: true)); evidenceRunner = runner; runner.start()
+        }
     }
 }
 
