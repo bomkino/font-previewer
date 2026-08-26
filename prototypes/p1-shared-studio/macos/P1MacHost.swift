@@ -3,7 +3,7 @@ import CoreFoundation
 import Darwin
 import Foundation
 import UniformTypeIdentifiers
-import WebKit
+@preconcurrency import WebKit
 
 private let hostBridgeWorldName = "FontPreviewerHostBridge"
 private let hostBridgeWorld = WKContentWorld.world(name: hostBridgeWorldName)
@@ -177,7 +177,7 @@ private final class LocalStudioSchemeHandler: NSObject, WKURLSchemeHandler {
               size <= maximumResourceBytes,
               let data = try? Data(contentsOf: fileURL, options: [.mappedIfSafe])
         else {
-            reject(urlSchemeTask, code: .fileReadNoSuchFile)
+            reject(urlSchemeTask, code: .fileDoesNotExist)
             return
         }
 
