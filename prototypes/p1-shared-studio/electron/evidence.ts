@@ -287,11 +287,21 @@ export async function runEvidenceFlow({
   if (!reloadTriggered) throw new Error("[p1 evidence] Reload Studio button is missing");
   await withTimeout("reload navigation", reloaded, 15_000);
   await settle(window, 160);
+  const afterReload = await inspectWorkspace(window);
   trace.reload = {
     durationMs: Number((performance.now() - reloadStarted).toFixed(3)),
     before: beforeReload,
-    after: await inspectWorkspace(window),
+    after: afterReload,
   };
+  if (
+    afterReload.stage !== beforeReload.stage ||
+    afterReload.revision !== beforeReload.revision
+  ) {
+    throw new Error("[p1 evidence] Reload did not preserve stage and revision");
+  }
+  if (afterReload.activeElement !== "workspace-heading") {
+    throw new Error("[p1 evidence] Reload did not restore workspace focus");
+  }
   await capture(window, join(output, "05-recovered.png"));
 
   console.error("[p1 evidence] accessibility tree");

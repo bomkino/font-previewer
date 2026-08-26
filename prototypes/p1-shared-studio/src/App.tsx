@@ -705,6 +705,7 @@ export default function App() {
     if (reloadRevision) {
       window.sessionStorage.removeItem(RELOAD_KEY);
       setAnnouncement(`Studio reloaded. Recovered revision ${reloadRevision}.`);
+      window.requestAnimationFrame(() => headingRef.current?.focus());
     }
   }, [requestHost]);
 
