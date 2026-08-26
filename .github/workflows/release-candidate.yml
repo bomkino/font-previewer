@@ -189,7 +189,13 @@ jobs:
             wait "$PID" || true
             exit 124
           fi
-          wait "$PID"
+          STATUS=0
+          wait "$PID" || STATUS=$?
+          if test "$STATUS" -ne 0; then
+            test ! -f "$FONT_PREVIEWER_MAC_EVIDENCE_DIR/host.stderr.log" || cat "$FONT_PREVIEWER_MAC_EVIDENCE_DIR/host.stderr.log"
+            test ! -f "$FONT_PREVIEWER_MAC_EVIDENCE_DIR/failure.txt" || cat "$FONT_PREVIEWER_MAC_EVIDENCE_DIR/failure.txt"
+            exit "$STATUS"
+          fi
 
       - name: Assert Mac evidence
         env:
