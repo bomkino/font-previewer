@@ -1,0 +1,228 @@
+name: Font Previewer release candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - codex/v1-release-candidate
+    paths:
+      - ".github/workflows/release-candidate.yml"
+      - "app/**"
+  pull_request:
+    paths:
+      - ".github/workflows/release-candidate.yml"
+      - "app/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: font-previewer-rc-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux Electron · evidence · packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.19.0
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+          package-manager-cache: false
+
+      - name: Install displayed-app dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends dbus-x11 xauth xvfb
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install exact Electron binary
+        run: npm run electron:install
+
+      - name: Configure production sandbox
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+          test "$(stat --format='%U:%G %a' node_modules/electron/dist/chrome-sandbox)" = "root:root 4755"
+
+      - name: Verify types, tests, bundles, SBOM, and audit
+        run: npm run verify
+
+      - name: Run displayed Electron release evidence
+        env:
+          FONT_PREVIEWER_EVIDENCE_DIR: ${{ runner.temp }}/font-previewer-linux-evidence
+          ELECTRON_ENABLE_LOGGING: "1"
+        run: |
+          timeout --signal=TERM --kill-after=10s 4m \
+            xvfb-run --auto-servernum --server-args="-screen 0 1500x980x24" \
+            dbus-run-session -- npm run electron -- --disable-dev-shm-usage
+
+      - name: Assert Linux evidence
+        env:
+          EVIDENCE: ${{ runner.temp }}/font-previewer-linux-evidence
+        run: |
+          jq -e '
+            .securityAudit.invalidRequests == .securityAudit.rejected and
+            .securityAudit.nodeUnavailable == true and
+            (.semanticAudit.unnamed | length) == 0 and
+            (.semanticAudit.duplicateIds | length) == 0 and
+            .reloadRecovery.after.activeElement == "workspace-heading" and
+            .reloadRecovery.after.reviewState == "Keep" and
+            .transactionalHandoff.fileCount >= 2
+          ' "$EVIDENCE/trace.json" >/dev/null
+          for image in 01-review 02-compare 03-system 04-handoff 05-recovered; do
+            test -s "$EVIDENCE/$image.png"
+            file "$EVIDENCE/$image.png" | grep -q 'PNG image data'
+          done
+          cd "$EVIDENCE"
+          sha256sum -c checksums.sha256
+
+      - name: Assemble Linux release candidates
+        run: node scripts/package-linux.mjs
+
+      - name: Inspect Linux packages
+        run: |
+          cd release
+          sha256sum -c checksums.sha256
+          dpkg-deb --info font-previewer_0.1.0_amd64.deb
+          dpkg-deb --contents font-previewer_0.1.0_amd64.deb | grep -q -- '-rwsr-xr-x root/root.*chrome-sandbox'
+          dpkg-deb --contents font-previewer_0.1.0_amd64.deb | grep -q 'usr/bin/font-previewer -> ../../opt/font-previewer/font-previewer'
+
+      - name: Upload Linux evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: font-previewer-linux-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/font-previewer-linux-evidence
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Linux packages
+        if: success()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: font-previewer-linux-${{ github.sha }}
+          path: |
+            app/release/Font-Previewer-0.1.0-linux-x64.tar.gz
+            app/release/font-previewer_0.1.0_amd64.deb
+            app/release/checksums.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  macos:
+    name: macOS WKWebView · evidence · app
+    runs-on: macos-14
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.19.0
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+          package-manager-cache: false
+
+      - name: Inspect Apple toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Install locked Studio dependencies
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify shared Studio
+        run: npm run build
+
+      - name: Build, ad-hoc sign, and verify Mac app
+        env:
+          FONT_PREVIEWER_MAC_OUTPUT_DIR: ${{ runner.temp }}/font-previewer-macos-build
+        run: |
+          ./scripts/build-macos-host.sh
+          APP="$RUNNER_TEMP/font-previewer-macos-build/Font Previewer.app"
+          test -x "$APP/Contents/MacOS/FontPreviewer"
+          test -s "$APP/Contents/Resources/Studio/index.html"
+          plutil -lint "$APP/Contents/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" = "dog.pitch.fontpreviewer"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          shasum -a 256 -c "$RUNNER_TEMP/font-previewer-macos-build/Font Previewer.zip.sha256"
+
+      - name: Run displayed WKWebView release evidence
+        env:
+          FONT_PREVIEWER_MAC_EVIDENCE_DIR: ${{ runner.temp }}/font-previewer-macos-evidence
+        run: |
+          mkdir -p "$FONT_PREVIEWER_MAC_EVIDENCE_DIR"
+          BIN="$RUNNER_TEMP/font-previewer-macos-build/Font Previewer.app/Contents/MacOS/FontPreviewer"
+          "$BIN" >"$FONT_PREVIEWER_MAC_EVIDENCE_DIR/host.stdout.log" 2>"$FONT_PREVIEWER_MAC_EVIDENCE_DIR/host.stderr.log" &
+          PID=$!
+          for _ in $(seq 1 240); do
+            if ! kill -0 "$PID" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          if kill -0 "$PID" 2>/dev/null; then
+            kill "$PID"
+            wait "$PID" || true
+            exit 124
+          fi
+          wait "$PID"
+
+      - name: Assert Mac evidence
+        env:
+          EVIDENCE: ${{ runner.temp }}/font-previewer-macos-evidence
+        run: |
+          jq -e '
+            .host == "wkwebview" and
+            .nativeMenu.installed == true and
+            .nativeMenu.import == true and
+            .nativeMenu.undo == true and
+            .security.attempts == .security.rejected and
+            .security.nodeUnavailable == true and
+            .semantics.unnamed == 0 and
+            .semantics.duplicateIds == 0 and
+            .reload.after.activeElement == "workspace-heading" and
+            .reload.after.reviewState == "Keep"
+          ' "$EVIDENCE/run.json" >/dev/null
+          for image in 01-review 02-compare 03-system 04-handoff 05-recovered; do
+            test -s "$EVIDENCE/$image.png"
+            file "$EVIDENCE/$image.png" | grep -q 'PNG image data'
+          done
+
+      - name: Upload Mac evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: font-previewer-macos-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/font-previewer-macos-evidence
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload Mac app
+        if: success()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: font-previewer-macos-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/font-previewer-macos-build/Font Previewer.zip
+            ${{ runner.temp }}/font-previewer-macos-build/Font Previewer.zip.sha256
+          if-no-files-found: error
+          retention-days: 30

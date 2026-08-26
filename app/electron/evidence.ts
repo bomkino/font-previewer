@@ -1,0 +1,284 @@
+import { createHash } from "node:crypto";
+import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { BrowserWindow, Menu } from "electron";
+import type { MenuCommand } from "../src/protocol.js";
+
+interface EvidenceOptions {
+  readonly window: BrowserWindow;
+  readonly outputDirectory: string;
+  readonly sendMenuCommand: (command: MenuCommand) => void;
+  readonly verifyDurability?: () => Promise<Record<string, unknown>>;
+  readonly exportHandoff?: () => Promise<Record<string, unknown>>;
+}
+
+async function withTimeout<T>(label: string, operation: Promise<T>, milliseconds = 15_000): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const expired = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${milliseconds} ms`)), milliseconds);
+  });
+  try {
+    return await Promise.race([operation, expired]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function settle(window: BrowserWindow, milliseconds = 100): Promise<void> {
+  await withTimeout("renderer settle", window.webContents.executeJavaScript(`new Promise((resolve) => setTimeout(resolve, ${milliseconds}))`, true), milliseconds + 5_000);
+}
+
+async function waitFor(window: BrowserWindow, label: string, expression: string, milliseconds = 15_000): Promise<void> {
+  const started = Date.now();
+  while (Date.now() - started < milliseconds) {
+    if (await window.webContents.executeJavaScript(`Boolean(${expression})`, true) as boolean) return;
+    await settle(window, 80);
+  }
+  throw new Error(`${label} did not become true within ${milliseconds} ms`);
+}
+
+async function capture(window: BrowserWindow, outputPath: string): Promise<void> {
+  await settle(window, 140);
+  const image = await withTimeout("page capture", window.webContents.capturePage());
+  await writeFile(outputPath, image.toPNG(), { mode: 0o600 });
+}
+
+async function inspectWorkspace(window: BrowserWindow): Promise<Record<string, unknown>> {
+  return withTimeout("workspace inspection", window.webContents.executeJavaScript(`(() => {
+    const selected = document.querySelector('.candidate-row[aria-current="true"]');
+    return {
+      heading: document.querySelector('#workspace-heading')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
+      selected: selected?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
+      reviewState: selected?.querySelector('.review-glyph')?.getAttribute('aria-label') ?? null,
+      stage: document.querySelector('.stage-nav [aria-current="step"]')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
+      durability: document.querySelector('.document-title > span:last-child')?.textContent?.trim() ?? null,
+      activeElement: document.activeElement?.id || document.activeElement?.tagName || null,
+      host: document.querySelector('.host-probe')?.textContent?.trim() ?? null,
+      candidates: document.querySelectorAll('.candidate-row').length,
+      sources: document.querySelectorAll('.source-row').length,
+    };
+  })()`, true));
+}
+
+async function clickStage(window: BrowserWindow, stage: "Review" | "Compare" | "System" | "Handoff"): Promise<void> {
+  await window.webContents.executeJavaScript(`(() => {
+    const button = [...document.querySelectorAll('.stage-nav button')].find((item) => item.textContent?.includes(${JSON.stringify(stage)}));
+    if (!(button instanceof HTMLButtonElement)) throw new Error('Missing ${stage} stage');
+    button.click();
+  })()`, true);
+  await waitFor(window, `${stage} stage`, `document.querySelector('.stage-nav [aria-current="step"]')?.textContent?.includes(${JSON.stringify(stage)})`);
+}
+
+async function collectAccessibilityTree(window: BrowserWindow): Promise<unknown> {
+  window.webContents.debugger.attach("1.3");
+  try {
+    await withTimeout("accessibility enable", window.webContents.debugger.sendCommand("Accessibility.enable"));
+    return await withTimeout("accessibility tree", window.webContents.debugger.sendCommand("Accessibility.getFullAXTree", { depth: 16 }), 20_000);
+  } finally {
+    window.webContents.debugger.detach();
+  }
+}
+
+function percentile(values: readonly number[], quantile: number): number {
+  const sorted = [...values].sort((left, right) => left - right);
+  return Number(sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * quantile) - 1)].toFixed(3));
+}
+
+function summarize(values: readonly number[]): Record<string, number> {
+  return {
+    samples: values.length,
+    minimumMs: Number(Math.min(...values).toFixed(3)),
+    medianMs: percentile(values, 0.5),
+    p95Ms: percentile(values, 0.95),
+    maximumMs: Number(Math.max(...values).toFixed(3)),
+  };
+}
+
+async function measureBridge(window: BrowserWindow): Promise<Record<string, number>> {
+  const values = await withTimeout("bridge latency", window.webContents.executeJavaScript(`(async () => {
+    const values = [];
+    for (let serial = 0; serial < 50; serial += 1) {
+      const started = performance.now();
+      const response = await window.fontPreviewerHost.request({ type: 'probe', serial });
+      if (response.type !== 'probe-result' || response.serial !== serial || response.host !== 'electron') throw new Error('Probe mismatch');
+      values.push(performance.now() - started);
+    }
+    return values;
+  })()`, true)) as number[];
+  return summarize(values);
+}
+
+async function measureInput(window: BrowserWindow): Promise<Record<string, number>> {
+  const values = await withTimeout("input latency", window.webContents.executeJavaScript(`(async () => {
+    const input = document.querySelector('.catalog-tools input[type="search"]');
+    if (!(input instanceof HTMLInputElement)) throw new Error('Missing Candidate search');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    if (!setter) throw new Error('Missing input setter');
+    const values = [];
+    for (let index = 0; index < 30; index += 1) {
+      const started = performance.now();
+      setter.call(input, index % 2 ? '' : 'sans');
+      input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: 's' }));
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+      values.push(performance.now() - started);
+    }
+    setter.call(input, '');
+    input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
+    return values;
+  })()`, true)) as number[];
+  return summarize(values);
+}
+
+async function semanticAudit(window: BrowserWindow): Promise<Record<string, unknown>> {
+  return withTimeout("semantic audit", window.webContents.executeJavaScript(`(() => {
+    const controls = [...document.querySelectorAll('button,input,select,textarea')];
+    const name = (control) => {
+      const aria = control.getAttribute('aria-label') || control.getAttribute('aria-labelledby');
+      if (aria) return aria;
+      if (control.id) {
+        const label = document.querySelector('label[for="' + CSS.escape(control.id) + '"]');
+        if (label?.textContent?.trim()) return label.textContent.trim();
+      }
+      const wrapping = control.closest('label');
+      return wrapping?.textContent?.trim() || control.textContent?.trim() || '';
+    };
+    const unnamed = controls.filter((control) => !name(control)).map((control) => control.outerHTML.slice(0, 160));
+    return {
+      controls: controls.length,
+      unnamed,
+      landmarks: {
+        main: document.querySelectorAll('main').length,
+        navigation: document.querySelectorAll('nav').length,
+        complementary: document.querySelectorAll('aside').length,
+        contentinfo: document.querySelectorAll('footer').length,
+      },
+      duplicateIds: [...document.querySelectorAll('[id]')].map((item) => item.id).filter((id, index, ids) => ids.indexOf(id) !== index),
+      horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    };
+  })()`, true));
+}
+
+async function securityAudit(window: BrowserWindow): Promise<Record<string, unknown>> {
+  return withTimeout("security audit", window.webContents.executeJavaScript(`(async () => {
+    const invalid = [
+      { type: 'open-import', path: '/private/font.otf' },
+      { type: 'probe', serial: -1 },
+      { type: 'read-file', path: '/etc/passwd' },
+      { type: 'export-handoff', path: '/tmp' },
+    ];
+    let rejected = 0;
+    for (const request of invalid) {
+      try { await window.fontPreviewerHost.request(request); } catch { rejected += 1; }
+    }
+    return {
+      invalidRequests: invalid.length,
+      rejected,
+      popupDenied: window.open('https://example.com') === null,
+      nodeUnavailable: typeof window.require === 'undefined' && typeof window.process === 'undefined',
+      hostKeys: Object.keys(window.fontPreviewerHost).sort(),
+    };
+  })()`, true));
+}
+
+async function checksumEvidence(output: string): Promise<void> {
+  const files = (await readdir(output, { recursive: true, withFileTypes: true }))
+    .filter((entry) => entry.isFile() && entry.name !== "checksums.sha256")
+    .map((entry) => join(entry.parentPath.slice(output.length + 1), entry.name))
+    .sort();
+  const lines: string[] = [];
+  for (const relativePath of files) {
+    const digest = createHash("sha256").update(await readFile(join(output, relativePath))).digest("hex");
+    lines.push(`${digest}  ${relativePath}`);
+  }
+  await writeFile(join(output, "checksums.sha256"), `${lines.join("\n")}\n`, { mode: 0o600 });
+}
+
+export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
+  const output = resolve(options.outputDirectory);
+  await mkdir(output, { recursive: true, mode: 0o700 });
+  await waitFor(options.window, "Studio bootstrap", `window.fontPreviewerHost && document.querySelector('#workspace-heading') && document.querySelector('.host-probe')?.textContent?.includes('electron')`, 25_000);
+  await settle(options.window, 180);
+
+  const trace: Record<string, unknown> = {
+    generatedAt: new Date().toISOString(),
+    platform: process.platform,
+    architecture: process.arch,
+    versions: process.versions,
+    initial: await inspectWorkspace(options.window),
+    nativeMenu: {
+      installed: Boolean(Menu.getApplicationMenu()),
+      import: Boolean(Menu.getApplicationMenu()?.getMenuItemById("font-previewer-import")),
+      undo: Boolean(Menu.getApplicationMenu()?.getMenuItemById("font-previewer-undo")),
+      semanticKeep: Boolean(Menu.getApplicationMenu()?.getMenuItemById("font-previewer-keep")),
+    },
+  };
+
+  await capture(options.window, join(output, "01-review.png"));
+  options.sendMenuCommand({ type: "mark-keep" });
+  await waitFor(options.window, "native Keep command", `document.querySelector('.candidate-row[aria-current="true"] .review-glyph')?.getAttribute('aria-label') === 'Keep'`);
+  trace.afterNativeKeep = await inspectWorkspace(options.window);
+  options.sendMenuCommand({ type: "undo-study" });
+  await waitFor(options.window, "native semantic undo", `document.querySelector('.candidate-row[aria-current="true"] .review-glyph')?.getAttribute('aria-label') === 'Unreviewed'`);
+  options.sendMenuCommand({ type: "redo-study" });
+  await waitFor(options.window, "native semantic redo", `document.querySelector('.candidate-row[aria-current="true"] .review-glyph')?.getAttribute('aria-label') === 'Keep'`);
+  trace.afterUndoRedo = await inspectWorkspace(options.window);
+
+  trace.bridgeRoundTrip = await measureBridge(options.window);
+  trace.inputToFrame = await measureInput(options.window);
+
+  await clickStage(options.window, "Compare");
+  trace.compare = await inspectWorkspace(options.window);
+  await capture(options.window, join(output, "02-compare.png"));
+
+  await clickStage(options.window, "System");
+  trace.system = await inspectWorkspace(options.window);
+  await capture(options.window, join(output, "03-system.png"));
+
+  await clickStage(options.window, "Review");
+  await options.window.webContents.executeJavaScript(`(() => {
+    const role = [...document.querySelectorAll('.field-label')].find((label) => label.querySelector(':scope > span')?.textContent?.trim() === 'Role')?.querySelector('select');
+    if (!(role instanceof HTMLSelectElement)) throw new Error('Missing Role control');
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    setter?.call(role, 'display');
+    role.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`, true);
+  await clickStage(options.window, "Handoff");
+  await waitFor(options.window, "Handoff preflight", `document.querySelector('.handoff-workspace') && !document.querySelector('.handoff-workspace .primary-button')?.disabled`);
+  trace.handoff = await inspectWorkspace(options.window);
+  await capture(options.window, join(output, "04-handoff.png"));
+  trace.semanticAudit = await semanticAudit(options.window);
+  trace.securityAudit = await securityAudit(options.window);
+
+  await waitFor(options.window, "durable recovery", `document.querySelector('.document-title > span:last-child')?.textContent?.includes('recovery ready')`, 20_000);
+  if (options.verifyDurability) trace.durabilityArtifact = await options.verifyDurability();
+  if (options.exportHandoff) trace.transactionalHandoff = await options.exportHandoff();
+
+  const beforeReload = await inspectWorkspace(options.window);
+  const loaded = new Promise<void>((resolveLoaded) => options.window.webContents.once("did-finish-load", () => resolveLoaded()));
+  options.window.webContents.reload();
+  await withTimeout("recovery reload", loaded, 20_000);
+  await waitFor(options.window, "recovered Studio", `document.querySelector('#workspace-heading') && document.querySelector('.host-probe')?.textContent?.includes('electron') && document.activeElement?.id === 'workspace-heading'`, 20_000);
+  const afterReload = await inspectWorkspace(options.window);
+  trace.reloadRecovery = { before: beforeReload, after: afterReload };
+  await capture(options.window, join(output, "05-recovered.png"));
+
+  const accessibilityTree = await collectAccessibilityTree(options.window);
+  await writeFile(join(output, "accessibility-tree.json"), `${JSON.stringify(accessibilityTree, null, 2)}\n`, { mode: 0o600 });
+  await writeFile(join(output, "trace.json"), `${JSON.stringify(trace, null, 2)}\n`, { mode: 0o600 });
+  const metadata = {
+    generatedAt: new Date().toISOString(),
+    platform: process.platform,
+    architecture: process.arch,
+    versions: process.versions,
+    viewport: options.window.getContentBounds(),
+    files: (await readdir(output, { recursive: true })).length,
+  };
+  await writeFile(join(output, "metadata.json"), `${JSON.stringify(metadata, null, 2)}\n`, { mode: 0o600 });
+
+  const audit = trace.semanticAudit as { unnamed?: unknown[]; duplicateIds?: unknown[] };
+  const security = trace.securityAudit as { invalidRequests?: number; rejected?: number; nodeUnavailable?: boolean };
+  if (audit.unnamed?.length || audit.duplicateIds?.length) throw new Error("Semantic accessibility audit failed.");
+  if (security.invalidRequests !== security.rejected || !security.nodeUnavailable) throw new Error("Host security audit failed.");
+  if (afterReload.activeElement !== "workspace-heading" || afterReload.reviewState !== "Keep") throw new Error("Reload recovery or focus restoration failed.");
+  await checksumEvidence(output);
+}
