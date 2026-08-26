@@ -1,28 +1,25 @@
-# P1 Dependency Ledger
+# Dependency ledger
 
-Checked against the npm registry on 2026-08-27. Every direct dependency is exact-pinned in `package.json` and transitively locked in `package-lock.json`. `npm outdated --json` reported only `@types/node`: `24.13.3` is deliberately held to the Node 24 runtime while `26.3.0` is latest. `npm audit --audit-level=moderate` reported zero known vulnerabilities across 81 resolved components.
+Checked on 2026-08-26. Every direct dependency is exact-pinned in `package.json` and every transitive dependency is locked in `package-lock.json`. The generated CycloneDX 1.6 SBOM records 81 resolved components. `npm audit --audit-level=high` reports zero known vulnerabilities.
 
-| Package | Version | Licence | Scope and product need | Seam | Removal plan |
-|---|---:|---|---|---|---|
-| React | 19.2.8 | MIT | Shared Studio component and state runtime | `src/main.tsx` root and semantic reducer dispatch | Replace the Studio renderer; no Host contract change required |
-| React DOM | 19.2.8 | MIT | DOM and server-rendered public-surface test | Browser root and `react-dom/server` test | Replace with the chosen renderer adapter |
-| Electron | 44.0.0 | MIT | Linux native Host prototype | `electron/main.ts` and sandboxed `electron/preload.ts` | Replace the Linux Host; Studio protocol remains the seam |
-| TypeScript | 7.0.2 | Apache-2.0 | Compile-time contract checking | `tsconfig*.json`; emits no runtime library | Compile or migrate source to another typed language |
-| Vite | 8.2.2 | MIT | Local Studio development, deterministic renderer bundle, and sandbox-compatible CommonJS preload bundle | `vite*.config.ts`, `dist/renderer`, and `dist-electron/electron/preload.cjs` | Replace build adapter without changing Studio semantics |
-| Vite React plugin | 6.1.0 | MIT | React transform for Vite | `vite.config.ts` only | Remove with Vite or React |
-| React type declarations | 19.2.18 | MIT | Development-only React types | TypeScript compiler | Remove with React or TypeScript |
-| React DOM type declarations | 19.2.5 | MIT | Development-only DOM renderer types | TypeScript compiler | Remove with React DOM or TypeScript |
-| Node type declarations | 24.13.3 | MIT | Development-only Host and test types aligned with the Node 24 runtime | Electron/test TypeScript configs | Remove with TypeScript or Node Host tooling |
+| Package | Version | Licence | Scope and need | Removal seam |
+|---|---:|---|---|---|
+| React | 19.2.8 | MIT | Shared semantic Studio and reducer-driven UI | Replace Studio renderer behind HostBridge |
+| React DOM | 19.2.8 | MIT | DOM renderer and server-rendered surface test | Replace with Studio renderer |
+| Electron | 44.0.0 | MIT | Sandboxed first-class Linux desktop Host | Replace Linux Host without changing Study semantics |
+| TypeScript | 7.0.2 | Apache-2.0 | Compile-time domain, bridge, Host, and test contracts | Build-only |
+| Vite | 8.2.2 | MIT | Deterministic Studio and sandbox-compatible preload bundles | Replace build adapter |
+| `@vitejs/plugin-react` | 6.1.0 | MIT | React transform | Remove with Vite/React |
+| React type packages | 19.2.18 / 19.2.5 | MIT | Development-only declarations | Remove with React/TypeScript |
+| `@types/node` | 24.13.3 | MIT | Node 24 Host/test declarations | Remove with TypeScript/Node tooling |
 
-The resolved graph uses only MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, and MPL-2.0 packages. MPL-2.0 appears only in Lightning CSS and its platform binaries, pulled by the Vite development/build path. No GPL-family dependency is present.
+The resolved npm graph uses MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, and MPL-2.0 licences. MPL-2.0 occurs in Lightning CSS build tooling and platform binaries. No GPL-family runtime dependency is present.
 
-The generated CycloneDX 1.6 `sbom.cdx.json` records all 81 name/version identities, integrity hashes where present, licences, and development/optional classification. Optional platform binaries remain in the SBOM because they are part of the locked resolution even when not installed on Linux x86_64.
-
-This prototype is not packaged or distributed. A production packaging ticket must generate third-party notices, pin the Electron binary checksum/cache path, rerun vulnerability and maintenance checks, and decide whether build-only MPL notices ship with artifacts.
+`THIRD_PARTY_NOTICES.md` ships in Mac and Linux application resources. Linux packages also retain Electron’s `LICENSE` and Chromium’s `LICENSES.chromium.html`. The repository `LICENSE` ships as `LICENSE.txt`.
 
 ## Workflow dependencies
 
-The unexecuted `.github/workflows/p1-linux-evidence.yml` workflow uses three MIT-licensed GitHub Actions pinned to immutable commit SHAs:
+The release-candidate workflow uses immutable commits:
 
 | Action | Release | Commit |
 |---|---:|---|
@@ -30,4 +27,4 @@ The unexecuted `.github/workflows/p1-linux-evidence.yml` workflow uses three MIT
 | `actions/setup-node` | 7.0.0 | `820762786026740c76f36085b0efc47a31fe5020` |
 | `actions/upload-artifact` | 6.0.0 | `b7c566a772e6b6bfb58ed0dc250532a479d7789f` |
 
-Their exact tags, commits, and repository licence files were checked on 2026-08-27. They are CI-only and do not enter the product or npm SBOM. Removal means replacing checkout/runtime/artifact transport in the workflow; no product seam changes.
+These actions are CI-only and do not enter the product or npm SBOM.

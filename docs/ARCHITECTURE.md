@@ -1,143 +1,104 @@
-# Font Previewer Architecture
+# Font Previewer architecture
 
 ## Product boundary
 
-Font Previewer is a Mac-only desktop application, not a hosted web app in a wrapper. The product boundary is deliberate:
+Font Previewer is one local product delivered by two desktop Hosts:
 
-- fonts stay local;
-- CoreText supplies the same shaping and variation behaviour used by the renderer and exporter;
-- native file panels, Finder reveal, source watching, document opening, keyboard commands, and app packaging are first-class;
-- no browser download hacks or local web server remain in the primary workflow.
+- macOS: AppKit window, native menus/panels, CoreText discovery, and a shared Studio inside WKWebView;
+- Linux: Electron main process, native menus/dialogs, Fontconfig discovery, and the same sandboxed Studio;
+- browser: a development fallback with reduced capabilities.
 
-## Layers
+No Host installs fonts, exposes arbitrary filesystem access to the Studio, or requires an account/network service.
 
-### `FontPreviewerCore`
+## Authority
 
-Foundation-only and portable. It owns:
+The Studio owns one mutable `StudySession`: portable document, workspace state, revision, acknowledged recovery revision, and intentionally saved revision. Semantic commands pass through one reducer and one bounded history.
 
-- versioned `.pitchfontstudy` models;
-- schema migration and validation;
-- relative path resolution;
-- canonical source-path-plus-face identity;
-- title-case transforms;
-- specimen presets;
-- search and field filters;
-- ordering, comparison, and pairing rules;
-- export planning;
-- privacy-safe JSON and Markdown handoff generation.
+The Host owns privileged and platform-local state only:
 
-This target compiles and tests on Linux. It must not import AppKit, SwiftUI, CoreText, or ImageIO.
+- Source ID → canonical local binding;
+- opaque preview-token → local file;
+- native document destination and recents;
+- recovery file;
+- installed Catalog index/cache;
+- file watchers, panels, menus, packaging, and Handoff destination.
 
-### `FontPreviewerMacKit`
+The Host does not mirror selected Candidate, active stage, review state, Recipe, Comparison Set, or Typography System as a second mutable UI authority.
 
-macOS typography and file I/O. It owns:
+## Domain model
 
-- CoreText descriptor loading;
-- collection-face enumeration;
-- variable-axis extraction;
-- OpenType feature extraction and application;
-- metrics and script probes;
-- source-file watching;
-- all live and export rendering;
-- PNG, PDF, JSON, Markdown, and optional font-copy transactions.
-
-`RuntimeFontFace` deliberately stays out of saved studies. It is reconstructed from the source file when a document opens.
-
-### `FontPreviewerApp`
-
-SwiftUI interaction and macOS lifecycle. It owns:
-
-- the three-column workspace;
-- review controls and inspector;
-- import, relink, open, save, and export panels;
-- keyboard commands;
-- document dirty state and delayed autosave;
-- cancellation and progress;
-- unsaved-change protection.
-
-### `FontPreviewerSmoke`
-
-A native executable used by CI and the local builder. It locates real macOS system fonts, imports multiple faces, renders every scene, exports a complete handoff, verifies image dimensions, checks the PDF payload, and asserts that privacy-default JSON contains no system font path.
-
-## Rendering contract
-
-There is one renderer: `BoardRenderer`.
-
-The SwiftUI canvas hosts an `NSView` that calls it. `BoardExporter` calls the same renderer against bitmap and PDF contexts. A live preview therefore cannot quietly diverge from its exported board because of a second implementation.
-
-Current scenes:
-
-- Review / Focus specimen
-- four-up Compare
-- Waterfall
-- Metrics
-- Glyph grid
-- Pairing / deck-stage composition
-
-## Font identity
-
-PostScript names are not unique enough. Different revisions, vendors, collection faces, or deliberately anonymised fonts can collide.
-
-The stable import identity is:
-
-```text
-canonical source URL + face index
+```mermaid
+flowchart TD
+  S["Source · portable hint"] --> F["Face · exact index/metadata"]
+  B["Binding · Host-local"] --> S
+  F --> C["Candidate · decision/settings"]
+  C --> U["Font Use · system role snapshot"]
+  R["Recipe"] --> X["Comparison Set"]
+  C --> X
 ```
 
-Relative project paths resolve against the study location before de-duplication. A TTC or OTC preserves every face.
+Family is grouping evidence, not identity. Durable IDs are not derived from paths, names, PostScript names, or digests. A portable Study contains no local path, preview URL, bookmark, or Binding.
 
-## Variable fonts and features
+## HostBridge protocol v2
 
-CoreText returns variation axes using numeric axis identifiers. The app stores both the identifier and the readable four-character tag. Rendering creates a font with:
+Requests and responses use a closed discriminated vocabulary with exact-key runtime validation. Privileged requests include launch state, import, paginated Catalog search, mirror, Save, Handoff, relink/reveal, native undo, reload, and bounded probe.
 
-1. the original descriptor;
-2. selected CoreText feature selectors;
-3. selected variation values;
-4. the requested point size.
+Important bounds:
 
-Axis bounds are clamped on load and relink. Feature selections survive only when the replacement face still exposes the same selector.
+- Study JSON: 8 MB;
+- one Source: 512 MB;
+- direct import: 2,048 files, 2 GB total, depth 12, 15 seconds;
+- installed Catalog index: 10,000 entries;
+- Catalog response: 200 entries maximum; UI asks for 80;
+- Catalog metadata cache: 400 entries;
+- Compare tray: four Candidates.
 
-## Documents
+The Studio receives display metadata and `pitch-font://asset/<opaque-token>` capabilities, never a filesystem path.
 
-`.pitchfontstudy` is pretty-printed JSON with an explicit schema version. Schema 2 studies migrate to schema 3 defaults. Future schemas are refused rather than partially misread.
+## Catalog versus Study
 
-The document stores source paths, not font payloads. Paths become relative when the study and font share a useful root. Saving As rewrites paths from the old document location to the new one without changing the actual source URL.
+CoreText or Fontconfig builds a Host-local searchable index. A Catalog query returns only one bounded page of inspected metadata. Browsing or rebuilding the Catalog is workspace activity and cannot change the Study.
 
-Autosave captures both its destination URL and a document-generation token. A delayed save from an earlier document cannot land in a newly opened study.
+An explicit Add action sends selected `ImportedSource` records through the semantic `ingest-sources` command. The next recovery mirror promotes those temporary Catalog bindings into durable Host-local bindings. Study capacity is checked before mutation; excess Sources are refused without corrupting the document.
 
-## Concurrency
+## Font rendering
 
-CoreText catalogue work, document rehydration, and export run outside the main actor. The interface receives only committed results and progress updates.
+Both current Hosts use the Studio’s CSS/`FontFace` interactive path with opaque Host-served font URLs. macOS uses CoreText for installed-font discovery and metadata; Linux uses Fontconfig plus bounded local inspection. The renderer declares its Host profile.
 
-Document transitions cancel import, export, reload, and autosave tasks. Export checks cancellation between every rendered page and copied source file.
+The product claims semantic parity, not raster parity. WebKit/CoreText and Chromium may shape or rasterize differently. Complex-script coverage metadata is evidence, not a promise of typographic correctness. A production reference-renderer/format-tier ADR remains open.
 
-## Export transaction
+## Recovery and intentional Save
 
-Export is all-or-nothing:
+After a semantic revision, the Studio mirrors the validated document/workspace to the Host. The Host atomically writes recovery and acknowledges the same monotonic revision. Stale revisions are rejected.
 
-1. validate selected records and runtime faces;
-2. create a hidden staging directory inside the chosen destination;
-3. render requested files;
-4. write handoffs;
-5. optionally copy each unique source file;
-6. check cancellation;
-7. move the complete staging directory into a collision-safe final name.
+Save and Handoff first require the exact current revision to be mirrored. Intentional Save writes `.pitchfontstudy`; recovery remains a separate Host-owned file and never silently becomes the user’s saved document.
 
-Failure or cancellation deletes staging. Existing exports are never overwritten.
+## Handoff transaction
 
-## Privacy
+The Host:
 
-Privacy is architectural, not a copy claim:
+1. validates revision, outputs, permission, and destination;
+2. creates a hidden staging directory inside the destination;
+3. writes selected screenshots/PDF/summary/JSON/CSV;
+4. optionally copies unique Sources only after explicit redistribution acknowledgement;
+5. hashes outputs and writes manifest/checksums;
+6. atomically moves staging to a collision-safe final directory;
+7. removes staging on failure.
 
-- no network dependency exists;
-- runtime descriptors are ephemeral;
-- saved studies contain no font bytes;
-- handoffs omit absolute paths unless explicitly requested;
-- source-font copying is off and permission-gated;
-- local studies, font files, and exports are Git-ignored.
+## Host security
 
-## Why not HarfBuzz yet
+Electron uses Chromium sandboxing, context isolation, no Node integration, a bundled local page, denied external navigation/windows/permissions, trusted-sender checks, and a bundled CommonJS preload exposing only `HostPort`.
 
-FontGoggles demonstrates the value of HarfBuzz for complex-script realism and source formats such as UFO and Designspace. This app currently uses CoreText to keep the first native release small, explainable, and dependency-free. Script coverage is therefore labelled as a probe, not proof.
+WKWebView uses a nonpersistent website-data store, separate bounded read-only schemes for Studio assets and font tokens, a named content world, main-frame request checks, exact request parsing, denied external navigation/popups, and a web-content termination reload handler.
 
-A HarfBuzz-backed shaping comparison belongs behind a measured test corpus, not as a decorative dependency.
+Font files, Studies, Catalog output, bridge messages, recovery files, and export destinations are untrusted. File traversal canonicalizes paths, rejects symlinks in imports, bounds work, and never logs or serializes client paths into portable artifacts.
+
+## Packaging
+
+Linux packages the exact Electron runtime as a portable archive and root-owned `.deb`; the Chromium sandbox helper must be root/root mode 4755. macOS compiles the Host against the current SDK, embeds the production Studio, signs ad hoc, verifies strictly, and creates a ZIP/checksum.
+
+Both carry the repository licence and third-party notices. Production Developer ID signing/notarization and clean-machine distribution remain external release gates.
+
+## Preserved reference
+
+The root `macos/` SwiftUI/CoreText app is retained as an output oracle and engine seed. It is not linked into `app/`, does not define the release-candidate Study contract, and must not be confused with the active AppKit/WKWebView Host.

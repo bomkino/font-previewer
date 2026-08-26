@@ -2,95 +2,51 @@
 
 ## Actual goal
 
-Build one trustworthy local typography-decision product—not a larger specimen viewer—through two desktop Hosts that preserve the same Study meaning.
-
-Success means a designer can move from local Sources through Review, Compare, System, and Handoff on Mac or Linux, reopen the Study on the other platform, and understand declared renderer differences without losing decisions or leaking font files.
+Deliver one trustworthy local typography-decision product on Mac and Linux. A designer must be able to move from local Sources through Review, Compare, System, and Handoff, reopen the portable Study on the other platform, preserve decisions, understand renderer differences, and avoid leaking or silently copying font files.
 
 ## Current reality
 
-The reference branch proves useful Mac implementation techniques but not the destination architecture.
+The v0.1 release-candidate branch now implements the end-to-end journey in one shared Studio with narrow AppKit/WKWebView and Electron Hosts. Automated displayed-app and packaging evidence is green on both platforms.
 
-- It is a native SwiftUI/AppKit application with no shared Studio or Linux Host.
-- Its schema is v3 and collapses Source, Face, Candidate, and Font Use into `FontFaceRecord`.
-- It defaults new records to Maybe rather than Unreviewed.
-- It stores source paths inside the portable Study.
-- It autosaves into the intentional Study file and has no separate recovery mirror.
-- It renders and exports through one in-process CoreText renderer.
-- Its extracted reference now passes macOS tests, native smoke, packaging, re-extraction, property-list, and ad-hoc signature checks. That validates it as an oracle; it does not resolve the domain and architecture conflicts above.
+The root `macos/` application remains a preserved CoreText oracle. It is not the active product because its historical model stores paths in the Study and collapses concepts that Study v4 keeps distinct.
 
-## Route
+## Evidence-backed route
 
-1. Preserve the current Mac implementation as an oracle and engine seed.
-2. Close D00 with evidence, not optimism.
-3. Test the most consequential product seam first: workspace ownership.
-4. Run rendering, durability, domain, and UX prototypes as isolated decisions.
-5. Freeze only the tracer contracts needed for one cross-platform journey.
-6. Build the tracer vertically across Mac and Linux.
-7. Expand through Alpha, Beta, and release hardening without deleting reference behavior early.
+1. D00 preserved and reconciled the reference.
+2. P1 proved one shared Studio can run inside both Hosts with native menus/dialogs, a narrow bridge, recovery, and stable focus.
+3. The release-candidate vertical slice replaced prototype recovery/import/Handoff seams with Host-owned durable implementations.
+4. The installed Catalog is now Host-local, bounded, searchable, paginated, and explicit-add; Family Groups preserve Candidate identity.
+5. CI now builds, launches, exercises, packages, and retains evidence for both Hosts.
+6. Human, performance, renderer-policy, signing, and owner gates remain before a supported release.
 
-## Current decision
+## Leading decision
 
-### D00 — repository reconciliation
+Full shared-Studio ownership remains the leading hypothesis. It has survived automated cross-Host vetoes for:
 
-Status: complete on the D00 working branch.
+- focus and native-panel return focus;
+- native semantic command routing;
+- bridge locality and malformed-request rejection;
+- renderer reload and Host recovery;
+- Catalog/Study separation and actual installed-font loading;
+- displayed composition and web accessibility semantics;
+- Mac and Linux packaging.
 
-Decision outcome:
+It is not yet an accepted ADR because interactive VoiceOver/Orca, attended native-quality review, real production-font review, and induced WebKit termination have not run.
 
-- standalone repository boundary is correct;
-- history-preserving subtree extraction is preferable to copying a snapshot;
-- reference source stays intact and explicitly mapped;
-- production implementation remains blocked;
-- reference CI repair is complete without mutating the old domain into the new one;
-- the preserved implementation can now serve as an output oracle and engine seed, not destination architecture.
+## Next decision packet
 
-## Next question
+The owner should receive one consolidated packet after:
 
-### D01 / P1 — can the full shared Studio own the workspace?
+- attended Mac/VoiceOver and Linux/Orca journeys;
+- reference-hardware Catalog/import/scroll/long-session measurements;
+- renderer and format-tier comparison with redistributable fonts;
+- clean-machine packages and production Mac signing evidence.
 
-Leading hypothesis:
+At that point, decide the workspace/durability/renderer/distribution ADRs, then separately decide PR readiness, merge, and release.
 
-Use one React/TypeScript Studio for Sources/Study navigation, central stage, Inspector, stage navigation, and tray inside WKWebView and Electron. Keep documents, windows, menus, dialogs, permissions, recovery, and privileged operations in native Hosts.
+## Discipline
 
-Prototype must prove:
-
-- review geometry and keyboard decisions remain immediate;
-- native menu commands reach one semantic command path;
-- native dialogs restore focus;
-- web-process reload rehydrates without duplicated mutable state;
-- semantic specimen equivalents are navigable;
-- Mac does not feel like a browser page;
-- Linux does not imitate Mac chrome.
-
-Veto full-Studio ownership when:
-
-- focus is unreliable;
-- VoiceOver or Orca paths are materially broken;
-- bridge code mirrors most UI state;
-- platform forks spread through the Studio;
-- Mac interaction quality cannot reach the reference bar.
-
-Environment and evidence:
-
-- Linux x86_64 workspace is available.
-- Node.js 24.19.0, npm 11.9.0, and pnpm 11.19.0 are available.
-- Swift, Rust, CMake, Ninja, a display server, Orca, and a local macOS runtime are unavailable.
-- SHA-pinned GitHub workflows supply displayed Ubuntu 24.04 Electron and macOS 14 arm64 AppKit/WKWebView evidence environments.
-- Electron `44.0.0` now completes its displayed evidence flow under Xvfb and isolated D-Bus.
-- The Mac Host builds, signs ad hoc, packages, launches, and completes its WKWebView evidence flow in CI.
-- Interactive Orca, VoiceOver, attended visual critique, and local platform claims still require human environments.
-
-Current P1 result:
-
-- Variant A exists and passes type, domain, protocol, SSR surface, build, SBOM, npm-audit, displayed-Linux Electron, and macOS WKWebView gates.
-- One renderer-owned `StudySession` drives the workspace; the Host retains only privileged Source Bindings and native operations.
-- The bridge carries narrow commands and opaque Source IDs, never paths or mirrored UI state.
-- Linux automation proves task composition, semantic menu paths, undo, bridge/input latency, reload recovery, focus restoration, and a named Chromium accessibility tree.
-- Mac automation proves the same Studio through a bounded bundled-content scheme, AppKit menu dispatch, real panel-open/cancel with focus restoration, undo, bridge/input latency, reload recovery, web semantics, and basic native accessibility hosting.
-- No workspace ADR is accepted. Attended native-window quality, human menu use, real source selection, Orca, VoiceOver, and induced WebKit process termination remain mandatory.
-
-## Decision discipline
-
-- Facts are gathered before owner questions.
-- Reversible prototype details do not require owner interruption.
-- Product taste trade-offs, scope changes, licence changes, merge, and publication remain owner-visible.
-- A prototype working does not accept its ADR. Evidence and veto reasoning do.
+- A working implementation does not silently accept an ADR.
+- A green workflow names its exact SHA and gates.
+- A package candidate is not a public release.
+- Missing human or credential evidence is reported as an open gate, never fabricated.

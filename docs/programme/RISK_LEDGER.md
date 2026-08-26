@@ -1,26 +1,24 @@
-# Risk Ledger
+# Risk ledger
 
-| ID | Risk | Evidence | Severity | Next control |
+| ID | Risk | Current evidence | State | Next control |
 |---|---|---|---|---|
-| R-001 | Reference Mac build may cease to be a usable oracle | Repaired GitHub Actions run `33008885071` passes tests, native smoke, packaging, re-extraction, plist, signing, and artifacts | Controlled release risk | Keep reference CI green; do not silently fold new-domain behavior into the oracle |
-| R-002 | Domain identity collapses distinct concepts | `FontFaceRecord` owns path, Face metadata, axes, review, Role, tags, and notes | Architecture blocker | P4 Study v4 prototype and explicit migration |
-| R-003 | Portable Study carries source paths | `FontStudy.records[].sourcePath` is serialized | Privacy/portability blocker | Separate portable Source hints from Host-local bindings in P4 |
-| R-004 | Unseen and deliberate Maybe are indistinguishable | `ReviewStatus` has no Unreviewed; default is `.maybe` | Product blocker | Preserve legacy Maybe with provenance; default new Candidate to Unreviewed |
-| R-005 | Autosave can overwrite intentional save | 850 ms autosave calls `ProjectCodec.save` on the selected document | Data-loss blocker | P3 recovery mirror and Save barrier; keep recovery separate |
-| R-006 | Font parsing/rendering shares application process | CoreText inspection and `BoardRenderer` run in-process | Security/stability blocker | P2/P6 crash-containment bake-off |
-| R-007 | Production Linux client is absent | Electron P1 run `33010127784` proves a thin displayed Host around the shared Studio, not a renderer or package candidate | Product blocker | P2/P7 prototypes, then cross-platform tracer and packaging evidence |
-| R-008 | Source watching may miss atomic replacement recovery | watcher binds file descriptors and reloads after rename/delete without a directory-level topology strategy | High | P6 topology fixtures: write, rename-over, delete/recreate, collection reorder |
-| R-009 | Format support is broader than current evidence | extension list and CoreText acceptance stand in for full import/render/export proof | High | P2 redistributable corpus and explicit Full/Metadata-only/Deferred tiers |
-| R-010 | No redistributable font fixture/output oracle | P1 preserves Mac/Linux architectural screenshots and traces, but uses names and geometry rather than real font binaries | High | Build fixture provenance set; generate cross-renderer outputs from redistributable fonts |
-| R-011 | Reference CI dependencies are major-tag references | P1 workflows are SHA-pinned; `macos-reference.yml` still uses `actions/checkout@v4` and `actions/upload-artifact@v4` | Medium | Pin the preserved reference workflow after exact-version/licence/security review |
-| R-012 | Filesystem traversal bounds are incomplete | file count is bounded, but depth, symlink directory cycles, byte totals, and time are not explicit | High | P2/P6 adversarial directory fixtures and canonical authorization |
-| R-013 | Handoff lacks renderer identity and reconstruction depth | current JSON/Markdown omits Render Profile, Recipes, Scenes, exact Font Uses, findings, checksums | High | P8 reconstruction gate and Handoff contract |
-| R-014 | UI and domain state live in one large `AppModel` | 643-line main-actor model owns documents, import, review, filters, watching, export, and autosave | Medium | Extract only through validated deep seams during tracer work; no architecture gardening |
-| R-015 | Mac minimum and architecture policy conflict | reference says macOS 13 and permits x86_64; programme leads with macOS 14 and Apple silicon only | Decision blocker | P6 evidence and accepted platform ADR |
-| R-016 | P1 assistive-technology and attended-quality evidence is unavailable in the current workspace | CI now proves displayed Linux and Mac WKWebView automation; no interactive Orca/VoiceOver or full native-window critique exists | Decision blocker | Run attended Linux/Orca and Mac/VoiceOver task traversals before D01 |
-| R-017 | P1 reload checkpoint is not a production durability design | Variant A writes the validated `StudySession` to renderer `localStorage` | Data-loss blocker for production | Replace only after D03 accepts Host mirror, recovery location, and intentional Save barrier |
-| R-018 | Full shared Studio has non-trivial UI and Host evidence surface | Shared runtime plus two Hosts is 4,127 lines, including 1,095 lines of CSS, an 828-line prototype App, and a 1,033-line all-in-one Mac evidence Host | Medium | Use P1 task evidence to accept/narrow/reject workspace ownership; do not promote prototype structure into production |
-| R-019 | Electron 44 binary acquisition is explicit | npm package no longer downloads the binary during postinstall | Build reproducibility | Keep exact package lock and `electron:install` command; cache and verify binary in future CI/package ticket |
-| R-020 | WKWebView recovery is proven only for reload | The Host installs a content-process termination handler, but run `33013245969` did not induce a termination | Decision blocker | Kill the Web Content process and require stage, revision, and focus recovery |
+| R-001 | Reference ceases to be a usable oracle | Preserved reference and its prior Mac CI remain intact | Controlled | Keep isolated from active Study semantics |
+| R-002 | Domain identities collapse | Study v4 validators/tests separate Source, Binding, Face, Candidate, and Font Use | Controlled | Preserve public-seam tests and migration fixtures |
+| R-003 | Portable Study leaks local paths | Protocol and serialization reject/omit Binding/path data; Catalog evidence scans bridge JSON | Controlled | Add adversarial saved-Study corpus before release |
+| R-004 | Catalog silently pollutes Study | Real-host evidence asserts Candidate count unchanged after browse; explicit Add is the only mutation | Controlled | Human Catalog journey and large-family test |
+| R-005 | Recovery overwrites intentional Save | Host mirror is separate; Save/Handoff require exact acknowledged revision | Reduced | Document-switch/crash/quit matrix and durability ADR |
+| R-006 | Malformed font destabilizes Host | File work is bounded, but parsing/rendering remains in Host/application process | Release blocker | Malformed corpus and process-containment decision |
+| R-007 | Mac/Linux rendering claims exceed evidence | Both load actual installed fonts, but no redistributable fidelity corpus or raster-parity claim exists | Release blocker | Renderer/format ADR with cross-Host corpus |
+| R-008 | Large Catalog freezes or grows without bound | 10,000 index, 80 UI page, 200 protocol cap, 400 metadata cache | Reduced | Synthetic 10,000 workload, cancellation, memory profile |
+| R-009 | Assistive-technology user is excluded | Keyboard/focus/semantics/AX automation passes; no attended VoiceOver/Orca | Release blocker | Complete packaged-app journeys with findings |
+| R-010 | Mac content process loses work | Automated reload restores revision/decision/focus; termination handler exists | Open | Induce WKWebView termination and inspect recovery |
+| R-011 | Bridge/filesystem authority expands | Exact protocol v2, trusted sender/frame, opaque tokens, denied renderer Node/path access | Controlled | Security review and fuzz invalid vocabulary |
+| R-012 | Handoff is partial or copies Sources silently | Hidden staging, atomic move, hashes, manifest, default-off permission gate pass | Reduced | Cancel/failure/low-disk and human permission tests |
+| R-013 | Package is mistaken for release | Draft PR, no release, ad-hoc Mac signature, explicit documentation | Controlled | Keep artifacts labelled evidence until owner gate |
+| R-014 | Supply-chain notices are incomplete | Exact pins, lockfile, 81-component SBOM, zero audit findings, notices in both packages | Reduced | Recheck at final signed SHA |
+| R-015 | Linux distribution coverage is too narrow | `.deb` and portable x64 pass; no RPM/arm64 clean-machine evidence | Open | Owner decides V1 package matrix, then test it |
+| R-016 | Mac distribution cannot pass Gatekeeper | Ad-hoc signature/ZIP pass; no Developer ID/notarization credentials used | Release blocker | Harden, sign, notarize, staple, verify when authorized |
+| R-017 | Typography quality is poor despite green automation | Displayed screenshots exist, but no 20–50 production-font attended review | Release blocker | Designer review across QA payload matrix |
+| R-018 | Dead prototype code becomes accidental authority | Obsolete P1 Mac Host removed; root native reference explicitly isolated | Reduced | Keep active app paths and docs unambiguous |
 
-Judgement note: severity reflects product harm, not implementation difficulty.
+Severity reflects potential user harm, not implementation difficulty.

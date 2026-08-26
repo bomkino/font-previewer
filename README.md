@@ -1,77 +1,84 @@
 # Font Previewer
 
-Font Previewer is a local typography-decision product for pitch-deck designers. It is being built as one product with two desktop clients:
+Font Previewer is a local desktop decision tool for choosing typography for pitch decks. One shared Studio runs inside a native AppKit/WKWebView Host on macOS and a sandboxed Electron Host on Linux. Both use the same portable `.pitchfontstudy` v4 document and the same workflow:
 
-- a native Apple-silicon Mac Host using SwiftUI, AppKit, and WKWebView;
-- a first-class Linux Host using Electron;
-- one shared Studio and one portable `.pitchfontstudy` contract.
+**Review → Compare → System → Handoff**
 
-The product journey is **Review → Compare → System → Handoff**. It imports local font sources without installing them, preserves exact Face and Candidate decisions, tests typography in deck contexts, and produces reconstructable handoffs.
+## Release-candidate status
 
-## Status
+The v0.1 implementation is isolated on [`codex/v1-release-candidate`](https://github.com/bomkino/font-previewer/tree/codex/v1-release-candidate) with a [draft pull request](https://github.com/bomkino/font-previewer/pull/1). Automated macOS and Linux gates build and launch the production desktop Hosts, exercise displayed UI, native menus and dialogs, recovery, accessibility semantics, the installed-font Catalog, and transactional Handoff, then inspect the package candidates and artifact integrity.
 
-Current milestone: **R0 — evidence and architecture decisions**.
+This is not a public release. The remaining release blockers require a person or distribution credentials: attended VoiceOver and Orca journeys, typography review with legally held production fonts, clean-machine install/uninstall checks, Developer ID signing/notarization, and the owner’s merge/release decision.
 
-No release is ready. The preserved macOS reference passes its tests, native smoke run, packaging, re-extraction, property-list, and ad-hoc signature checks in macOS CI. Isolated Variant A branches now pass automated displayed-Linux Electron and macOS AppKit/WKWebView evidence flows against the same Studio. D01 remains open for attended native-window critique, assistive-technology traversal, real source selection, and induced WebKit process recovery. Production work remains blocked until the required R0 decisions and Contract Freeze A are complete.
+## What works
 
-Start here:
+- Host-local file/folder import without font installation or upload.
+- A searchable, paginated installed-font Catalog indexing up to 10,000 entries; Catalog results enter a Study only through an explicit Add action.
+- Separate Source, local Binding, Face, Candidate, Recipe, Comparison Set, Font Use, Typography System, and Handoff entities.
+- Exact Face indices, variable axes, named instances, OpenType features, casing, tags, notes, rationale, and review decisions.
+- Family Groups with normalized-name confidence, static/variable disclosure, bulk add, Candidate duplication, and family-to-Compare actions.
+- Contact Sheet, Focus, Waterfall, blind comparison, fit policies, deck scenes, Role assignment, and preflighted Handoff.
+- Host-owned recovery distinct from intentional Save, with stale-revision rejection and reload/focus restoration.
+- Transactional Handoff staging, checksums, privacy-safe manifests, and an explicit permission gate before copying font Sources.
+- Native menus, native panels, source reveal/relink, semantic undo/redo, and a bounded path-free HostBridge.
 
-- [`docs/programme/STATUS.md`](docs/programme/STATUS.md) — current truth and frontier
-- [`docs/programme/RECONCILIATION.md`](docs/programme/RECONCILIATION.md) — reference audit
-- [`docs/programme/WAYFINDER.md`](docs/programme/WAYFINDER.md) — decision map
-- [`docs/programme/handover/00_MASTER_HANDOFF.md`](docs/programme/handover/00_MASTER_HANDOFF.md) — product authority
-- [`AGENTS.md`](AGENTS.md) — repository working rules
+## Platforms and artifacts
 
-Current prototype:
+| Platform | Host | Current artifact |
+|---|---|---|
+| macOS 13+ | AppKit + WKWebView + CoreText discovery | Current-architecture ad-hoc signed `.app` ZIP |
+| Ubuntu/Debian x64 | Electron 44 + Fontconfig discovery | `.deb` and portable `.tar.gz` |
+| Browser | Development fallback only | No native Catalog, durable recovery, or transactional Handoff |
 
-- [`prototypes/p1-shared-studio/README.md`](prototypes/p1-shared-studio/README.md) — Variant A implementation for D01 workspace ownership
-- [`prototypes/p1-shared-studio/REPORT.md`](prototypes/p1-shared-studio/REPORT.md) — verified evidence, remaining limits, and next experiment
+CI artifacts are attached to the release-candidate workflow runs; they are evidence builds, not endorsed downloads.
+
+## Build and run
+
+Use Node.js 24 or newer.
+
+```bash
+cd app
+npm ci
+npm run electron:install
+npm run verify
+```
+
+Linux:
+
+```bash
+npm run electron
+npm run package:linux
+```
+
+macOS:
+
+```bash
+./scripts/build-macos-host.sh
+open "output/macos-host/Font Previewer.app"
+```
+
+The Mac builder requires Apple command-line developer tools and signs ad hoc. It does not use a Developer ID identity or notarize.
+
+## Architecture and evidence
+
+- [`app/README.md`](app/README.md) — application development and packaging
+- [`app/REPORT.md`](app/REPORT.md) — exact release-candidate evidence and open gates
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — authority, HostBridge, persistence, and security boundaries
+- [`docs/QA.md`](docs/QA.md) — automated and human release gates
+- [`docs/programme/STATUS.md`](docs/programme/STATUS.md) — current programme truth
+- [`app/DEPENDENCIES.md`](app/DEPENDENCIES.md), [`app/sbom.cdx.json`](app/sbom.cdx.json), and [`app/THIRD_PARTY_NOTICES.md`](app/THIRD_PARTY_NOTICES.md) — supply-chain record
 
 ## Preserved reference
 
-`macos/` contains the native CoreText reference extracted from [`bomkino/pitch-deck-tools`](https://github.com/bomkino/pitch-deck-tools) at:
-
-```text
-branch: codex/native-macos-font-lab
-commit: be77221cb7cb809fdf119945f3fee3d2e1e72ed6
-```
-
-It demonstrates valuable implementation ideas:
-
-- CoreText Face enumeration and collection indices;
-- variable axes and feature selectors;
-- shared live/export CoreText rendering;
-- source watching and relinking;
-- atomic staged exports;
-- a Foundation-only core package.
-
-It also contains model and architecture conflicts documented in `RECONCILIATION.md`. Treat it as an oracle and engine seed, not current product authority.
-
-## Reference build
-
-On macOS with Apple command-line developer tools:
-
-```bash
-swift test --package-path macos
-./build-font-previewer-app.command --no-install
-```
-
-On non-macOS systems, only the Foundation-only Swift target is intended to compile. This workspace currently has no Swift toolchain, so no local Swift result is claimed.
+`macos/` is the original native CoreText reference extracted from `bomkino/pitch-deck-tools` at commit `be77221cb7cb809fdf119945f3fee3d2e1e72ed6`. It remains an oracle and implementation seed, not the release-candidate application. See [`docs/PROVENANCE.md`](docs/PROVENANCE.md).
 
 ## Product boundaries
 
-- Local-only V1. No account, analytics, upload, or required network.
+- Local-only V1: no account, analytics, upload, or required network.
 - No font installation, activation, mutation, moving, or deletion.
-- No taste score or automatic winner.
-- No paid, client, or mystery font binaries in Git.
-- No fake Figma integration.
-- No Mac/Linux pixel-parity claim; renderer differences must be declared.
-- No merge, release, or deployment by inference.
+- No automatic winner or taste score.
+- No paid, client, system, or mystery font binaries in Git.
+- No raster-parity claim between CoreText/WebKit and Chromium.
+- No merge, release, signing-identity use, or deployment by inference.
 
-## Repository provenance
-
-This repository preserves the Font Previewer subdirectory history from `pitch-deck-tools`; the source repository and its reference branch remain unchanged. See [`docs/PROVENANCE.md`](docs/PROVENANCE.md).
-
-## Licence
-
-MIT. See [`LICENSE`](LICENSE).
+MIT licensed. See [`LICENSE`](LICENSE).

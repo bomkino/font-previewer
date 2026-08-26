@@ -1,51 +1,36 @@
-# Open-source Notes
+# Open-source notes
 
-This app learns from open-source typography tools without copying their interfaces or source wholesale.
+## Shipped runtime and build dependencies
+
+The active application deliberately keeps a small dependency surface: React/React DOM for the shared Studio and Electron for the Linux Host. TypeScript and Vite are build-time tools. Exact versions, licences, removal seams, transitive posture, and immutable workflow actions are recorded in [`../app/DEPENDENCIES.md`](../app/DEPENDENCIES.md) and the CycloneDX SBOM.
+
+Mac uses platform AppKit, WebKit, CoreText, CryptoKit, Foundation, and Uniform Type Identifiers frameworks. No additional Swift package is linked into the active Host.
 
 ## FontGoggles
 
-Useful lessons:
-
-- open files and folders directly;
-- treat collections as multiple faces;
-- reload a source when it changes;
-- test real variable behaviour instead of static thumbnails;
-- complex-script shaping deserves an explicit engine and test corpus.
-
-FontGoggles supports more source formats and uses HarfBuzz. Font Previewer currently chooses a smaller CoreText-only boundary because its first job is deck typography on macOS, not font development. HarfBuzz remains a serious future direction, not a checkbox.
+Useful patterns include direct local-file work, collection Faces, reload behavior, variable-font testing, and explicit complex-script shaping. Font Previewer does not copy its UI or bundle its Python/HarfBuzz stack. HarfBuzz remains a renderer decision to evaluate against a corpus.
 
 ## FontBlind
 
-Useful lessons from our own project:
+Useful operational lessons include local-only architecture, native panels, staged packaging, re-extraction/verification, privacy tests, and refusal over untrustworthy output. Font Previewer borrows those standards, not transformation logic or interface.
 
-- local-only should be enforced in architecture;
-- native file panels are better than browser upload facsimiles;
-- builders should stage installation, preserve the old app, sign nested output, package, extract, and verify;
-- privacy claims need output-level tests;
-- refusal is better than silently producing an untrustworthy artefact.
+## fontTools and FontBakery
 
-Font Previewer borrows those operational standards, not FontBlind’s transformation logic or interface.
-
-## fontTools
-
-fontTools remains the obvious future route for richer OpenType metadata, design-space inspection, and source-format support. It is not bundled in the native app today because CoreText already covers the product’s first release boundary without a Python runtime.
-
-## FontBakery
-
-FontBakery’s broad, explicit checks are a useful model for future preflight diagnostics. Font Previewer should not become a compliance dashboard, but it can eventually surface a small deck-relevant subset: broken names, missing common punctuation, implausible vertical metrics, and variation-axis anomalies.
+fontTools is a plausible future seam for richer metadata and source formats; FontBakery’s explicit checks are a useful model for a small deck-relevant preflight. Neither is bundled. Adding Python/runtime weight requires a measured need, licence review, security review, notices, and a removal plan.
 
 ## DrawBot
 
-DrawBot demonstrates how valuable repeatable specimen scripts can be. Font Previewer’s JSON study and single rendering engine create the foundation for shareable specimen recipes without forcing users to write Python.
+DrawBot demonstrates repeatable specimen scripting. Study v4 and Recipes provide a data foundation for repeatable specimens without requiring users to write Python.
 
-## Apple frameworks
+## Electron and Chromium
 
-CoreText supplies descriptor loading, variation axes, features, metrics, shaping, and drawing. AppKit supplies font-aware file panels, Finder integration, source watching, and app packaging. SwiftUI supplies the workspace, but does not own typography rendering.
+Electron is isolated to the Linux Host. The package retains Electron and Chromium licence files, and the app ships third-party notices. Replacing Electron should leave Study semantics and HostBridge intent intact.
 
 ## Non-goals
 
-- Reproducing another tool’s visual language.
-- Adding a dependency merely because it is famous.
-- Claiming script support from Unicode coverage alone.
-- Generating subjective “best font” scores.
-- Training on or uploading paid fonts.
+- Reproducing another tool’s visual language or source wholesale.
+- Adding a famous dependency without measured product need.
+- Claiming script quality from Unicode coverage alone.
+- Generating subjective winner scores.
+- Training on, uploading, or redistributing paid/client fonts.
+- Treating system-font availability as permission to package font binaries.

@@ -1,24 +1,35 @@
 # Contributing
 
-Font Previewer is in evidence-led R0 work. Read `AGENTS.md`, `docs/programme/STATUS.md`, the current ticket, and relevant accepted ADRs before changing code.
+Font Previewer is in R3 release-candidate hardening. Read `AGENTS.md`, `docs/programme/STATUS.md`, the relevant accepted ADRs, and the named ticket before changing code.
 
 ## Working rules
 
-1. Use one branch for one decision prototype or vertical ticket.
-2. Confirm blockers are closed before starting downstream work.
-3. Preserve the macOS reference until replacement evidence exists.
-4. Add tests only at a named public seam for a named user risk.
-5. Keep font sources, studies, exports, client material, and absolute paths out of Git.
-6. Record evidence, limitations, and changed risks.
-7. Do not merge, publish, or release without owner approval.
+1. Preserve Source/Binding/Face/Candidate/Font Use separation and Catalog/Study separation.
+2. Keep privileged operations in the Host and the HostBridge closed, path-free, runtime-validated, and bounded.
+3. Add tests at a public seam for a named user/security risk.
+4. Preserve the root `macos/` reference until replacement rendering evidence exists.
+5. Keep font binaries, Studies, recovery files, Handoffs, client material, absolute paths, and credentials out of Git.
+6. Record exact SHA, commands, evidence, limitations, and changed risk.
+7. Do not merge, mark the PR ready, sign for distribution, publish, or release without owner approval.
+
+## Required verification
+
+```bash
+cd app
+npm ci
+npm run electron:install
+npm run verify
+```
+
+Changes to the application or release workflow must pass both jobs in `.github/workflows/release-candidate.yml`. A Linux-only build is not a Mac claim; a semantic audit is not a VoiceOver/Orca pass; a package is not a verified release until clean-machine and signing gates close.
+
+## Fixtures
+
+Committed font fixtures require exact provenance, licence, redistribution permission, purpose, expected behavior, size, and upstream version. Paid fonts, client fonts, copied system fonts, and mystery binaries are forbidden.
 
 ## Commit hygiene
 
 - Keep commits coherent and scoped.
-- Avoid unrelated refactors.
-- Include fresh verification in the completion report.
-- Never claim macOS, Linux, accessibility, package, or visual gates you did not run.
-
-## Fixtures
-
-Committed font fixtures require exact provenance, licence, redistribution permission, purpose, expected behavior, size, and upstream version. Paid fonts, client fonts, system fonts copied from macOS, and mystery binaries are forbidden.
+- Preserve unrelated work.
+- Update status/docs when a claim or gate changes.
+- Never weaken an evidence assertion merely to make CI green.

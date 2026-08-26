@@ -1,103 +1,93 @@
 # Font Previewer QA
 
-## Automated gates
+## Automated release-candidate gate
 
-Every macOS CI run must pass:
+`npm run verify` must pass:
 
-1. portable core tests;
-2. macOS CoreText tests against actual system font files;
-3. renderer tests for every preview mode;
-4. export tests for dimensions and privacy defaults;
-5. permission-gate tests for source-font copying;
-6. the native smoke executable;
-7. release compilation;
-8. Info.plist lint;
-9. ad-hoc code signing and strict verification;
-10. ZIP integrity;
-11. archive extraction and a second signature / bundle verification.
+1. strict Studio types;
+2. public-seam domain, grouping, protocol, Host-utility, and rendered-surface tests;
+3. production Studio bundle;
+4. Electron main and sandboxed preload compilation;
+5. CycloneDX SBOM generation;
+6. high-severity npm audit.
 
-The local builder runs the same test and smoke paths before packaging unless `--skip-tests` is explicitly supplied.
+The cross-Host workflow additionally requires:
 
-## Manual visual matrix
+- a real displayed Electron run under Xvfb and isolated D-Bus;
+- a real displayed AppKit/WKWebView run on macOS;
+- native menu and panel routes;
+- semantic undo/redo and keyboard-collision checks;
+- named interactive controls, no duplicate IDs, no page overflow, and no Inspector-help collision;
+- malformed/path-bearing bridge-request rejection;
+- actual installed Catalog discovery and font loading through an opaque URL;
+- no Study mutation from Catalog browsing;
+- transactional Handoff and durable recovery;
+- reload with review decision and workspace focus restored;
+- six non-empty screenshots/snapshots per Host, including the installed Catalog, and a Chromium AX tree;
+- packaged licence/notices, checksums, signature/package structure, and Linux sandbox ownership.
 
-Automation cannot judge typography. Before merge or release, test with fonts the team is legally allowed to use across this matrix.
+## Current automated result
 
-### Payloads
+- Remote code commit: `704be6e94939b867323f735609d692c1e5c6ad67`
+- Workflow: [33023567900](https://github.com/bomkino/font-previewer/actions/runs/33023567900)
+- Tests: 19/19
+- Audit: zero known vulnerabilities
+- Mac and Linux displayed/package jobs: pass
 
-- static OTF with CFF outlines;
-- static TrueType;
-- variable font with `wght` only;
-- variable font with at least two axes;
-- TTC or OTC with multiple faces;
-- WOFF and WOFF2 that CoreText accepts;
-- font with ligatures and stylistic sets;
-- font missing ₹, €, em dash, or accented Latin;
-- font covering Arabic, Devanagari, Hebrew, Thai, Japanese, or Korean;
-- deliberately colliding PostScript names in different files.
+Hosted-runner measurements are diagnostic, not universal performance claims.
 
-### Workflows
+## Human release matrix
 
-- drag one file;
-- drag a folder with nested folders and hidden files;
-- import the same source twice;
-- save next to fonts and confirm relative paths;
-- Save As into another directory and reopen;
-- rename or remove a source, reopen, and relink;
-- modify a source file while the app is open;
-- cancel a large import;
-- cancel a multi-page export;
-- quit with unsaved changes;
-- open a study by double-clicking it in Finder.
+Automation cannot judge typography, screen-reader usability, native feel, or redistribution rights. Before release, use legally held fonts covering:
 
-### Visual checks
+- static CFF OTF and TrueType;
+- one-axis and multi-axis variable families;
+- TTC/OTC collections with multiple Faces;
+- ligatures and stylistic sets;
+- missing currency, punctuation, accented Latin, and emoji/color behavior;
+- Arabic, Devanagari, Hebrew, Thai, Japanese, or Korean with a competent reader;
+- colliding names and noisy `VF`/`Variable` family names;
+- malformed, oversized, replaced, deleted, and relinked Sources.
 
-For each representative font:
+Run the complete journey:
 
-- title at short and long lengths;
-- paragraph with several lines;
-- numerals, currency, punctuation, and legal text;
-- dark, light, and split backgrounds;
-- left, centre, right, and justified alignment;
-- negative and positive tracking;
-- tight and loose line height;
-- every variable-axis extreme and default;
-- feature selectors on and off;
-- missing-scalar warning;
-- Waterfall rows;
-- Metrics guide accuracy;
-- Glyph cell centring and labels;
-- Pairing hierarchy and body readability;
-- live canvas versus PNG and PDF.
+- browse Catalog without changing the Study;
+- search and page a large Catalog, rebuild, and cancel/leave during work;
+- add one Source and one visible Family Group;
+- duplicate a variable Candidate and prove settings/decisions stay independent;
+- Review, Compare, assign Roles, Save, quit/recover, reopen on the other Host, relink, and export;
+- cancel every native panel and Handoff;
+- include Sources once without permission and once with explicit permission;
+- compare live Review/Compare/System with PNG/PDF outputs.
 
-## Accessibility checks
+## Accessibility gate
 
-- Full keyboard review using `1`, `2`, `3`, `4`, `⌘↑`, and `⌘↓`.
-- VoiceOver announces family, style, decision, and role for list rows.
-- Buttons have labels beyond icon shape.
-- The interface remains usable with increased contrast and reduced transparency.
-- Status is never communicated by colour alone.
-- The window works at its minimum 1080 × 700 size.
+- Traverse the packaged Mac app with VoiceOver and Linux app with Orca.
+- Confirm Family, style, decision, Role, grouping confidence, and source state are understandable.
+- Operate all decisions, comparison, Role assignment, Save, and Handoff without a pointer.
+- Confirm modal focus trap, Escape close, return focus, stage focus, and native-panel return focus.
+- Test increased contrast, reduced transparency, keyboard repeat, and minimum window size.
+- Record findings; semantic labels alone are not a screen-reader pass.
 
-## Performance thresholds
+## Performance and stability gate
 
-These are product guards, not benchmarks to game:
+The following remain release blockers until measured on reference hardware:
 
-- importing 500 ordinary static faces must keep the main interface responsive;
-- scrolling 100 visible review cards must not trigger font-file reads per frame;
-- source watching opens one descriptor per unique source, not per collection face;
-- exports must release bitmap contexts page by page;
-- cancellation must remove hidden staging output.
+- 10,000-entry Catalog query at the provisional ≤75 ms search budget after indexing;
+- responsive 500-Face import and 100 visible review cards;
+- bounded memory over a long Review/Compare session;
+- cancellation and rebuild without stale results;
+- malformed-font failure containment;
+- induced WKWebView content-process termination and recovery;
+- no per-frame font-file reads or unbounded watcher/token growth.
 
-## Release checklist
+## Distribution gate
 
-- [ ] Core and macOS tests green.
-- [ ] Smoke output inspected.
-- [ ] At least 20 legally held production fonts reviewed manually.
-- [ ] One variable family and one collection tested.
-- [ ] One complex-script specimen reviewed by a competent reader.
-- [ ] PNG and PDF compared against live rendering.
-- [ ] No source font, study, export, or absolute client path staged in Git.
-- [ ] README and changelog match the build.
-- [ ] ZIP checksum generated.
-- [ ] Extracted app launches on a clean macOS user account.
-- [ ] Gatekeeper behaviour documented for the ad-hoc build.
+- Install, launch, Save, recover, export, and uninstall the `.deb` on a clean supported Linux image.
+- Extract and launch the portable archive without changing its sandbox-helper guarantees.
+- Build Mac arm64 and any promised x86_64/universal artifact; sign with Developer ID, enable hardened runtime, notarize, staple, and verify with Gatekeeper.
+- Decide and test RPM if included in V1.
+- Verify notices/SBOM/checksums against the exact source SHA.
+- Owner reviews the draft PR and explicitly authorizes merge and release.
+
+No source font, Study, recovery file, Handoff, absolute client path, signing secret, or notarization credential may enter Git or CI artifacts.
