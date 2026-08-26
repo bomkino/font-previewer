@@ -167,6 +167,7 @@ export async function runEvidenceFlow({
     platform: process.platform,
     architecture: process.arch,
     versions: process.versions,
+    ciChromiumSandboxBypassed: process.argv.includes("--no-sandbox"),
     initial: await inspectWorkspace(window),
     nativeMenu: {
       installed: Boolean(Menu.getApplicationMenu()),

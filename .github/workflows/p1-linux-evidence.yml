@@ -61,10 +61,13 @@ jobs:
       - name: Run displayed Electron evidence flow
         env:
           P1_EVIDENCE_DIR: ${{ runner.temp }}/p1-linux-electron
+          ELECTRON_ENABLE_LOGGING: "1"
         run: |
+          # CI-only: GitHub's hosted runner cannot start Electron's nested SUID sandbox.
+          # BrowserWindow sandboxing remains enabled in product code and is not waived for normal runs.
           timeout --signal=TERM --kill-after=10s 2m \
             xvfb-run --auto-servernum --server-args="-screen 0 1440x960x24" \
-            dbus-run-session -- npm run electron -- --disable-dev-shm-usage
+            dbus-run-session -- npm run electron -- --disable-dev-shm-usage --no-sandbox
 
       - name: Upload evidence
         if: always()
