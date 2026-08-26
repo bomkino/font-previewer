@@ -71,7 +71,7 @@ struct ExportSheet: View {
                         if includeFontCopies {
                             Toggle("I have permission to copy these font files", isOn: $acknowledgedCopyPermission)
                                 .toggleStyle(.checkbox)
-                                .foregroundStyle(acknowledgedCopyPermission ? .primary : .orange)
+                                .foregroundStyle(acknowledgedCopyPermission ? Color.primary : Color.orange)
                             Text("The app cannot determine licence terms. This copies files; it does not grant redistribution rights.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
