@@ -41,6 +41,17 @@ npm run dev
 
 The browser fallback simulates import and undo. It cannot provide native-host evidence.
 
+On macOS 13 or newer, build the thin AppKit/WKWebView Host after bundling the Studio:
+
+```bash
+npm install
+npm run build
+./scripts/build-macos-host.sh
+open "output/macos-host/Font Previewer P1.app"
+```
+
+The app is ad-hoc signed and local-only. It serves the bundled Studio through a bounded read-only custom scheme; it does not use a development server. Set `P1_MAC_OUTPUT_DIR` to choose another build destination. `P1_MAC_EVIDENCE_DIR` is reserved for the destructive automated fixture flow and causes the app to run evidence, write artifacts, and quit.
+
 ## Verification
 
 ```bash
@@ -52,3 +63,10 @@ node scripts/build-sbom.mjs
 ```
 
 See `REPORT.md` for the current evidence and remaining decision gates. See `DEPENDENCIES.md` and `sbom.cdx.json` for the exact dependency posture.
+
+Verified automated runs:
+
+- Linux Electron: GitHub Actions `33010127784`;
+- macOS WKWebView: GitHub Actions `33013245969`.
+
+Neither run accepts D01 or makes this a release candidate.

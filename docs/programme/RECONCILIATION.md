@@ -4,7 +4,7 @@
 **Date:** 2026-08-26  
 **Public seam:** repository evidence
 
-> **Post-reconciliation update — 2026-08-27:** the standalone public repository now exists at `bomkino/font-previewer`. macOS Actions run `33008885071` repairs and verifies the preserved reference build, tests, smoke executable, package, re-extraction, property list, ad-hoc signature, and artifacts. Linux Actions run `33010127784` verifies the isolated P1 shared-Studio prototype under Electron, Xvfb, and D-Bus. The capability table below records the D00 environment at reconciliation time; current truth lives in `STATUS.md` and the P1 report.
+> **Post-reconciliation update — 2026-08-27:** the standalone public repository now exists at `bomkino/font-previewer`. macOS Actions run `33008885071` repairs and verifies the preserved reference build, tests, smoke executable, package, re-extraction, property list, ad-hoc signature, and artifacts. Linux Actions run `33010127784` verifies the isolated P1 shared-Studio prototype under Electron, Xvfb, and D-Bus. macOS Actions run `33013245969` verifies the same Studio through an AppKit/WKWebView Host, including native menu dispatch, a real panel-open/cancel route, undo, reload/focus recovery, semantic-accessibility checks, screenshots, and artifacts. The capability table below records the D00 environment at reconciliation time; current truth lives in `STATUS.md` and the P1 report.
 
 ## 1. Baseline
 

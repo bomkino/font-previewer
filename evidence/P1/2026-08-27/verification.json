@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "verified_at": "2026-08-27",
   "repository": "bomkino/font-previewer",
   "branch": "prototype/p1-full-shared-studio",
@@ -117,12 +117,100 @@
     "app_artifact_digest": "sha256:70df77891d6152c82f829b4da27ad82c80d69d14ec4804e59f075fae43f0aff3",
     "smoke_artifact_digest": "sha256:2a945d0087c59c728c6986763feca24636b11bdee6404a05724ba787916ced24"
   },
+  "mac_shared_studio": {
+    "status": "pass-with-limits",
+    "branch": "prototype/p1-macos-shared-studio",
+    "workflow_run_id": 33013245969,
+    "workflow_job_id": 98324702131,
+    "remote_verified_sha": "f6acb4451f4fbe7946b492cf0f9c90adea32c595",
+    "local_equivalent_sha": "561877c",
+    "evidence_artifact": {
+      "id": 9623417053,
+      "digest": "sha256:1ccfdcc74b251783755faa8294858599920b7e70bdaeadafa0d5c48d8bda0acb"
+    },
+    "prototype_artifact": {
+      "id": 9623417947,
+      "digest": "sha256:c3eb15a345374b3f6787306303573cb96e9a895e77234fa8c3d178f3eac979af"
+    },
+    "environment": {
+      "operating_system": "macOS 14.8.7 (Build 23J520)",
+      "architecture": "arm64",
+      "host": "AppKit and WKWebView"
+    },
+    "screenshots": 5,
+    "native_menu": {
+      "installed": true,
+      "import_item_present": true,
+      "keep_item_present": true,
+      "undo_item_present": true,
+      "reload_item_present": true,
+      "commands_dispatched": 3
+    },
+    "native_panel": {
+      "status": "pass-with-limit",
+      "opened": 1,
+      "cancelled": 1,
+      "focus_restored_to": "import-fonts-button",
+      "limit": "The real NSOpenPanel was shown and automatically cancelled; no font source was selected."
+    },
+    "bridge_round_trip_ms": {
+      "samples": 40,
+      "minimum": 0,
+      "median": 0,
+      "p95": 1,
+      "maximum": 1,
+      "timer_limit": "WKWebView performance timing is quantized; zero-valued samples are not literal zero-latency claims."
+    },
+    "input_to_frame_ms": {
+      "samples": 20,
+      "minimum": 7,
+      "median": 17,
+      "p95": 18,
+      "maximum": 18
+    },
+    "edit_then_native_undo": "pass",
+    "reload_recovery": {
+      "status": "pass",
+      "duration_ms": 185.811,
+      "stage_preserved": true,
+      "revision_preserved": true,
+      "workspace_focus_restored": true
+    },
+    "accessibility_semantics": {
+      "status": "pass-with-limit",
+      "interactive_elements": 48,
+      "unnamed_interactive_elements": 0,
+      "landmarks": {
+        "banner": 1,
+        "navigation": 1,
+        "main": 1,
+        "complementary": 2,
+        "contentinfo": 1
+      },
+      "native_web_view_role": "AXGroup",
+      "native_web_view_direct_children": 1,
+      "limit": "Automated semantics and basic native accessibility hosting passed; VoiceOver traversal was not run."
+    },
+    "security": {
+      "bundled_local_content_only": true,
+      "read_only_custom_scheme": "font-previewer://studio",
+      "named_content_world": "FontPreviewerHostBridge",
+      "persistent_website_data": false,
+      "invalid_bridge_requests_rejected": 3,
+      "navigation_attempts": 0,
+      "popup_attempts": 0,
+      "web_process_terminations": 0
+    }
+  },
   "remaining_limits": [
     "Linux evidence used an automated Xvfb session, not an attended product-quality review.",
-    "The actual native Import dialog and OS menu were not clicked by a human; their routes and menu items were inspected and semantic commands were exercised.",
+    "Mac and Linux native menu paths were automated, not clicked by a human.",
+    "The Mac NSOpenPanel opened and restored focus after automatic cancellation, but no real source was selected; the Linux dialog was not shown.",
     "No interactive Orca traversal has run.",
-    "No WKWebView Host, macOS shared-Studio visual review, or VoiceOver traversal exists.",
+    "No interactive VoiceOver traversal has run.",
+    "Mac screenshots capture WKWebView content, not complete native window chrome; attended Mac quality critique remains open.",
+    "The WKWebView termination recovery handler exists, but an actual web-content-process termination was not induced.",
     "Fixture font names are architectural test data; P1 does not prove cross-engine typography fidelity."
   ],
-  "decision": "D01 remains open; Linux evidence supports Variant A, while Mac shared-Studio and assistive-technology vetoes remain untested."
+  "decision": "D01 remains open. Automated Mac and Linux evidence strongly supports Variant A, but attended native-window critique, VoiceOver and Orca traversal, real source selection, and WKWebView process-termination recovery remain untested."
 }

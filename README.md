@@ -12,7 +12,7 @@ The product journey is **Review → Compare → System → Handoff**. It imports
 
 Current milestone: **R0 — evidence and architecture decisions**.
 
-No release is ready. The preserved macOS reference now passes its tests, native smoke run, packaging, re-extraction, property-list, and ad-hoc signature checks in macOS CI. The isolated Variant A branch also passes its automated displayed-Linux Electron evidence flow. Neither result completes the two-client product model: D01 remains open for native-control use, assistive-technology traversal, and a Mac shared-Studio experiment, and production work remains blocked until the required R0 decisions and Contract Freeze A are complete.
+No release is ready. The preserved macOS reference passes its tests, native smoke run, packaging, re-extraction, property-list, and ad-hoc signature checks in macOS CI. Isolated Variant A branches now pass automated displayed-Linux Electron and macOS AppKit/WKWebView evidence flows against the same Studio. D01 remains open for attended native-window critique, assistive-technology traversal, real source selection, and induced WebKit process recovery. Production work remains blocked until the required R0 decisions and Contract Freeze A are complete.
 
 Start here:
 

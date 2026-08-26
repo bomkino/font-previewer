@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "captured_at": "2026-08-27",
   "workspace": {
     "platform": "linux",
@@ -43,5 +43,19 @@
       "evidence": "No local browser exists. An isolated Playwright Chromium download returned a truncated zero-size archive through the restricted network and the temporary dependency was removed."
     }
   ],
-  "decision_effect": "D01 remains open. No native, focus, screen-reader, reload, input-latency, or visual-quality claim is made."
+  "hosted_runner_evidence": [
+    {
+      "platform": "Ubuntu 24.04 x64",
+      "workflow_run_id": 33010127784,
+      "status": "pass",
+      "coverage": "Displayed Electron task flow under Xvfb and isolated D-Bus, native menu routes, undo, latency, reload/focus recovery, screenshots, and Chromium accessibility tree."
+    },
+    {
+      "platform": "macOS 14.8.7 arm64",
+      "workflow_run_id": 33013245969,
+      "status": "pass-with-limits",
+      "coverage": "AppKit/WKWebView task flow, native menu dispatch, real panel-open/cancel and focus restoration, undo, latency, reload/focus recovery, screenshots, web semantics, basic native accessibility hosting, and bridge-security rejection."
+    }
+  ],
+  "decision_effect": "D01 remains open. Hosted automation strongly supports Variant A across both Hosts; interactive Orca/VoiceOver, attended native-window critique, real source selection, and induced WebKit process termination remain untested."
 }

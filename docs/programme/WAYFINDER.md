@@ -16,7 +16,7 @@ The reference branch proves useful Mac implementation techniques but not the des
 - It stores source paths inside the portable Study.
 - It autosaves into the intentional Study file and has no separate recovery mirror.
 - It renders and exports through one in-process CoreText renderer.
-- Its current reference SHA fails macOS CI before tests or packaging run.
+- Its extracted reference now passes macOS tests, native smoke, packaging, re-extraction, property-list, and ad-hoc signature checks. That validates it as an oracle; it does not resolve the domain and architecture conflicts above.
 
 ## Route
 
@@ -40,7 +40,8 @@ Decision outcome:
 - history-preserving subtree extraction is preferable to copying a snapshot;
 - reference source stays intact and explicitly mapped;
 - production implementation remains blocked;
-- reference CI repair is a prerequisite for treating Mac output as an oracle, but it must not mutate the old domain into the new one by stealth.
+- reference CI repair is complete without mutating the old domain into the new one;
+- the preserved implementation can now serve as an output oracle and engine seed, not destination architecture.
 
 ## Next question
 
@@ -68,20 +69,24 @@ Veto full-Studio ownership when:
 - platform forks spread through the Studio;
 - Mac interaction quality cannot reach the reference bar.
 
-Environment limits:
+Environment and evidence:
 
 - Linux x86_64 workspace is available.
 - Node.js 24.19.0, npm 11.9.0, and pnpm 11.19.0 are available.
 - Swift, Rust, CMake, Ninja, a display server, Orca, and a local macOS runtime are unavailable.
-- Electron `44.0.0` can be resolved and compiled, but `app.whenReady()` did not complete in this workspace, which has no display server and denies D-Bus socket creation.
-- Mac build, WKWebView, VoiceOver, signing, and visual claims require external macOS evidence.
+- SHA-pinned GitHub workflows supply displayed Ubuntu 24.04 Electron and macOS 14 arm64 AppKit/WKWebView evidence environments.
+- Electron `44.0.0` now completes its displayed evidence flow under Xvfb and isolated D-Bus.
+- The Mac Host builds, signs ad hoc, packages, launches, and completes its WKWebView evidence flow in CI.
+- Interactive Orca, VoiceOver, attended visual critique, and local platform claims still require human environments.
 
 Current P1 result:
 
-- Variant A exists and passes type, domain, protocol, SSR surface, build, SBOM, and npm-audit gates.
+- Variant A exists and passes type, domain, protocol, SSR surface, build, SBOM, npm-audit, displayed-Linux Electron, and macOS WKWebView gates.
 - One renderer-owned `StudySession` drives the workspace; the Host retains only privileged Source Bindings and native operations.
 - The bridge carries narrow commands and opaque Source IDs, never paths or mirrored UI state.
-- No workspace ADR is accepted. Displayed Linux, Orca, Mac/WKWebView, native dialog/menu, focus, reload, and visual-quality evidence remain mandatory.
+- Linux automation proves task composition, semantic menu paths, undo, bridge/input latency, reload recovery, focus restoration, and a named Chromium accessibility tree.
+- Mac automation proves the same Studio through a bounded bundled-content scheme, AppKit menu dispatch, real panel-open/cancel with focus restoration, undo, bridge/input latency, reload recovery, web semantics, and basic native accessibility hosting.
+- No workspace ADR is accepted. Attended native-window quality, human menu use, real source selection, Orca, VoiceOver, and induced WebKit process termination remain mandatory.
 
 ## Decision discipline
 
