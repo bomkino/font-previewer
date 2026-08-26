@@ -2,6 +2,12 @@ name: P1 Linux evidence
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - prototype/p1-full-shared-studio
+    paths:
+      - ".github/workflows/p1-linux-evidence.yml"
+      - "prototypes/p1-shared-studio/**"
 
 permissions:
   contents: read
