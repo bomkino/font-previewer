@@ -62,7 +62,8 @@ jobs:
         env:
           P1_EVIDENCE_DIR: ${{ runner.temp }}/p1-linux-electron
         run: |
-          xvfb-run --auto-servernum --server-args="-screen 0 1440x960x24" \
+          timeout --signal=TERM --kill-after=10s 2m \
+            xvfb-run --auto-servernum --server-args="-screen 0 1440x960x24" \
             dbus-run-session -- npm run electron -- --disable-dev-shm-usage
 
       - name: Upload evidence

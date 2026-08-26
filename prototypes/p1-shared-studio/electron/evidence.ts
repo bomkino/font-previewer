@@ -9,23 +9,48 @@ interface EvidenceOptions {
   readonly sendMenuCommand: (command: MenuCommand) => void;
 }
 
+async function withTimeout<T>(
+  label: string,
+  operation: Promise<T>,
+  milliseconds = 10_000,
+): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const expired = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`[p1 evidence] ${label} timed out after ${milliseconds} ms`)),
+      milliseconds,
+    );
+  });
+  try {
+    return await Promise.race([operation, expired]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function settle(window: BrowserWindow, milliseconds = 80): Promise<void> {
-  await window.webContents.executeJavaScript(
-    `new Promise((resolve) => window.setTimeout(resolve, ${milliseconds}))`,
-    true,
+  await withTimeout(
+    "renderer settle",
+    window.webContents.executeJavaScript(
+      `new Promise((resolve) => window.setTimeout(resolve, ${milliseconds}))`,
+      true,
+    ),
+    milliseconds + 5_000,
   );
 }
 
 async function capture(window: BrowserWindow, path: string): Promise<void> {
   console.error(`[p1 evidence] capture ${path}`);
   await settle(window);
-  const image = await window.webContents.capturePage();
+  const image = await withTimeout("page capture", window.webContents.capturePage());
   await writeFile(path, image.toPNG());
 }
 
 async function inspectWorkspace(window: BrowserWindow): Promise<Record<string, unknown>> {
-  return window.webContents.executeJavaScript(
-    `(() => {
+  return withTimeout(
+    "workspace inspection",
+    window.webContents.executeJavaScript(
+      `(() => {
       const selected = document.querySelector('.candidate-row[aria-current="true"]');
       const heading = document.querySelector('#workspace-heading');
       const revision = document.querySelector('.document-title span:last-child');
@@ -39,26 +64,34 @@ async function inspectWorkspace(window: BrowserWindow): Promise<Record<string, u
         stage: document.querySelector('.stage-nav [aria-current="page"]')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
         storedBytes: localStorage.getItem('font-previewer:p1:study')?.length ?? 0,
       };
-    })()`,
-    true,
+      })()`,
+      true,
+    ),
   );
 }
 
 async function collectAccessibilityTree(window: BrowserWindow): Promise<unknown> {
   window.webContents.debugger.attach("1.3");
   try {
-    await window.webContents.debugger.sendCommand("Accessibility.enable");
-    return await window.webContents.debugger.sendCommand("Accessibility.getFullAXTree", {
-      depth: 12,
-    });
+    await withTimeout(
+      "accessibility enable",
+      window.webContents.debugger.sendCommand("Accessibility.enable"),
+    );
+    return await withTimeout(
+      "accessibility tree",
+      window.webContents.debugger.sendCommand("Accessibility.getFullAXTree", { depth: 12 }),
+      15_000,
+    );
   } finally {
     window.webContents.debugger.detach();
   }
 }
 
 async function measureBridge(window: BrowserWindow): Promise<readonly number[]> {
-  return window.webContents.executeJavaScript(
-    `(async () => {
+  return withTimeout(
+    "bridge measurement",
+    window.webContents.executeJavaScript(
+      `(async () => {
       const values = [];
       for (let serial = 0; serial < 40; serial += 1) {
         const started = performance.now();
@@ -67,14 +100,17 @@ async function measureBridge(window: BrowserWindow): Promise<readonly number[]> 
         values.push(performance.now() - started);
       }
       return values;
-    })()`,
-    true,
+      })()`,
+      true,
+    ),
   );
 }
 
 async function measureInput(window: BrowserWindow): Promise<readonly number[]> {
-  return window.webContents.executeJavaScript(
-    `(async () => {
+  return withTimeout(
+    "input measurement",
+    window.webContents.executeJavaScript(
+      `(async () => {
       const textarea = document.querySelector('.field-label textarea');
       if (!(textarea instanceof HTMLTextAreaElement)) throw new Error('Missing specimen editor');
       const setValue = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
@@ -94,8 +130,9 @@ async function measureInput(window: BrowserWindow): Promise<readonly number[]> {
       setValue.call(textarea, original);
       textarea.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'historyUndo' }));
       return values;
-    })()`,
-    true,
+      })()`,
+      true,
+    ),
   );
 }
 
@@ -153,33 +190,44 @@ export async function runEvidenceFlow({
   trace.inputToFrame = summarize(await measureInput(window));
 
   console.error("[p1 evidence] edit and undo");
-  trace.editAndUndo = await window.webContents.executeJavaScript(
-    `(() => {
+  trace.editAndUndo = await withTimeout(
+    "undo preparation",
+    window.webContents.executeJavaScript(
+      `(() => {
       const textarea = document.querySelector('.field-label textarea');
       if (!(textarea instanceof HTMLTextAreaElement)) throw new Error('Missing specimen editor');
       textarea.focus();
       textarea.setSelectionRange(textarea.value.length, textarea.value.length);
       return { before: textarea.value };
-    })()`,
-    true,
+      })()`,
+      true,
+    ),
   );
   window.webContents.insertText(" undo-probe");
   await settle(window);
-  const afterInsert = await window.webContents.executeJavaScript(
-    `document.querySelector('.field-label textarea')?.value ?? null`,
-    true,
+  const afterInsert = await withTimeout(
+    "insert inspection",
+    window.webContents.executeJavaScript(
+      `document.querySelector('.field-label textarea')?.value ?? null`,
+      true,
+    ),
   );
   window.webContents.undo();
   await settle(window);
-  const afterUndo = await window.webContents.executeJavaScript(
-    `document.querySelector('.field-label textarea')?.value ?? null`,
-    true,
+  const afterUndo = await withTimeout(
+    "undo inspection",
+    window.webContents.executeJavaScript(
+      `document.querySelector('.field-label textarea')?.value ?? null`,
+      true,
+    ),
   );
   trace.editAndUndo = { ...(trace.editAndUndo as object), afterInsert, afterUndo };
 
   console.error("[p1 evidence] compare task");
-  await window.webContents.executeJavaScript(
-    `(() => {
+  await withTimeout(
+    "compare task",
+    window.webContents.executeJavaScript(
+      `(() => {
       const select = [...document.querySelectorAll('.field-label select')].at(-1);
       if (!(select instanceof HTMLSelectElement)) throw new Error('Missing role selector');
       const setValue = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
@@ -189,26 +237,33 @@ export async function runEvidenceFlow({
       add?.click();
       const compare = [...document.querySelectorAll('.stage-nav button')].find((button) => button.textContent?.includes('Compare'));
       compare?.click();
-    })()`,
-    true,
+      })()`,
+      true,
+    ),
   );
   await settle(window);
   trace.compare = await inspectWorkspace(window);
   await capture(window, join(output, "02-compare.png"));
 
   console.error("[p1 evidence] system task");
-  await window.webContents.executeJavaScript(
-    `[...document.querySelectorAll('.stage-nav button')].find((button) => button.textContent?.includes('System'))?.click()`,
-    true,
+  await withTimeout(
+    "system task",
+    window.webContents.executeJavaScript(
+      `[...document.querySelectorAll('.stage-nav button')].find((button) => button.textContent?.includes('System'))?.click()`,
+      true,
+    ),
   );
   await settle(window);
   trace.focusAfterStageChange = await inspectWorkspace(window);
   await capture(window, join(output, "03-system.png"));
 
   console.error("[p1 evidence] handoff task");
-  await window.webContents.executeJavaScript(
-    `[...document.querySelectorAll('.stage-nav button')].find((button) => button.textContent?.includes('Handoff'))?.click()`,
-    true,
+  await withTimeout(
+    "handoff task",
+    window.webContents.executeJavaScript(
+      `[...document.querySelectorAll('.stage-nav button')].find((button) => button.textContent?.includes('Handoff'))?.click()`,
+      true,
+    ),
   );
   await settle(window);
   await capture(window, join(output, "04-handoff.png"));
@@ -217,11 +272,20 @@ export async function runEvidenceFlow({
   const beforeReload = await inspectWorkspace(window);
   const reloaded = new Promise<void>((resolveLoad) => window.webContents.once("did-finish-load", () => resolveLoad()));
   const reloadStarted = performance.now();
-  await window.webContents.executeJavaScript(
-    `document.querySelector('button[aria-label="Reload Studio"]')?.click()`,
-    true,
+  const reloadTriggered = await withTimeout<boolean>(
+    "reload trigger",
+    window.webContents.executeJavaScript(
+      `(() => {
+        const button = document.querySelector('button[aria-label="Reload Studio"]');
+        if (!(button instanceof HTMLButtonElement)) return false;
+        button.click();
+        return true;
+      })()`,
+      true,
+    ),
   );
-  await reloaded;
+  if (!reloadTriggered) throw new Error("[p1 evidence] Reload Studio button is missing");
+  await withTimeout("reload navigation", reloaded, 15_000);
   await settle(window, 160);
   trace.reload = {
     durationMs: Number((performance.now() - reloadStarted).toFixed(3)),
