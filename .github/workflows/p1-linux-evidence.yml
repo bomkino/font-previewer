@@ -49,6 +49,12 @@ jobs:
       - name: Install exact Electron binary
         run: npm run electron:install
 
+      - name: Configure Electron sandbox
+        run: |
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+          test "$(stat --format='%U:%G %a' node_modules/electron/dist/chrome-sandbox)" = "root:root 4755"
+
       - name: Verify types, tests, renderer, Host, preload, and SBOM
         run: npm run build
 
