@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "ticket": "D00",
+  "capturedAt": "2026-08-26",
+  "reference": {
+    "repository": "bomkino/pitch-deck-tools",
+    "branch": "codex/native-macos-font-lab",
+    "commit": "be77221cb7cb809fdf119945f3fee3d2e1e72ed6"
+  },
+  "committedFontBinaries": [],
+  "committedStudyFiles": [],
+  "inlineFixtures": [
+    {
+      "id": "schema-v2-migration-study",
+      "kind": "inline-json",
+      "path": "macos/Tests/FontPreviewerCoreTests/CoreTests.swift",
+      "test": "testSchemaTwoProjectMigratesWithNewDefaults",
+      "protects": "schema-2 decode and schema-3 defaults",
+      "limitation": "encodes legacy Maybe, path identity, and collapsed record semantics"
+    },
+    {
+      "id": "schema-v3-semantic-round-trip",
+      "kind": "programmatic-study",
+      "path": "macos/Tests/FontPreviewerCoreTests/CoreTests.swift",
+      "test": "testProjectRoundTripPreservesSemanticContentAndFractionalDates",
+      "protects": "current semantic snapshot and fractional dates",
+      "limitation": "not a canonical portable Study v4 fixture"
+    },
+    {
+      "id": "privacy-default-handoff",
+      "kind": "programmatic-study",
+      "path": "macos/Tests/FontPreviewerCoreTests/CoreTests.swift",
+      "test": "testHandoffOmitsAbsolutePathsByDefaultAndIncludesUsefulDetails",
+      "protects": "default path omission and basic axis/feature handoff",
+      "limitation": "does not test complete Handoff reconstruction"
+    }
+  ],
+  "runtimeOracles": [
+    {
+      "id": "macos-system-font-tests",
+      "kind": "host-system-fonts",
+      "paths": [
+        "macos/Tests/FontPreviewerMacKitTests/MacKitTests.swift",
+        "macos/Sources/FontPreviewerSmoke/main.swift"
+      ],
+      "redistributable": false,
+      "currentReferenceResult": "not reached because Swift compilation failed"
+    }
+  ],
+  "gaps": [
+    "no redistributable static TTF fixture",
+    "no redistributable CFF OTF fixture",
+    "no variable or collection fixture",
+    "no complex-script shaping oracle",
+    "no malformed-font fixture",
+    "no canonical Study file",
+    "no renderer output committed at the reference SHA"
+  ]
+}

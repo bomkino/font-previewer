@@ -1,0 +1,43 @@
+# macOS / editor noise
+.DS_Store
+Icon?
+*.xcuserstate
+*.xcuserdata/
+DerivedData/
+
+# Swift build output
+.build/
+macos/.build/
+output/
+
+# Shared Studio / Electron output
+node_modules/
+dist/
+coverage/
+.vite/
+.cache/
+
+# Local studies, sources, exports, and client material
+private/
+OFFLINE_HANDOVER/
+*.pitchfontstudy
+*.otf
+*.ttf
+*.ttc
+*.otc
+*.dfont
+*.woff
+*.woff2
+*.psd
+*.ai
+*.eps
+*.tif
+*.tiff
+*.mp4
+*.mov
+*.m4v
+*.webm
+
+# Python helper noise
+__pycache__/
+*.pyc

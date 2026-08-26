@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "ticket": "D00",
+  "capturedAt": "2026-08-26",
+  "referenceCommit": "be77221cb7cb809fdf119945f3fee3d2e1e72ed6",
+  "githubActions": {
+    "runId": 32954024459,
+    "jobId": 98131604888,
+    "url": "https://github.com/bomkino/pitch-deck-tools/actions/runs/32954024459",
+    "status": "completed",
+    "conclusion": "failure",
+    "failedStep": "Test portable core and macOS kit",
+    "skippedEvidence": [
+      "native system-font smoke",
+      "signed package",
+      "package inspection",
+      "application artifact",
+      "smoke artifact"
+    ],
+    "decisiveDiagnostics": [
+      "AppModel.swift:194:36: error: 'TextAlignment' is ambiguous for type lookup in this context",
+      "AppModel.swift:370:53: error: reference to captured var 'self' in concurrently-executing code",
+      "AppModel.swift:594:34: error: reference to captured var 'self' in concurrently-executing code",
+      "ExportSheet.swift:61:17: error: struct 'ViewBuilder' requires that 'TableHeaderRowContent<V, Text>' conform to 'View'",
+      "WorkspaceView.swift:355:56: error: no exact matches in call to initializer"
+    ]
+  },
+  "availableCurrentOutputs": [],
+  "localChecks": {
+    "extractedMacosTreeMatchesReference": true,
+    "swiftToolchainAvailable": false,
+    "swiftCommandResult": "swift: command not found"
+  },
+  "claimsNotMade": [
+    "macOS build success",
+    "portable Swift test success",
+    "renderer output validity",
+    "package validity",
+    "visual quality",
+    "VoiceOver behavior",
+    "Linux behavior"
+  ]
+}

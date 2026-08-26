@@ -1,0 +1,910 @@
+{
+  "version": 1,
+  "tickets": [
+    {
+      "id": "D00",
+      "kind": "decision",
+      "milestone": "R0",
+      "title": "Reconcile the handover with the native reference",
+      "blocked_by": [],
+      "outcome": "A read-only report identifies current capabilities, reusable implementation, schema behavior, oracle artifacts, and plan conflicts.",
+      "acceptance": [
+        "Reference branch and commit recorded.",
+        "Current source tree and recent hot spots mapped.",
+        "Current Study fixtures captured without private fonts.",
+        "Current render/export evidence captured.",
+        "Plan conflicts and migration constraints named.",
+        "No source file moved, deleted, or rewritten."
+      ],
+      "seam": "Repository evidence",
+      "non_goals": [
+        "No product changes.",
+        "No architecture wrapper around existing files."
+      ],
+      "evidence": [
+        "RECONCILIATION.md",
+        "fixture manifest",
+        "reference output index"
+      ]
+    },
+    {
+      "id": "D01",
+      "kind": "decision",
+      "milestone": "R0",
+      "title": "Choose the workspace ownership model",
+      "blocked_by": [
+        "D00"
+      ],
+      "outcome": "P1 selects full shared Studio, narrowed shared stage, or separate UIs using measured native quality, focus, accessibility, recovery, and locality.",
+      "acceptance": [
+        "Mac and Linux prototype run the same fixture tasks.",
+        "Native menus/dialogs exercised.",
+        "Web-process reload demonstrated.",
+        "Focus and VoiceOver/Orca exploratory findings recorded.",
+        "Accepted ADR includes veto reasoning."
+      ],
+      "seam": "Host/Studio interface",
+      "non_goals": [
+        "No real font engine.",
+        "No final visual polish."
+      ],
+      "evidence": [
+        "P1 branch",
+        "workspace ADR",
+        "task report"
+      ]
+    },
+    {
+      "id": "D02",
+      "kind": "decision",
+      "milestone": "R0",
+      "title": "Choose interactive and reference rendering",
+      "blocked_by": [
+        "D00"
+      ],
+      "outcome": "P2 selects native assets, browser direct, or controlled hybrid and classifies V1 format support.",
+      "acceptance": [
+        "Common, variable, collection, complex-script, color, and malformed fixtures run.",
+        "Mac and Linux candidates measured.",
+        "Interaction and export tasks run.",
+        "Renderer and format ADRs accepted.",
+        "Unsupported/deferred claims explicit."
+      ],
+      "seam": "Render Service",
+      "non_goals": [
+        "No general font engine rewrite.",
+        "No UI beyond test harness."
+      ],
+      "evidence": [
+        "engine matrix",
+        "performance results",
+        "renderer ADRs"
+      ]
+    },
+    {
+      "id": "D03",
+      "kind": "decision",
+      "milestone": "R0",
+      "title": "Choose Study authority and durability",
+      "blocked_by": [
+        "D00",
+        "D01"
+      ],
+      "outcome": "P3 selects the smallest authority/mirror model that meets interaction and recovery requirements.",
+      "acceptance": [
+        "Optimistic, synchronous, and Host-authoritative alternatives compared.",
+        "Save/close/crash/document-switch scenarios run.",
+        "Durability vocabulary and guarantee documented.",
+        "Authority/recovery ADR accepted."
+      ],
+      "seam": "Study Session / Host mirror",
+      "non_goals": [
+        "No production database.",
+        "No event-sourcing framework."
+      ],
+      "evidence": [
+        "P3 report",
+        "durability ADR",
+        "recovery artifacts"
+      ]
+    },
+    {
+      "id": "D04",
+      "kind": "decision",
+      "milestone": "R0",
+      "title": "Lock the domain and Study v4 migration",
+      "blocked_by": [
+        "D00",
+        "D03"
+      ],
+      "outcome": "P4 proves Source, Face, Candidate, Font Use, portable IDs, local bindings, and legacy migration.",
+      "acceptance": [
+        "Runtime schema and canonical fixtures exist.",
+        "v2/v3 migration preserves legacy Maybe with provenance.",
+        "Same-Face multiple Candidates work.",
+        "Same-Face multiple Font Uses work.",
+        "Mac/Linux prototype round trip is semantic.",
+        "Future schema refuses safely."
+      ],
+      "seam": "Study Session open/migrate/save",
+      "non_goals": [
+        "No Catalog in Study.",
+        "No path identity."
+      ],
+      "evidence": [
+        "schema fixtures",
+        "migration report",
+        "domain ADRs"
+      ]
+    },
+    {
+      "id": "D05",
+      "kind": "decision",
+      "milestone": "R0",
+      "title": "Choose the UX direction and visible labels",
+      "blocked_by": [
+        "D00",
+        "D01",
+        "D02"
+      ],
+      "outcome": "P5 selects the tested Contact Sheet / Editorial Lab / Deck Stage composition and stage labels.",
+      "acceptance": [
+        "Three directions use same fixture and tasks.",
+        "Review, Compare, System, and Inspect tasks complete.",
+        "Vocabulary comprehension recorded.",
+        "Mac/Linux visual critiques recorded.",
+        "DESIGN.md accepted."
+      ],
+      "seam": "Human task journey",
+      "non_goals": [
+        "No component library extraction.",
+        "No final animation."
+      ],
+      "evidence": [
+        "three prototypes",
+        "task report",
+        "DESIGN.md"
+      ]
+    },
+    {
+      "id": "D06",
+      "kind": "decision",
+      "milestone": "R0",
+      "title": "Choose Mac document, sandbox, and engine isolation",
+      "blocked_by": [
+        "D01",
+        "D02",
+        "D03"
+      ],
+      "outcome": "P6 fixes Mac document architecture, App Sandbox posture, XPC/in-process rendering, and minimum OS.",
+      "acceptance": [
+        "Real folder/watch/relink workflows run.",
+        "Multiple documents and recovery tested.",
+        "Helper crash tested.",
+        "Entitlements and signing implications documented.",
+        "Three ADRs accepted."
+      ],
+      "seam": "Packaged Mac prototype",
+      "non_goals": [
+        "No public release.",
+        "No updater."
+      ],
+      "evidence": [
+        "P6 report",
+        "Mac ADRs",
+        "entitlement matrix"
+      ]
+    },
+    {
+      "id": "D07",
+      "kind": "decision",
+      "milestone": "R0",
+      "title": "Choose Linux sidecar transport and packages",
+      "blocked_by": [
+        "D01",
+        "D02",
+        "D03"
+      ],
+      "outcome": "P7 selects Linux process/transport and the first clean-install package set.",
+      "acceptance": [
+        "Electron security baseline applied.",
+        "Sidecar kill/restart demonstrated.",
+        "Ubuntu and Fedora clean tests run.",
+        "Wayland/X11 checked.",
+        "Package ADRs accepted."
+      ],
+      "seam": "Packaged Linux prototype",
+      "non_goals": [
+        "No Flatpak promise without portals proof.",
+        "No Linux arm64."
+      ],
+      "evidence": [
+        "P7 report",
+        "package artifacts",
+        "Linux ADRs"
+      ]
+    },
+    {
+      "id": "D08",
+      "kind": "decision",
+      "milestone": "R0",
+      "title": "Lock the cross-platform accessibility and security contract",
+      "blocked_by": [
+        "D01",
+        "D02",
+        "D03",
+        "D04",
+        "D05",
+        "D06",
+        "D07"
+      ],
+      "outcome": "The threat model and semantic accessibility model are accepted before the tracer becomes production-shaped.",
+      "acceptance": [
+        "Trust boundaries documented.",
+        "Font bytes/path policy fixed.",
+        "Semantic equivalent for render assets demonstrated.",
+        "Native/web focus behavior documented.",
+        "Security/accessibility ADRs accepted."
+      ],
+      "seam": "HostBridge / packaged prototype",
+      "non_goals": [
+        "No release certification claim."
+      ],
+      "evidence": [
+        "threat model",
+        "a11y report",
+        "accepted contract"
+      ]
+    },
+    {
+      "id": "D09",
+      "kind": "decision",
+      "milestone": "R0",
+      "title": "Freeze the tracer contracts",
+      "blocked_by": [
+        "D01",
+        "D02",
+        "D03",
+        "D04",
+        "D05",
+        "D08"
+      ],
+      "outcome": "Minimal Study, HostBridge, Render, Scene, and error contracts are frozen for the first production tracer.",
+      "acceptance": [
+        "Contract schemas versioned.",
+        "Mac/TypeScript/Linux bindings generated or validated.",
+        "Capability and error vocabulary fixed.",
+        "Only tracer-required fields included.",
+        "Breaking-change process documented."
+      ],
+      "seam": "Contracts",
+      "non_goals": [
+        "No beta-complete schema.",
+        "No plugin surface."
+      ],
+      "evidence": [
+        "Contract Freeze A",
+        "conformance fixtures"
+      ]
+    },
+    {
+      "id": "T00",
+      "kind": "build",
+      "milestone": "R0.5",
+      "title": "Create the shared tracer foundation",
+      "blocked_by": [
+        "D09"
+      ],
+      "outcome": "The repository builds the shared Study Session, contracts, one Recipe/Scene, and a minimal Studio without moving the old app.",
+      "acceptance": [
+        "One workspace package builds.",
+        "One Study fixture opens.",
+        "One semantic review command works.",
+        "One Scene request serializes.",
+        "Old native reference remains runnable.",
+        "Build commands documented."
+      ],
+      "seam": "Study Session / contracts",
+      "non_goals": [
+        "No import UI.",
+        "No final design system."
+      ],
+      "evidence": [
+        "shared build",
+        "contract conformance"
+      ]
+    },
+    {
+      "id": "T01",
+      "kind": "build",
+      "milestone": "R0.5",
+      "title": "Build the Mac tracer Host",
+      "blocked_by": [
+        "T00",
+        "D06"
+      ],
+      "outcome": "An arm64 Mac Host opens the shared Studio, selects one Source, renders one Face, mirrors state, and saves a Study.",
+      "acceptance": [
+        "WKWebView or accepted workspace host works.",
+        "Native source panel.",
+        "One exact Face.",
+        "Accepted render path.",
+        "Host mirror.",
+        "Native Save.",
+        "No raw path leak.",
+        "Engine restart leaves Study safe."
+      ],
+      "seam": "Mac HostBridge / Render Service",
+      "non_goals": [
+        "No installed Catalog.",
+        "No package release."
+      ],
+      "evidence": [
+        "Mac tracer video/log",
+        "Study",
+        "PNG"
+      ]
+    },
+    {
+      "id": "T02",
+      "kind": "build",
+      "milestone": "R0.5",
+      "title": "Build the Linux tracer Host",
+      "blocked_by": [
+        "T00",
+        "D07"
+      ],
+      "outcome": "A secure Electron Host opens the shared Studio, binds one Source, renders one Face, mirrors state, and saves a Study.",
+      "acceptance": [
+        "Sandbox/context isolation.",
+        "Narrow preload.",
+        "Custom protocol.",
+        "One exact Face.",
+        "Accepted renderer.",
+        "Host mirror.",
+        "Native Save.",
+        "Sidecar restart."
+      ],
+      "seam": "Linux HostBridge / Render Service",
+      "non_goals": [
+        "No installed Catalog.",
+        "No final package."
+      ],
+      "evidence": [
+        "Linux tracer log",
+        "Study",
+        "PNG"
+      ]
+    },
+    {
+      "id": "T03",
+      "kind": "build",
+      "milestone": "R0.5",
+      "title": "Complete the Mac\u2013Linux\u2013Mac tracer",
+      "blocked_by": [
+        "T01",
+        "T02"
+      ],
+      "outcome": "One Study saves on Mac, opens and renders on Linux, saves, and reopens on Mac without semantic drift.",
+      "acceptance": [
+        "SourceID/FaceID/CandidateID stable.",
+        "Keep decision preserved.",
+        "local bindings differ correctly.",
+        "renderer profile declared.",
+        "semantic snapshots equal.",
+        "one proof and manifest per platform.",
+        "no unapproved merge."
+      ],
+      "seam": "Critical packaged/source journey",
+      "non_goals": [
+        "No broad feature expansion."
+      ],
+      "evidence": [
+        "round-trip report",
+        "two proofs",
+        "snapshot diff"
+      ]
+    },
+    {
+      "id": "T04",
+      "kind": "build",
+      "milestone": "R1",
+      "title": "Stream file and folder import into Review",
+      "blocked_by": [
+        "T03"
+      ],
+      "outcome": "A user imports bounded files/folders, sees Candidates progressively, cancels safely, and understands failures.",
+      "acceptance": [
+        "bounded recursive discovery.",
+        "exact collection Faces.",
+        "progress/task drawer.",
+        "first Candidate early.",
+        "duplicate categories.",
+        "cancel coherent.",
+        "unsupported/quarantined states."
+      ],
+      "seam": "Catalog/import",
+      "non_goals": [
+        "No ZIP.",
+        "No installed fonts."
+      ],
+      "evidence": [
+        "import fixtures",
+        "journey recording"
+      ]
+    },
+    {
+      "id": "T05",
+      "kind": "build",
+      "milestone": "R1",
+      "title": "Implement the stable Review loop",
+      "blocked_by": [
+        "T04"
+      ],
+      "outcome": "Contact Sheet and Focus support fast, reversible Unreviewed/Keep/Maybe/Reject decisions.",
+      "acceptance": [
+        "stable cards.",
+        "keyboard decisions.",
+        "editable-focus guard.",
+        "undo/redo.",
+        "filters/counts.",
+        "comparison tray.",
+        "notes/tags/rationale.",
+        "multi-select preview."
+      ],
+      "seam": "Study Session review commands",
+      "non_goals": [
+        "No command palette.",
+        "No automatic score."
+      ],
+      "evidence": [
+        "review journey",
+        "command tests"
+      ]
+    },
+    {
+      "id": "T06",
+      "kind": "build",
+      "milestone": "R1",
+      "title": "Implement Recipe Packs and custom Recipes",
+      "blocked_by": [
+        "T05"
+      ],
+      "outcome": "A Study tests real Film/TV, Advertising, Business, or custom copy through reusable Recipes.",
+      "acceptance": [
+        "three seed packs and Blank.",
+        "create/duplicate/rename/delete.",
+        "copy and common typography settings.",
+        "advanced language/direction.",
+        "scope labels.",
+        "undo.",
+        "migration from global sample."
+      ],
+      "seam": "Recipe commands",
+      "non_goals": [
+        "No arbitrary Scene editor."
+      ],
+      "evidence": [
+        "Recipe fixtures",
+        "journey"
+      ]
+    },
+    {
+      "id": "T07",
+      "kind": "build",
+      "milestone": "R1",
+      "title": "Implement fair Compare",
+      "blocked_by": [
+        "T05",
+        "T06"
+      ],
+      "outcome": "A user saves and reopens 2\u20134 Candidate comparisons under named policies.",
+      "acceptance": [
+        "equal nominal size.",
+        "equal fit.",
+        "locked line breaks.",
+        "order/reorder.",
+        "lock Recipe/settings.",
+        "fitted-size evidence.",
+        "saved Comparison Set.",
+        "basic blind mode."
+      ],
+      "seam": "Comparison commands / Scene grammar",
+      "non_goals": [
+        "No winner score.",
+        "Overlay/blink optional later."
+      ],
+      "evidence": [
+        "comparison fixtures",
+        "human task"
+      ]
+    },
+    {
+      "id": "T08",
+      "kind": "build",
+      "milestone": "R1",
+      "title": "Finish native document and recovery lifecycle",
+      "blocked_by": [
+        "T05",
+        "D06",
+        "D07"
+      ],
+      "outcome": "Open, Save, Save As, recent documents, recovery, and web/engine restart work on both Apps.",
+      "acceptance": [
+        "atomic save.",
+        "flush barrier.",
+        "separate recovery.",
+        "corrupt quarantine.",
+        "multiple document policy.",
+        "cross-platform round trip.",
+        "future-schema refusal.",
+        "file association development check."
+      ],
+      "seam": "Document Store / Study mirror",
+      "non_goals": [
+        "No cloud sync."
+      ],
+      "evidence": [
+        "crash matrix",
+        "round-trip fixtures"
+      ]
+    },
+    {
+      "id": "T09",
+      "kind": "build",
+      "milestone": "R1",
+      "title": "Export a basic transactional Handoff",
+      "blocked_by": [
+        "T06",
+        "T07",
+        "T08"
+      ],
+      "outcome": "Review/Compare boards, PDF, summary, manifest, and checksums export without partial debris.",
+      "acceptance": [
+        "preflight.",
+        "hidden staging.",
+        "PNG/PDF.",
+        "summary/manifest.",
+        "renderer identity.",
+        "checksums.",
+        "cancel cleanup.",
+        "no paths/font copies by default."
+      ],
+      "seam": "Handoff Builder",
+      "non_goals": [
+        "No Figma integration.",
+        "No source copies yet."
+      ],
+      "evidence": [
+        "export bundle",
+        "verification report"
+      ]
+    },
+    {
+      "id": "T10",
+      "kind": "build",
+      "milestone": "R2",
+      "title": "Implement Family Groups and variable Candidate duplication",
+      "blocked_by": [
+        "T05"
+      ],
+      "outcome": "Families aid navigation while exact Faces and configured Candidate instances remain distinct.",
+      "acceptance": [
+        "group confidence.",
+        "bad-name fixtures.",
+        "static/variable relationship.",
+        "duplicate Candidate.",
+        "independent decision/settings.",
+        "bulk family add with preview."
+      ],
+      "seam": "Catalog grouping / Study commands",
+      "non_goals": [
+        "Family is not identity."
+      ],
+      "evidence": [
+        "family corpus report",
+        "Candidate fixtures"
+      ]
+    },
+    {
+      "id": "T11",
+      "kind": "build",
+      "milestone": "R2",
+      "title": "Build Typography Systems and deck Scenes",
+      "blocked_by": [
+        "T06",
+        "T07",
+        "T10"
+      ],
+      "outcome": "Exact Font Uses fill Roles and render believable pitch-deck typography Scenes.",
+      "acceptance": [
+        "Display/Body/Data/Caption/Legal/Utility.",
+        "same Face different Role settings.",
+        "title/logline/body/data/legal Scenes.",
+        "system rationale.",
+        "Handoff profile completeness.",
+        "no slide-authoring tools."
+      ],
+      "seam": "Typography System commands / Scene grammar",
+      "non_goals": [
+        "No media.",
+        "No automatic pairing score."
+      ],
+      "evidence": [
+        "System Study",
+        "Scene proofs"
+      ]
+    },
+    {
+      "id": "T12",
+      "kind": "build",
+      "milestone": "R2",
+      "title": "Add variable axes, named instances, and OpenType features",
+      "blocked_by": [
+        "T10",
+        "D02"
+      ],
+      "outcome": "Contextual Inspect exposes authored variation and supported features with responsive focused preview.",
+      "acceptance": [
+        "named instances first.",
+        "custom axes.",
+        "min/default/max.",
+        "reset one/all.",
+        "copy matching axes deliberately.",
+        "supported feature groups.",
+        "proof strings.",
+        "clamp after reconcile."
+      ],
+      "seam": "Font intelligence / Candidate commands",
+      "non_goals": [
+        "No generated static font export."
+      ],
+      "evidence": [
+        "font fixture report",
+        "axis interaction trace"
+      ]
+    },
+    {
+      "id": "T13",
+      "kind": "build",
+      "milestone": "R2",
+      "title": "Add characters, script, fallback, metrics, and practical metadata",
+      "blocked_by": [
+        "T12"
+      ],
+      "outcome": "Inspect provides decision-relevant evidence without becoming a compliance dashboard.",
+      "acceptance": [
+        "character search/copy.",
+        "Unicode/glyph name where available.",
+        "required-copy missing report.",
+        "native/fallback/missing distinction.",
+        "metrics guides.",
+        "color evidence.",
+        "embedding disclaimer.",
+        "profile declared."
+      ],
+      "seam": "Font intelligence / Render evidence",
+      "non_goals": [
+        "No accessibility certification.",
+        "No full FontBakery UI."
+      ],
+      "evidence": [
+        "script corpus",
+        "fallback report"
+      ]
+    },
+    {
+      "id": "T14",
+      "kind": "build",
+      "milestone": "R2",
+      "title": "Implement Source relink, reconciliation, and hot reload",
+      "blocked_by": [
+        "T08",
+        "T10",
+        "T12"
+      ],
+      "outcome": "Moved or changed Sources reconnect without losing configured Candidates or silently remapping Faces.",
+      "acceptance": [
+        "single/folder relink.",
+        "ranked match.",
+        "ambiguous confirmation.",
+        "in-place write.",
+        "rename-over.",
+        "directory replacement.",
+        "collection topology report.",
+        "cache invalidation.",
+        "crash quarantine."
+      ],
+      "seam": "Source Binding / watcher / reconcile",
+      "non_goals": [
+        "No silent face-index substitution."
+      ],
+      "evidence": [
+        "filesystem scenario report"
+      ]
+    },
+    {
+      "id": "T15",
+      "kind": "build",
+      "milestone": "R2",
+      "title": "Add installed-font Catalog and large-library performance",
+      "blocked_by": [
+        "T10",
+        "T14"
+      ],
+      "outcome": "Local installed fonts are searchable progressively without becoming Study state or freezing the UI.",
+      "acceptance": [
+        "CoreText installed discovery.",
+        "Fontconfig discovery.",
+        "incremental index.",
+        "10,000-Face search.",
+        "virtualization.",
+        "explicit add to Study.",
+        "bounded cache.",
+        "cancel/rebuild."
+      ],
+      "seam": "Catalog",
+      "non_goals": [
+        "No activation.",
+        "No remote catalog."
+      ],
+      "evidence": [
+        "large-catalog trace",
+        "memory report"
+      ]
+    },
+    {
+      "id": "T16",
+      "kind": "build",
+      "milestone": "R2",
+      "title": "Complete reconstructable Handoff",
+      "blocked_by": [
+        "T11",
+        "T13",
+        "T14",
+        "T09"
+      ],
+      "outcome": "A recipient can reconstruct the Typography System from human, machine, and visual evidence.",
+      "acceptance": [
+        "human summary.",
+        "Sources/Faces/Candidates/Font Uses.",
+        "Recipes/Scenes.",
+        "renderer evidence.",
+        "source health.",
+        "coverage/fallback.",
+        "Figma reference JSON/CSV.",
+        "permission-gated Source copies.",
+        "independent reconstruction."
+      ],
+      "seam": "Handoff Builder / reconstruction",
+      "non_goals": [
+        "No Figma API claim.",
+        "No licence conclusion."
+      ],
+      "evidence": [
+        "reconstruction report",
+        "complete Handoff"
+      ]
+    },
+    {
+      "id": "T17",
+      "kind": "build",
+      "milestone": "R3",
+      "title": "Close security, accessibility, and performance risks",
+      "blocked_by": [
+        "T15",
+        "T16"
+      ],
+      "outcome": "The complete product passes the named risk ledger and human core journeys.",
+      "acceptance": [
+        "VoiceOver.",
+        "Orca.",
+        "keyboard only.",
+        "high contrast/reduced motion/zoom.",
+        "malformed-font containment.",
+        "Electron security/fuses.",
+        "Mac entitlements.",
+        "privacy observation.",
+        "long session.",
+        "performance budgets."
+      ],
+      "seam": "Packaged/source critical journeys",
+      "non_goals": [
+        "No certification theatre."
+      ],
+      "evidence": [
+        "risk ledger",
+        "human reports",
+        "traces"
+      ]
+    },
+    {
+      "id": "T18",
+      "kind": "build",
+      "milestone": "R3",
+      "title": "Package Mac and Linux release candidates",
+      "blocked_by": [
+        "T17",
+        "D06",
+        "D07"
+      ],
+      "outcome": "Downloaded release candidates install/open and complete the critical journey on clean supported machines.",
+      "acceptance": [
+        "arm64 Mac.",
+        "Developer ID/hardened/notarized/stapled.",
+        "nested helper verification.",
+        "deb/rpm accepted.",
+        "native dependencies bundled.",
+        "file associations.",
+        "SBOM/notices.",
+        "checksums.",
+        "clean install/uninstall.",
+        "no accidental font fixture."
+      ],
+      "seam": "Packaged applications",
+      "non_goals": [
+        "No public publication.",
+        "No updater."
+      ],
+      "evidence": [
+        "packages",
+        "clean-machine report"
+      ]
+    },
+    {
+      "id": "T19",
+      "kind": "build",
+      "milestone": "R3",
+      "title": "Migrate legacy work and archive superseded paths",
+      "blocked_by": [
+        "T18"
+      ],
+      "outcome": "Every reference-branch capability is preserved, replaced, deferred, or explicitly removed, and legacy Studies migrate safely.",
+      "acceptance": [
+        "capability parity matrix.",
+        "v2/v3 migration.",
+        "reference CoreText logic reused or consciously replaced.",
+        "old full UI no longer primary.",
+        "legacy HTML archived.",
+        "docs updated.",
+        "no private artifact.",
+        "draft PR."
+      ],
+      "seam": "Migration / packaged apps",
+      "non_goals": [
+        "No deletion before evidence.",
+        "No merge."
+      ],
+      "evidence": [
+        "migration report",
+        "draft PR"
+      ]
+    },
+    {
+      "id": "T20",
+      "kind": "gate",
+      "milestone": "V1",
+      "title": "Prepare the owner release decision",
+      "blocked_by": [
+        "T19"
+      ],
+      "outcome": "Owners receive the verified packages, limitations, provenance, release notes, and explicit merge/release choices.",
+      "acceptance": [
+        "final verification report.",
+        "open limitations.",
+        "package links/checksums.",
+        "licence ledger.",
+        "release notes.",
+        "merge decision separate from release decision.",
+        "no action taken by default."
+      ],
+      "seam": "Owner review",
+      "non_goals": [
+        "No implicit approval."
+      ],
+      "evidence": [
+        "release-decision packet"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,178 @@
+{
+  "version": 1,
+  "decisions": [
+    {
+      "id": "ADR-001",
+      "status": "accepted",
+      "title": "One product, two Hosts"
+    },
+    {
+      "id": "ADR-002",
+      "status": "accepted",
+      "title": "Mac reference, Linux first-class"
+    },
+    {
+      "id": "ADR-003",
+      "status": "accepted",
+      "title": "Four canonical stages"
+    },
+    {
+      "id": "ADR-004",
+      "status": "accepted",
+      "title": "Catalog separate from Study"
+    },
+    {
+      "id": "ADR-005",
+      "status": "accepted",
+      "title": "Source, Face, Candidate, and Font Use are distinct"
+    },
+    {
+      "id": "ADR-006",
+      "status": "accepted",
+      "title": "Durable IDs are not paths or names"
+    },
+    {
+      "id": "ADR-007",
+      "status": "accepted",
+      "title": "New Candidates are Unreviewed"
+    },
+    {
+      "id": "ADR-008",
+      "status": "accepted",
+      "title": "Semantic parity, not raster parity"
+    },
+    {
+      "id": "ADR-009",
+      "status": "accepted",
+      "title": "V1 is local-only"
+    },
+    {
+      "id": "ADR-010",
+      "status": "accepted",
+      "title": "No font-installation mutation"
+    },
+    {
+      "id": "ADR-011",
+      "status": "accepted",
+      "title": "Expand-contract migration"
+    },
+    {
+      "id": "ADR-012",
+      "status": "accepted",
+      "title": "Risk-led public-seam testing"
+    },
+    {
+      "id": "ADR-013",
+      "status": "accepted",
+      "title": "Owner-controlled irreversible actions"
+    },
+    {
+      "id": "ADR-H01",
+      "status": "leading-hypothesis",
+      "title": "Full shared Studio workspace",
+      "gate": "P1"
+    },
+    {
+      "id": "ADR-H02",
+      "status": "leading-hypothesis",
+      "title": "Native rendered assets as primary interactive path",
+      "gate": "P2"
+    },
+    {
+      "id": "ADR-H03",
+      "status": "leading-hypothesis",
+      "title": "Optimistic Studio authority with asynchronous Host mirror",
+      "gate": "P3"
+    },
+    {
+      "id": "ADR-H04",
+      "status": "leading-hypothesis",
+      "title": "One CoreText XPC engine on Mac",
+      "gate": "P6"
+    },
+    {
+      "id": "ADR-H05",
+      "status": "leading-hypothesis",
+      "title": "HarfBuzz/FreeType Linux stack",
+      "gate": "P2"
+    },
+    {
+      "id": "ADR-H06",
+      "status": "leading-hypothesis",
+      "title": "macOS 14 minimum",
+      "gate": "P6"
+    },
+    {
+      "id": "ADR-H07",
+      "status": "leading-hypothesis",
+      "title": "Developer ID direct distribution without updater",
+      "gate": "P6"
+    },
+    {
+      "id": "ADR-H08",
+      "status": "leading-hypothesis",
+      "title": "deb and rpm first",
+      "gate": "P7"
+    },
+    {
+      "id": "ADR-O01",
+      "status": "open",
+      "title": "Interactive render path",
+      "gate": "P2"
+    },
+    {
+      "id": "ADR-O02",
+      "status": "open",
+      "title": "Study authority and durability",
+      "gate": "P3"
+    },
+    {
+      "id": "ADR-O03",
+      "status": "open",
+      "title": "Linux drawing/PDF backend",
+      "gate": "P2"
+    },
+    {
+      "id": "ADR-O04",
+      "status": "open",
+      "title": "Mac App Sandbox",
+      "gate": "P6"
+    },
+    {
+      "id": "ADR-O05",
+      "status": "open",
+      "title": "Mac document architecture",
+      "gate": "P6"
+    },
+    {
+      "id": "ADR-O06",
+      "status": "open",
+      "title": "V1 format tiers",
+      "gate": "P2"
+    },
+    {
+      "id": "ADR-O07",
+      "status": "open",
+      "title": "Visible stage labels",
+      "gate": "P5"
+    },
+    {
+      "id": "ADR-O08",
+      "status": "open",
+      "title": "Browser Render Profile",
+      "gate": "P2"
+    },
+    {
+      "id": "ADR-O09",
+      "status": "open",
+      "title": "Private Source digest policy",
+      "gate": "P4"
+    },
+    {
+      "id": "ADR-O10",
+      "status": "open",
+      "title": "Multiple Linux document windows",
+      "gate": "P7"
+    }
+  ]
+}

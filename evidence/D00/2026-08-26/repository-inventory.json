@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "ticket": "D00",
+  "referenceCommit": "be77221cb7cb809fdf119945f3fee3d2e1e72ed6",
+  "extractedCommit": "f89cde8c3e6e347e29829e5bcd7ee59160d7b3ad",
+  "history": {
+    "fontPreviewerCommitsPreserved": 27,
+    "nativeRewriteDate": "2026-08-26"
+  },
+  "modules": [
+    {
+      "path": "macos/Sources/FontPreviewerCore",
+      "swiftLines": 1497,
+      "role": "Foundation-only current models, codec, filters, presets, handoff, and export planning"
+    },
+    {
+      "path": "macos/Sources/FontPreviewerMacKit",
+      "swiftLines": 1650,
+      "role": "CoreText inspection/rendering, source watching, and export transaction"
+    },
+    {
+      "path": "macos/Sources/FontPreviewerApp",
+      "swiftLines": 1961,
+      "role": "SwiftUI/AppKit application and current document authority"
+    },
+    {
+      "path": "macos/Sources/FontPreviewerSmoke",
+      "swiftLines": 145,
+      "role": "macOS system-font smoke executable"
+    }
+  ],
+  "tests": {
+    "coreTests": 16,
+    "macKitTests": 4,
+    "smokeExecutables": 1
+  },
+  "legacyReferences": [
+    "typeboards.html",
+    "figma-font-test-exporter.html",
+    "start-font-previewer.sh"
+  ],
+  "packaging": [
+    "build-font-previewer-app.command",
+    "macos/Support/Info.plist",
+    "macos/Support/make_icon.swift"
+  ],
+  "currentSchemaVersion": 3,
+  "currentPreviewModes": [
+    "Review",
+    "Focus",
+    "Compare",
+    "Waterfall",
+    "Metrics",
+    "Glyphs",
+    "Pairing"
+  ],
+  "currentSupportedExtensionsClaim": [
+    "otf",
+    "ttf",
+    "ttc",
+    "otc",
+    "dfont",
+    "woff",
+    "woff2"
+  ]
+}
