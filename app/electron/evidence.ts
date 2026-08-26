@@ -132,6 +132,11 @@ async function measureInput(window: BrowserWindow): Promise<Record<string, numbe
 async function semanticAudit(window: BrowserWindow): Promise<Record<string, unknown>> {
   return withTimeout("semantic audit", window.webContents.executeJavaScript(`(() => {
     const controls = [...document.querySelectorAll('button,input,select,textarea')];
+    const roleLabel = [...document.querySelectorAll('.field-label')].find((label) => label.querySelector(':scope > span')?.textContent?.trim() === 'Role');
+    const roleSelect = roleLabel?.querySelector('select');
+    const roleHelp = roleLabel?.querySelector(':scope > small');
+    const roleSelectRect = roleSelect?.getBoundingClientRect();
+    const roleHelpRect = roleHelp?.getBoundingClientRect();
     const name = (control) => {
       const aria = control.getAttribute('aria-label') || control.getAttribute('aria-labelledby');
       if (aria) return aria;
@@ -154,6 +159,7 @@ async function semanticAudit(window: BrowserWindow): Promise<Record<string, unkn
       },
       duplicateIds: [...document.querySelectorAll('[id]')].map((item) => item.id).filter((id, index, ids) => ids.indexOf(id) !== index),
       horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      roleHelpSeparated: Boolean(roleSelectRect && roleHelpRect && roleSelectRect.bottom <= roleHelpRect.top),
     };
   })()`, true));
 }
@@ -329,6 +335,7 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   trace.semanticAudit = await semanticAudit(options.window);
   trace.securityAudit = await securityAudit(options.window);
   trace.installedCatalog = await installedCatalogAudit(options.window);
+  await capture(options.window, join(output, "06-catalog.png"));
 
   await waitFor(options.window, "durable recovery", `document.querySelector('.document-title > span:last-child')?.textContent?.includes('recovery ready')`, 20_000);
   if (options.verifyDurability) trace.durabilityArtifact = await options.verifyDurability();
@@ -359,11 +366,11 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   };
   await writeFile(join(output, "metadata.json"), `${JSON.stringify(metadata, null, 2)}\n`, { mode: 0o600 });
 
-  const audit = trace.semanticAudit as { unnamed?: unknown[]; duplicateIds?: unknown[] };
+  const audit = trace.semanticAudit as { unnamed?: unknown[]; duplicateIds?: unknown[]; horizontalOverflow?: boolean; roleHelpSeparated?: boolean };
   const security = trace.securityAudit as { invalidRequests?: number; rejected?: number; nodeUnavailable?: boolean };
   const keyboard = trace.keyboardAccessibility as Record<string, boolean>;
   const catalog = trace.installedCatalog as { count?: number; indexed?: number; pathLeak?: boolean; opaquePreviewUrls?: boolean; previewAvailable?: boolean; fontLoaded?: boolean; pageBounded?: boolean; studyUnchanged?: boolean };
-  if (audit.unnamed?.length || audit.duplicateIds?.length) throw new Error("Semantic accessibility audit failed.");
+  if (audit.unnamed?.length || audit.duplicateIds?.length || audit.horizontalOverflow || !audit.roleHelpSeparated) throw new Error("Semantic accessibility or layout audit failed.");
   if (security.invalidRequests !== security.rejected || !security.nodeUnavailable) throw new Error("Host security audit failed.");
   if (!catalog.count || !catalog.indexed || catalog.pathLeak || !catalog.opaquePreviewUrls || !catalog.previewAvailable || !catalog.fontLoaded || !catalog.pageBounded || !catalog.studyUnchanged) throw new Error("Installed font catalog audit failed.");
   if (!keyboard.forwardWrap || !keyboard.backwardWrap || !keyboard.candidateUnchanged || !keyboard.trayUnchanged || !keyboard.returnFocus) throw new Error("Keyboard accessibility audit failed.");

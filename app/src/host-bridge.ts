@@ -1,4 +1,5 @@
 import { parseStudyDocument, serializeStudyDocument, type ImportedSource } from "./domain.js";
+import { createNewStudy } from "./fixture.js";
 import {
   isHostEvent,
   isHostResponse,
@@ -126,7 +127,7 @@ const browserPort: HostPort = {
         if (!file) {
           return {
             type: "study-opened",
-            document: parseStudyDocument(serializeStudyDocument((await import("./fixture.js")).createNewStudy().document)),
+            document: parseStudyDocument(serializeStudyDocument(createNewStudy().document)),
             bindings: [],
             warnings: ["Open cancelled."],
           };

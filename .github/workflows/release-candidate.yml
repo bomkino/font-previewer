@@ -91,11 +91,13 @@ jobs:
             .installedCatalog.fontLoaded == true and
             (.semanticAudit.unnamed | length) == 0 and
             (.semanticAudit.duplicateIds | length) == 0 and
+            .semanticAudit.horizontalOverflow == false and
+            .semanticAudit.roleHelpSeparated == true and
             .reloadRecovery.after.activeElement == "workspace-heading" and
             .reloadRecovery.after.reviewState == "Keep" and
             .transactionalHandoff.fileCount >= 2
           ' "$EVIDENCE/trace.json" >/dev/null
-          for image in 01-review 02-compare 03-system 04-handoff 05-recovered; do
+          for image in 01-review 02-compare 03-system 04-handoff 05-recovered 06-catalog; do
             test -s "$EVIDENCE/$image.png"
             file "$EVIDENCE/$image.png" | grep -q 'PNG image data'
           done
@@ -238,10 +240,12 @@ jobs:
             .keyboardAccessibility.returnFocus == true and
             .semantics.unnamed == 0 and
             .semantics.duplicateIds == 0 and
+            .semantics.horizontalOverflow == false and
+            .semantics.roleHelpSeparated == true and
             .reload.after.activeElement == "workspace-heading" and
             .reload.after.reviewState == "Keep"
           ' "$EVIDENCE/run.json" >/dev/null
-          for image in 01-review 02-compare 03-system 04-handoff 05-recovered; do
+          for image in 01-review 02-compare 03-system 04-handoff 05-recovered 06-catalog; do
             test -s "$EVIDENCE/$image.png"
             file "$EVIDENCE/$image.png" | grep -q 'PNG image data'
           done
