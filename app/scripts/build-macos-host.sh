@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_DIR="$(cd "$APP_DIR/.." && pwd)"
 SOURCE="$APP_DIR/macos/FontPreviewerHost.swift"
 PLIST="$APP_DIR/macos/Info.plist"
 STUDIO="$APP_DIR/dist/renderer"
@@ -62,6 +63,8 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/Studio"
 ditto "$BINARY" "$APP/Contents/MacOS/FontPreviewer"
 ditto "$PLIST" "$APP/Contents/Info.plist"
 ditto "$STUDIO" "$APP/Contents/Resources/Studio"
+ditto "$REPO_DIR/LICENSE" "$APP/Contents/Resources/LICENSE.txt"
+ditto "$APP_DIR/THIRD_PARTY_NOTICES.md" "$APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
 codesign --force --sign - --identifier dog.pitch.fontpreviewer "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"

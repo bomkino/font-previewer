@@ -10,7 +10,9 @@ import {
   type WorkspaceState,
 } from "./domain.js";
 
-export const HOST_PROTOCOL_VERSION = 1 as const;
+export const HOST_PROTOCOL_VERSION = 2 as const;
+export const CATALOG_PAGE_SIZE = 80 as const;
+export const MAX_CATALOG_PAGE_SIZE = 200 as const;
 
 export interface HostCapabilities {
   readonly host: "browser" | "electron" | "wkwebview";
@@ -58,7 +60,13 @@ export interface RecoveryEnvelope {
 export type HostRequest =
   | { readonly type: "get-launch-state" }
   | { readonly type: "open-import" }
-  | { readonly type: "scan-installed" }
+  | {
+      readonly type: "scan-installed";
+      readonly query: string;
+      readonly cursor: number;
+      readonly limit: number;
+      readonly refresh: boolean;
+    }
   | { readonly type: "open-study" }
   | {
       readonly type: "mirror-study";
@@ -92,6 +100,15 @@ export type HostResponse =
       readonly imports: readonly ImportedSource[];
       readonly rejected: number;
       readonly truncated: boolean;
+    }
+  | {
+      readonly type: "catalog-result";
+      readonly imports: readonly ImportedSource[];
+      readonly indexed: number;
+      readonly total: number;
+      readonly rejected: number;
+      readonly truncated: boolean;
+      readonly nextCursor?: number;
     }
   | {
       readonly type: "study-opened";
@@ -267,8 +284,19 @@ function validDocument(value: unknown): value is StudyDocument {
 
 export function isHostRequest(value: unknown): value is HostRequest {
   if (!isRecord(value) || typeof value.type !== "string") return false;
-  if (["get-launch-state", "open-import", "scan-installed", "open-study", "native-undo", "reload-studio"].includes(value.type)) {
+  if (["get-launch-state", "open-import", "open-study", "native-undo", "reload-studio"].includes(value.type)) {
     return exactKeys(value, ["type"]);
+  }
+  if (value.type === "scan-installed") {
+    return (
+      exactKeys(value, ["type", "query", "cursor", "limit", "refresh"]) &&
+      typeof value.query === "string" &&
+      value.query.length <= 200 &&
+      isInteger(value.cursor) &&
+      isInteger(value.limit, 1) &&
+      value.limit <= MAX_CATALOG_PAGE_SIZE &&
+      typeof value.refresh === "boolean"
+    );
   }
   if (value.type === "probe") return exactKeys(value, ["type", "serial"]) && isInteger(value.serial);
   if (value.type === "mirror-study") {
@@ -370,6 +398,21 @@ export function isHostResponse(value: unknown): value is HostResponse {
       isInteger(value.rejected) &&
       typeof value.truncated === "boolean"
     );
+  }
+  if (value.type === "catalog-result") {
+    if (
+      !allowedKeys(value, ["type", "imports", "indexed", "total", "rejected", "truncated"], ["nextCursor"]) ||
+      !Array.isArray(value.imports) ||
+      value.imports.length > MAX_CATALOG_PAGE_SIZE ||
+      !value.imports.every(validImportedSource) ||
+      !isInteger(value.indexed) ||
+      !isInteger(value.total) ||
+      value.total > value.indexed ||
+      !isInteger(value.rejected) ||
+      typeof value.truncated !== "boolean" ||
+      (value.nextCursor !== undefined && (!isInteger(value.nextCursor, 1) || value.nextCursor > value.total))
+    ) return false;
+    return true;
   }
   if (value.type === "study-opened") {
     return (

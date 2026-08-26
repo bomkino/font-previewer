@@ -10,10 +10,12 @@ import {
 } from "react";
 import {
   STAGES,
+  STUDY_LIMITS,
   applyStudyCommand,
   createSession,
   isSemanticCommand,
   type RecipePack,
+  type ImportedSource,
   type Stage,
   type StudyCommand,
   type StudyDocument,
@@ -31,8 +33,10 @@ import {
   Workspace,
   stageLabels,
   type AppActions,
+  type InstalledCatalogView,
+  type NavigatorMode,
 } from "./components.js";
-import type { HostCapabilities, MenuCommand } from "./protocol.js";
+import { CATALOG_PAGE_SIZE, type HostCapabilities, type MenuCommand } from "./protocol.js";
 
 interface HistorySnapshot {
   readonly document: StudyDocument;
@@ -52,6 +56,30 @@ type HistoryAction =
   | { readonly type: "redo" };
 
 const HISTORY_LIMIT = 100;
+const EMPTY_CATALOG: InstalledCatalogView = { query: "", cursor: 0, imports: [], indexed: 0, total: 0, rejected: 0, truncated: false };
+
+function importsWithinStudyLimits(document: StudyDocument, imports: readonly ImportedSource[]): ImportedSource[] {
+  const existing = new Set(document.sources.map((source) => source.id));
+  const seen = new Set(existing);
+  let sources = document.sources.length;
+  let faces = document.faces.length;
+  let candidates = document.candidates.length;
+  const accepted: ImportedSource[] = [];
+  for (const imported of imports) {
+    if (existing.has(imported.source.id)) {
+      if (!accepted.some((item) => item.source.id === imported.source.id)) accepted.push(imported);
+      continue;
+    }
+    if (seen.has(imported.source.id)) continue;
+    seen.add(imported.source.id);
+    if (sources + 1 > STUDY_LIMITS.sources || faces + imported.faces.length > STUDY_LIMITS.faces || candidates + imported.faces.length > STUDY_LIMITS.candidates) continue;
+    accepted.push(imported);
+    sources += 1;
+    faces += imported.faces.length;
+    candidates += imported.faces.length;
+  }
+  return accepted;
+}
 
 function snapshot(session: StudySession): HistorySnapshot {
   return { document: session.document, workspace: session.workspace };
@@ -137,11 +165,14 @@ export default function App() {
   const [newStudyOpen, setNewStudyOpen] = useState(false);
   const [newStudyTitle, setNewStudyTitle] = useState("Untitled font study");
   const [newStudyPack, setNewStudyPack] = useState<RecipePack>("film-tv");
+  const [navigatorMode, setNavigatorMode] = useState<NavigatorMode>("study");
+  const [catalog, setCatalog] = useState<InstalledCatalogView>(EMPTY_CATALOG);
   const [titleDraft, setTitleDraft] = useState(session.document.title);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const pendingWorkspaceFocusRef = useRef(false);
   const newStudyDialogRef = useRef<HTMLElement>(null);
   const newStudyReturnFocusRef = useRef<HTMLElement | null>(null);
+  const catalogRequestRef = useRef(0);
   const index = useStudyIndex(session.document);
   const fontStates = useFontRegistry(session);
 
@@ -198,25 +229,43 @@ export default function App() {
     void runTask("Importing Sources", async () => {
       const response = await host.request({ type: "open-import" });
       if (response.type !== "import-result") throw new Error("Host returned the wrong import response.");
-      if (response.imports.length) {
-        dispatch({ type: "ingest-sources", imports: response.imports });
+      const accepted = importsWithinStudyLimits(sessionRef.current.document, response.imports);
+      if (accepted.length) {
+        dispatch({ type: "ingest-sources", imports: accepted });
         setShowWelcome(false);
-        setNotice(`${response.imports.length} ${response.imports.length === 1 ? "Source" : "Sources"} imported${response.rejected ? ` · ${response.rejected} rejected` : ""}${response.truncated ? " · limit reached" : ""}.`);
+        const limited = response.imports.length - accepted.length;
+        setNotice(`${accepted.length} ${accepted.length === 1 ? "Source" : "Sources"} imported${response.rejected ? ` · ${response.rejected} rejected` : ""}${response.truncated || limited ? " · Study limit reached" : ""}.`);
       } else {
-        setNotice(response.rejected ? `${response.rejected} unsupported or unreadable Sources rejected.` : "Import cancelled.");
+        setNotice(response.rejected ? `${response.rejected} unsupported or unreadable Sources rejected.` : response.imports.length ? "Study capacity reached. No Sources were imported." : "Import cancelled.");
       }
     });
   }, [dispatch, host, runTask]);
 
-  const scanInstalled = useCallback(() => {
+  const scanInstalled = useCallback((query = "", refresh = false, cursor = 0) => {
+    const serial = catalogRequestRef.current + 1;
+    catalogRequestRef.current = serial;
+    setNavigatorMode("catalog");
+    setShowWelcome(false);
     void runTask("Scanning installed fonts", async () => {
-      const response = await host.request({ type: "scan-installed" });
-      if (response.type !== "import-result") throw new Error("Host returned the wrong catalog response.");
-      if (response.imports.length) dispatch({ type: "ingest-sources", imports: response.imports });
-      setShowWelcome(false);
-      setNotice(response.imports.length ? `${response.imports.length} installed Sources added.` : "Installed-font catalog is unavailable in this Host.");
+      const response = await host.request({ type: "scan-installed", query: query.slice(0, 200), cursor, limit: CATALOG_PAGE_SIZE, refresh });
+      if (response.type !== "catalog-result") throw new Error("Host returned the wrong catalog response.");
+      if (catalogRequestRef.current !== serial) return;
+      setCatalog({ query: query.slice(0, 200), cursor, imports: response.imports, indexed: response.indexed, total: response.total, rejected: response.rejected, truncated: response.truncated, ...(response.nextCursor === undefined ? {} : { nextCursor: response.nextCursor }) });
+      setNotice(response.indexed ? `${response.total} installed ${response.total === 1 ? "Source" : "Sources"} match. Add only what belongs in this Study.` : "Installed-font Catalog is unavailable in this Host.");
     });
-  }, [dispatch, host, runTask]);
+  }, [host, runTask]);
+
+  const addCatalogSources = useCallback((sourceIds: readonly string[]) => {
+    const current = sessionRef.current.document;
+    const requested = catalog.imports.filter((item) => sourceIds.includes(item.source.id) && !current.sources.some((source) => source.id === item.source.id));
+    const selected = importsWithinStudyLimits(current, requested);
+    if (!selected.length) {
+      setNotice(requested.length ? "Study capacity reached. No installed Sources were added." : "Those Sources are already in this Study.");
+      return;
+    }
+    dispatch({ type: "ingest-sources", imports: selected });
+    setNotice(`${selected.length} installed ${selected.length === 1 ? "Source" : "Sources"} added explicitly to this Study${selected.length < requested.length ? " · Study capacity reached" : ""}.`);
+  }, [catalog.imports, dispatch]);
 
   const openStudy = useCallback(() => {
     void runTask("Opening Study", async () => {
@@ -309,6 +358,7 @@ export default function App() {
   const actions = useMemo<AppActions>(() => ({
     importSources,
     scanInstalled,
+    addCatalogSources,
     openStudy,
     saveStudy,
     exportHandoff,
@@ -316,7 +366,7 @@ export default function App() {
     revealSource,
     newStudy,
     loadSample,
-  }), [exportHandoff, importSources, loadSample, newStudy, openStudy, relinkSource, revealSource, saveStudy, scanInstalled]);
+  }), [addCatalogSources, exportHandoff, importSources, loadSample, newStudy, openStudy, relinkSource, revealSource, saveStudy, scanInstalled]);
 
   const handleMenu = useCallback((command: MenuCommand) => {
     switch (command.type) {
@@ -506,7 +556,7 @@ export default function App() {
       {showWelcome ? <Welcome actions={actions} capabilities={capabilities} /> : (
         <>
           <nav className="stage-nav" aria-label="Workflow stages">{STAGES.map((stage, stageIndex) => <button type="button" key={stage} className={session.workspace.stage === stage ? "is-active" : ""} aria-current={session.workspace.stage === stage ? "step" : undefined} onClick={() => setStage(stage)}><span>{String(stageIndex + 1).padStart(2, "0")}</span>{stageLabels[stage]}</button>)}</nav>
-          <Navigator session={session} index={index} dispatch={dispatch} actions={actions} />
+          <Navigator session={session} index={index} dispatch={dispatch} actions={actions} mode={navigatorMode} onModeChange={setNavigatorMode} catalog={catalog} />
           <Workspace session={session} index={index} dispatch={dispatch} fontStates={fontStates} headingRef={headingRef} actions={actions} capabilities={capabilities} />
           <Inspector key={session.workspace.selectedCandidateId ?? "none"} session={session} dispatch={dispatch} fontStates={fontStates} actions={actions} blindIdentityHidden={blindIdentityHidden} />
           <Tray session={session} dispatch={dispatch} />

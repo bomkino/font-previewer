@@ -93,6 +93,21 @@ test("Host import creates Unreviewed Candidates while the portable Study stays p
   assert.equal(deduplicated.document.candidates.length, added.document.candidates.length);
 });
 
+test("Study capacity rejects excess Catalog Sources without corrupting the document", () => {
+  const fixture = createFixtureSession();
+  const filler = Array.from({ length: 2_048 - fixture.document.sources.length }, (_, index) => ({
+    id: `source:capacity:${index}`,
+    displayName: `Capacity ${index}`,
+    hint: { fileName: `capacity-${index}.otf`, format: "OTF", faceCount: 1 },
+    lastKnownState: "missing" as const,
+  }));
+  const saturated = createSession(assertStudyDocument({ ...fixture.document, sources: [...fixture.document.sources, ...filler] }), fixture.bindings);
+  const unchanged = applyStudyCommand(saturated, { type: "ingest-sources", imports: [importedSource()] });
+  assert.equal(unchanged.document.sources.length, 2_048);
+  assert.equal(unchanged.document.candidates.length, saturated.document.candidates.length);
+  assert.equal(unchanged.bindings.some((binding) => binding.sourceId === "source:opaque:new-sans"), false);
+});
+
 test("Role assignment creates a Font Use without collapsing Candidate or Face identity", () => {
   const fixture = createFixtureSession();
   const candidateId = "candidate:fixture:vector:4";
@@ -106,6 +121,25 @@ test("Role assignment creates a Font Use without collapsing Candidate or Face id
   assert.equal(use.faceId, candidate.faceId);
   assert.equal(use.originatingCandidateId, candidate.id);
   assert.notEqual(use.axes, candidate.axes);
+});
+
+test("duplicated family Candidates keep independent decisions and variable settings", () => {
+  const fixture = createFixtureSession();
+  const original = fixture.document.candidates.find((candidate) => candidate.axes.length > 0);
+  assert.ok(original);
+  const duplicated = applyStudyCommand(fixture, { type: "duplicate-candidate", candidateId: original.id, label: "Family alternate" });
+  const duplicate = duplicated.document.candidates.at(-1);
+  assert.ok(duplicate);
+  assert.equal(duplicate.faceId, original.faceId);
+  assert.equal(duplicate.reviewState, "unreviewed");
+  const axis = duplicate.axes[0];
+  assert.ok(axis);
+  const adjusted = applyStudyCommand(duplicated, { type: "set-axis", candidateId: duplicate.id, tag: axis.tag, value: axis.value + 1 });
+  const decided = applyStudyCommand(adjusted, { type: "set-review-state", candidateIds: [duplicate.id], reviewState: "keep" });
+  assert.equal(decided.document.candidates.find((candidate) => candidate.id === original.id)?.reviewState, original.reviewState);
+  assert.equal(decided.document.candidates.find((candidate) => candidate.id === original.id)?.axes[0]?.value, original.axes[0]?.value);
+  assert.equal(decided.document.candidates.find((candidate) => candidate.id === duplicate.id)?.reviewState, "keep");
+  assert.notEqual(decided.document.candidates.find((candidate) => candidate.id === duplicate.id)?.axes[0]?.value, original.axes[0]?.value);
 });
 
 test("recovery round-trips document/workspace/revisions but never Host-local bindings", () => {

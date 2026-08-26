@@ -113,11 +113,14 @@ private enum HostError: LocalizedError {
 private final class FontAssetStore: @unchecked Sendable {
     private let lock = NSLock()
     private var urls: [String: URL] = [:]
+    private var tokensByPath: [String: String] = [:]
 
     func assign(_ url: URL) -> String {
-        let token = UUID().uuidString.lowercased()
         lock.lock(); defer { lock.unlock() }
+        if let token = tokensByPath[url.path], urls[token] == url { return token }
+        let token = UUID().uuidString.lowercased()
         urls[token] = url
+        tokensByPath[url.path] = token
         return token
     }
 
@@ -189,7 +192,7 @@ private final class BoundedSchemeHandler: NSObject, WKURLSchemeHandler {
 private enum HostRequest {
     case getLaunchState
     case openImport
-    case scanInstalled
+    case scanInstalled(String, Int, Int, Bool)
     case openStudy
     case mirrorStudy([String: Any], [String: Any], Int)
     case saveStudy([String: Any], Int, Bool)
@@ -199,6 +202,11 @@ private enum HostRequest {
     case nativeUndo
     case reloadStudio
     case probe(Int)
+}
+
+private struct InstalledCatalogEntry {
+    let url: URL
+    let searchText: String
 }
 
 @main
@@ -231,8 +239,16 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     private let fullExtensions = Set(["otf", "ttf", "woff", "woff2"])
     private let maximumStudyBytes = 8_000_000
     private let maximumSourceBytes = 512 * 1024 * 1024
+    private let maximumCatalogEntries = 10_000
+    private let maximumCatalogCache = 400
     private var sourceBindings: [String: URL] = [:]
     private var sourceIDsByPath: [String: String] = [:]
+    private var catalogSourceIDsByPath: [String: String] = [:]
+    private var catalogURLsBySourceID: [String: URL] = [:]
+    private var catalogImportCache: [String: [String: Any]] = [:]
+    private var catalogCacheOrder: [String] = []
+    private var installedCatalogIndex: [InstalledCatalogEntry] = []
+    private var installedCatalogTruncated = false
     private var scopedURLs: [URL] = []
     private var mirroredDocument: [String: Any]?
     private var mirroredWorkspace: [String: Any]?
@@ -327,7 +343,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         addMenu(file, "Open Study…", "o", [], #selector(openStudyMenu(_:)), "font-previewer-open")
         file.addItem(.separator())
         addMenu(file, "Import Sources…", "i", [.command, .shift], #selector(importMenu(_:)), "font-previewer-import")
-        addMenu(file, "Add Installed Fonts", "", [], #selector(installedMenu(_:)), "font-previewer-installed")
+        addMenu(file, "Browse Installed Fonts", "", [], #selector(installedMenu(_:)), "font-previewer-installed")
         file.addItem(.separator())
         addMenu(file, "Save Study", "s", [], #selector(saveMenu(_:)), "font-previewer-save")
         addMenu(file, "Save Study As…", "S", [.command, .shift], #selector(saveAsMenu(_:)), "font-previewer-save-as")
@@ -391,7 +407,9 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         switch type {
         case "get-launch-state": return exact(object, ["type"]) ? .getLaunchState : nil
         case "open-import": return exact(object, ["type"]) ? .openImport : nil
-        case "scan-installed": return exact(object, ["type"]) ? .scanInstalled : nil
+        case "scan-installed":
+            guard exact(object, ["type", "query", "cursor", "limit", "refresh"]), let query = object["query"] as? String, query.count <= 200, let cursor = integer(object["cursor"]), let limit = integer(object["limit"]), (1...200).contains(limit), let refresh = object["refresh"] as? Bool else { return nil }
+            return .scanInstalled(query, cursor, limit, refresh)
         case "open-study": return exact(object, ["type"]) ? .openStudy : nil
         case "mirror-study":
             guard exact(object, ["type", "document", "workspace", "revision"]), let document = object["document"] as? [String: Any], let workspace = object["workspace"] as? [String: Any], let revision = integer(object["revision"]), validJSON(document, maximum: maximumStudyBytes), validJSON(workspace, maximum: 200_000) else { return nil }
@@ -418,13 +436,14 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         switch request {
         case .getLaunchState: replyHandler(launchState(), nil)
         case .openImport: presentImport(replyHandler)
-        case .scanInstalled: replyHandler(importResult(Array((CTFontManagerCopyAvailableFontURLs() as? [URL] ?? []).prefix(2_048))), nil)
+        case .scanInstalled(let query, let cursor, let limit, let refresh): replyHandler(catalogResult(query: query, cursor: cursor, limit: limit, refresh: refresh), nil)
         case .openStudy: presentOpenStudy(replyHandler)
         case .mirrorStudy(let document, let workspace, let revision):
             guard mirroredDocument?["id"] as? String != document["id"] as? String || revision >= mirroredRevision else { replyHandler(nil, "Rejected stale recovery revision."); return }
+            let promotedCatalogBindings = promoteCatalogBindings(document)
             if mirroredDocument?["id"] as? String != document["id"] as? String { intentionallySavedRevision = 0 }
             mirroredDocument = document; mirroredWorkspace = workspace; mirroredRevision = revision
-            do { try persistRecovery(); replyHandler(["type": "mirror-ack", "revision": revision, "recoveryPersisted": true], nil) }
+            do { if promotedCatalogBindings { try persistLocalState() }; try persistRecovery(); replyHandler(["type": "mirror-ack", "revision": revision, "recoveryPersisted": true], nil) }
             catch { replyHandler(nil, error.localizedDescription) }
         case .saveStudy(let document, let revision, let saveAs): presentSave(document, revision, saveAs, replyHandler)
         case .exportHandoff(let document, let revision, let preferences, let permission): presentExport(document, revision, preferences, permission, replyHandler)
@@ -494,16 +513,87 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         return ["type": "import-result", "imports": imports, "rejected": rejected, "truncated": urls.count > 2_048]
     }
 
-    private func importedSource(_ selected: URL, forcedID: String? = nil) throws -> [String: Any] {
+    private func rebuildInstalledCatalog() {
+        installedCatalogIndex = []
+        installedCatalogTruncated = false
+        catalogImportCache = [:]
+        catalogCacheOrder = []
+        var seen = Set<String>()
+        for selected in (CTFontManagerCopyAvailableFontURLs() as? [URL] ?? []) {
+            let url = selected.resolvingSymlinksInPath().standardizedFileURL
+            guard allowedExtensions.contains(url.pathExtension.lowercased()) else { continue }
+            guard seen.insert(url.path).inserted else { continue }
+            if installedCatalogIndex.count >= maximumCatalogEntries { installedCatalogTruncated = true; break }
+            let descriptors = (CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor]) ?? []
+            let names = descriptors.prefix(32).flatMap { descriptor -> [String] in
+                let family = CTFontDescriptorCopyAttribute(descriptor, kCTFontFamilyNameAttribute) as? String
+                let style = CTFontDescriptorCopyAttribute(descriptor, kCTFontStyleNameAttribute) as? String
+                return [family, style].compactMap { $0 }
+            }
+            let text = ([url.deletingPathExtension().lastPathComponent] + names).joined(separator: " ").folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current).lowercased()
+            installedCatalogIndex.append(InstalledCatalogEntry(url: url, searchText: text))
+        }
+        installedCatalogIndex.sort { $0.searchText.localizedStandardCompare($1.searchText) == .orderedAscending }
+    }
+
+    private func catalogResult(query: String, cursor: Int, limit: Int, refresh: Bool) -> [String: Any] {
+        if refresh || installedCatalogIndex.isEmpty { rebuildInstalledCatalog() }
+        let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines).folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current).lowercased()
+        let matches = normalized.isEmpty ? installedCatalogIndex : installedCatalogIndex.filter { $0.searchText.contains(normalized) }
+        let start = min(cursor, matches.count)
+        let end = min(start + limit, matches.count)
+        let page = Array(matches[start..<end])
+        var imports: [[String: Any]] = []
+        var rejected = 0
+        for (index, entry) in page.enumerated() {
+            do {
+                let imported: [String: Any]
+                if let cached = catalogImportCache[entry.url.path] { imported = cached }
+                else {
+                    imported = try importedSource(entry.url, catalogOnly: true)
+                    catalogImportCache[entry.url.path] = imported
+                    catalogCacheOrder.removeAll { $0 == entry.url.path }
+                    catalogCacheOrder.append(entry.url.path)
+                    if catalogCacheOrder.count > maximumCatalogCache, let evicted = catalogCacheOrder.first {
+                        catalogCacheOrder.removeFirst(); catalogImportCache.removeValue(forKey: evicted)
+                    }
+                }
+                imports.append(imported)
+            } catch { rejected += 1 }
+            if index % 25 == 0 || index + 1 == page.count { sendEvent(["type": "task-progress", "task": "catalog", "completed": start + index + 1, "total": matches.count]) }
+        }
+        var response: [String: Any] = ["type": "catalog-result", "imports": imports, "indexed": installedCatalogIndex.count, "total": matches.count, "rejected": rejected, "truncated": installedCatalogTruncated]
+        if end < matches.count { response["nextCursor"] = end }
+        return response
+    }
+
+    private func promoteCatalogBindings(_ document: [String: Any]) -> Bool {
+        var changed = false
+        for source in document["sources"] as? [[String: Any]] ?? [] {
+            guard let id = source["id"] as? String, sourceBindings[id] == nil, let url = catalogURLsBySourceID[id] else { continue }
+            _ = url.startAccessingSecurityScopedResource(); scopedURLs.append(url)
+            sourceBindings[id] = url; sourceIDsByPath[url.path] = id
+            catalogURLsBySourceID.removeValue(forKey: id); catalogSourceIDsByPath.removeValue(forKey: url.path)
+            changed = true
+        }
+        return changed
+    }
+
+    private func importedSource(_ selected: URL, forcedID: String? = nil, catalogOnly: Bool = false) throws -> [String: Any] {
         let initial = try selected.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
         guard initial.isRegularFile == true, initial.isSymbolicLink != true else { throw HostError.unavailable("Source is not a regular file.") }
-        _ = selected.startAccessingSecurityScopedResource(); scopedURLs.append(selected)
+        if !catalogOnly { _ = selected.startAccessingSecurityScopedResource(); scopedURLs.append(selected) }
         let canonical = selected.resolvingSymlinksInPath().standardizedFileURL
         let values = try canonical.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey])
         guard values.isRegularFile == true, values.isSymbolicLink != true, let size = values.fileSize, size > 0, size <= maximumSourceBytes, allowedExtensions.contains(canonical.pathExtension.lowercased()) else { throw HostError.unavailable("Source is unreadable, unsupported, or too large.") }
-        let id = forcedID ?? sourceIDsByPath[canonical.path] ?? "source:\(UUID().uuidString.lowercased())"
+        let id = forcedID ?? sourceIDsByPath[canonical.path] ?? catalogSourceIDsByPath[canonical.path] ?? "source:\(UUID().uuidString.lowercased())"
         if let old = sourceBindings[id] { sourceIDsByPath.removeValue(forKey: old.path) }
-        sourceBindings[id] = canonical; sourceIDsByPath[canonical.path] = id
+        if catalogOnly && sourceBindings[id] == nil {
+            catalogSourceIDsByPath[canonical.path] = id; catalogURLsBySourceID[id] = canonical
+        } else {
+            sourceBindings[id] = canonical; sourceIDsByPath[canonical.path] = id
+            catalogSourceIDsByPath.removeValue(forKey: canonical.path); catalogURLsBySourceID.removeValue(forKey: id)
+        }
         let full = fullExtensions.contains(canonical.pathExtension.lowercased())
         let token = full ? fontAssets.assign(canonical) : nil
         let descriptors = (CTFontManagerCreateFontDescriptorsFromURL(canonical as CFURL) as? [CTFontDescriptor]) ?? []
@@ -654,14 +744,28 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     private func loadRecovery() { guard let data = try? Data(contentsOf: recoveryURL), data.count <= maximumStudyBytes * 2, let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any], value["version"] as? Int == 1, let document = value["document"] as? [String: Any], document["schemaVersion"] as? Int == 4, let workspace = value["workspace"] as? [String: Any], let revision = value["revision"] as? Int else { return }; mirroredDocument = document; mirroredWorkspace = workspace; mirroredRevision = max(0, revision); intentionallySavedRevision = min(max(0, value["intentionallySavedRevision"] as? Int ?? 0), mirroredRevision) }
 
     private func persistLocalState() throws {
-        let bindings: [[String: Any]] = sourceBindings.compactMap { id, url in guard let bookmark = try? url.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil) else { return nil }; return ["sourceId": id, "bookmark": bookmark.base64EncodedString()] }
+        let installedPaths = Set((CTFontManagerCopyAvailableFontURLs() as? [URL] ?? []).map { $0.resolvingSymlinksInPath().standardizedFileURL.path })
+        let bindings: [[String: Any]] = sourceBindings.compactMap { id, url in
+            if let bookmark = try? url.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil) { return ["sourceId": id, "bookmark": bookmark.base64EncodedString()] }
+            let canonical = url.resolvingSymlinksInPath().standardizedFileURL
+            return installedPaths.contains(canonical.path) ? ["sourceId": id, "installedPath": canonical.path] : nil
+        }
         let recents = recentDocuments.compactMap { try? $0.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil).base64EncodedString() }
         try JSONSerialization.data(withJSONObject: ["version": 1, "bindings": bindings, "recentDocuments": recents], options: [.sortedKeys]).write(to: localStateURL, options: [.atomic])
     }
 
     private func loadLocalState() {
         guard let data = try? Data(contentsOf: localStateURL), data.count <= 2_000_000, let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any], value["version"] as? Int == 1 else { return }
-        for item in value["bindings"] as? [[String: Any]] ?? [] { guard let id = item["sourceId"] as? String, let encoded = item["bookmark"] as? String, let bookmark = Data(base64Encoded: encoded) else { continue }; var stale = false; guard let url = try? URL(resolvingBookmarkData: bookmark, options: [.withSecurityScope], relativeTo: nil, bookmarkDataIsStale: &stale) else { continue }; _ = url.startAccessingSecurityScopedResource(); scopedURLs.append(url); sourceBindings[id] = url; sourceIDsByPath[url.path] = id }
+        var installedURLs: [String: URL] = [:]
+        for url in (CTFontManagerCopyAvailableFontURLs() as? [URL] ?? []) { let canonical = url.resolvingSymlinksInPath().standardizedFileURL; installedURLs[canonical.path] = canonical }
+        for item in value["bindings"] as? [[String: Any]] ?? [] {
+            guard let id = item["sourceId"] as? String else { continue }
+            var resolved: URL?
+            if let encoded = item["bookmark"] as? String, let bookmark = Data(base64Encoded: encoded) { var stale = false; resolved = try? URL(resolvingBookmarkData: bookmark, options: [.withSecurityScope], relativeTo: nil, bookmarkDataIsStale: &stale) }
+            else if let path = item["installedPath"] as? String { resolved = installedURLs[path] }
+            guard let url = resolved else { continue }
+            _ = url.startAccessingSecurityScopedResource(); scopedURLs.append(url); sourceBindings[id] = url; sourceIDsByPath[url.path] = id
+        }
         for encoded in value["recentDocuments"] as? [String] ?? [] { guard let bookmark = Data(base64Encoded: encoded) else { continue }; var stale = false; if let url = try? URL(resolvingBookmarkData: bookmark, options: [.withSecurityScope], relativeTo: nil, bookmarkDataIsStale: &stale) { recentDocuments.append(url) } }
     }
 
@@ -700,8 +804,9 @@ private final class MacEvidenceRunner {
         host.sendMenu(["type": "undo-study"]); try await wait("Undo") { try await self.bool("document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label') === 'Unreviewed'") }; host.sendMenu(["type": "redo-study"]); try await wait("Redo") { try await self.bool("document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label') === 'Keep'") }
         trace["afterMenuUndoRedo"] = try await inspect()
         trace["bridge"] = try await host.evaluateAsync("(async()=>{const v=[];for(let i=0;i<40;i++){const s=performance.now();const r=await window.fontPreviewerHost.request({type:'probe',serial:i});if(r.serial!==i)throw new Error('probe');v.push(performance.now()-s)}return {samples:v.length,max:Math.max(...v),mean:v.reduce((a,b)=>a+b,0)/v.length}})()") ?? NSNull()
+        trace["installedCatalog"] = try await host.evaluateAsync("(async()=>{const studyCount=()=>Number([...document.querySelectorAll('.catalog-switcher button')].find(item=>item.textContent?.trim().startsWith('Study'))?.querySelector('span')?.textContent??-1);const beforeStudy=studyCount();[...document.querySelectorAll('.catalog-switcher button')].find(item=>item.textContent?.trim().startsWith('Catalog'))?.click();const deadline=performance.now()+30000;while(!document.querySelector('.catalog-results .catalog-source')&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,50));const afterStudy=studyCount();const r=await window.fontPreviewerHost.request({type:'scan-installed',query:'',cursor:0,limit:40,refresh:false});if(r.type!=='catalog-result')throw new Error('catalog');const raw=JSON.stringify(r);const preview=r.imports.find(item=>item.binding.previewUrl)?.binding.previewUrl;let fontLoaded=false;if(preview){const face=new FontFace('Font Previewer Evidence','url(\"'+preview+'\")');await face.load();fontLoaded=face.status==='loaded'}return {count:r.imports.length,indexed:r.indexed,total:r.total,rejected:r.rejected,truncated:r.truncated,pageBounded:r.imports.length<=40,studyUnchanged:beforeStudy>=0&&beforeStudy===afterStudy,rendered:document.querySelectorAll('.catalog-results .catalog-source').length,pathLeak:/(?:file:\\/\\/|\\/home\\/|\\/Users\\/|[A-Za-z]:\\\\)/.test(raw),opaquePreviewUrls:r.imports.every(item=>!item.binding.previewUrl||item.binding.previewUrl.startsWith('pitch-font://asset/')),previewAvailable:Boolean(preview),fontLoaded}})()") ?? NSNull()
         for (stage, file) in [("Compare", "02-compare.png"), ("System", "03-system.png"), ("Handoff", "04-handoff.png")] { _ = try await host.evaluate("([...document.querySelectorAll('.stage-nav button')].find((item)=>item.textContent?.includes('\(stage)')))?.click();true"); try await Task.sleep(nanoseconds: 150_000_000); try await host.snapshot(to: output.appendingPathComponent(file)) }
-        trace["security"] = try await host.evaluateAsync("(async()=>{const bad=[{type:'open-import',path:'/tmp/x'},{type:'probe',serial:-1},{type:'read-file',path:'/etc/passwd'}];let rejected=0;for(const r of bad){try{await window.fontPreviewerHost.request(r)}catch{rejected++}}return {attempts:bad.length,rejected,nodeUnavailable:typeof window.require==='undefined'&&typeof window.process==='undefined',hostKeys:Object.keys(window.fontPreviewerHost).sort()}})()") ?? NSNull()
+        trace["security"] = try await host.evaluateAsync("(async()=>{const bad=[{type:'open-import',path:'/tmp/x'},{type:'probe',serial:-1},{type:'read-file',path:'/etc/passwd'},{type:'scan-installed'},{type:'scan-installed',query:'',cursor:0,limit:10000,refresh:false}];let rejected=0;for(const r of bad){try{await window.fontPreviewerHost.request(r)}catch{rejected++}}return {attempts:bad.length,rejected,nodeUnavailable:typeof window.require==='undefined'&&typeof window.process==='undefined',hostKeys:Object.keys(window.fontPreviewerHost).sort()}})()") ?? NSNull()
         trace["semantics"] = try await host.evaluate("(()=>{const controls=[...document.querySelectorAll('button,input,select,textarea')];const named=el=>el.getAttribute('aria-label')||el.getAttribute('aria-labelledby')||el.closest('label')?.textContent?.trim()||el.textContent?.trim();return {controls:controls.length,unnamed:controls.filter(el=>!named(el)).length,mains:document.querySelectorAll('main').length,asides:document.querySelectorAll('aside').length,duplicateIds:[...document.querySelectorAll('[id]')].map(el=>el.id).filter((id,i,a)=>a.indexOf(id)!==i).length}})()") ?? NSNull()
         try await wait("Recovery") { try await self.bool("document.querySelector('.document-title > span:last-child')?.textContent?.includes('recovery ready')") }
         let before = try await inspect(); host.webView.reload(); try await wait("Reload") { try await self.bool("document.querySelector('#workspace-heading') && document.activeElement?.id==='workspace-heading' && document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label')==='Keep'") }; let after = try await inspect(); trace["reload"] = ["before": before, "after": after]
@@ -709,8 +814,8 @@ private final class MacEvidenceRunner {
         trace["nativePanel"] = ["opened": host.panelOpened, "cancelled": host.panelCancelled]
         trace["hostCounters"] = ["rejectedRequests": host.rejectedRequests, "menuCommands": host.menuCommands, "navigationRejections": host.navigationRejections, "popupRejections": host.popupRejections, "processTerminations": host.processTerminations]
         try JSONSerialization.data(withJSONObject: trace, options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("run.json"), options: [.atomic])
-        let security = trace["security"] as? [String: Any]; let semantics = trace["semantics"] as? [String: Any]; let keyboard = trace["keyboardAccessibility"] as? [String: Any]
-        guard security?["attempts"] as? Int == security?["rejected"] as? Int, security?["nodeUnavailable"] as? Bool == true, semantics?["unnamed"] as? Int == 0, semantics?["duplicateIds"] as? Int == 0, keyboard?["forwardWrap"] as? Bool == true, keyboard?["backwardWrap"] as? Bool == true, keyboard?["candidateUnchanged"] as? Bool == true, keyboard?["trayUnchanged"] as? Bool == true, keyboard?["returnFocus"] as? Bool == true, host.panelOpened > 0, host.panelCancelled > 0 else { throw HostError.unavailable("Evidence assertions failed") }
+        let security = trace["security"] as? [String: Any]; let semantics = trace["semantics"] as? [String: Any]; let keyboard = trace["keyboardAccessibility"] as? [String: Any]; let catalog = trace["installedCatalog"] as? [String: Any]
+        guard security?["attempts"] as? Int == security?["rejected"] as? Int, security?["nodeUnavailable"] as? Bool == true, semantics?["unnamed"] as? Int == 0, semantics?["duplicateIds"] as? Int == 0, keyboard?["forwardWrap"] as? Bool == true, keyboard?["backwardWrap"] as? Bool == true, keyboard?["candidateUnchanged"] as? Bool == true, keyboard?["trayUnchanged"] as? Bool == true, keyboard?["returnFocus"] as? Bool == true, ((catalog?["count"] as? Int) ?? 0) > 0, ((catalog?["indexed"] as? Int) ?? 0) > 0, catalog?["pageBounded"] as? Bool == true, catalog?["studyUnchanged"] as? Bool == true, catalog?["pathLeak"] as? Bool == false, catalog?["opaquePreviewUrls"] as? Bool == true, catalog?["previewAvailable"] as? Bool == true, catalog?["fontLoaded"] as? Bool == true, host.panelOpened > 0, host.panelCancelled > 0 else { throw HostError.unavailable("Evidence assertions failed") }
     }
     private func performMenu(_ menuTitle: String, _ itemTitle: String) throws {
         guard let menu = NSApp.mainMenu?.item(withTitle: menuTitle)?.submenu, let item = menu.item(withTitle: itemTitle) else { throw HostError.unavailable("Missing native menu item \(menuTitle) → \(itemTitle)") }

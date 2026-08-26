@@ -54,6 +54,8 @@ const maximumStudyBytes = 8_000_000;
 const maximumSourceBytes = 512 * 1024 * 1024;
 const maximumImportBytes = 2 * 1024 * 1024 * 1024;
 const maximumImportFiles = 2_048;
+const maximumCatalogEntries = 10_000;
+const maximumCatalogCache = 400;
 const maximumImportDepth = 12;
 const maximumImportMilliseconds = 15_000;
 
@@ -87,6 +89,11 @@ const sourceIdsByCanonicalPath = new Map<string, string>();
 const sourceTokens = new Map<string, string>();
 const pathsByToken = new Map<string, string>();
 const sourceWatchers = new Map<string, FSWatcher>();
+const catalogSourceIdsByCanonicalPath = new Map<string, string>();
+const catalogPathsBySourceId = new Map<string, string>();
+const catalogImportCache = new Map<string, ImportedSource>();
+let installedCatalogIndex: Array<{ readonly path: string; readonly searchText: string }> = [];
+let installedCatalogTruncated = false;
 
 if (evidenceDirectory) app.disableHardwareAcceleration();
 
@@ -123,7 +130,7 @@ function buildMenu(): Menu {
         { label: "Open Study…", accelerator: "CmdOrCtrl+O", click: () => sendMenuCommand({ type: "open-study" }) },
         { type: "separator" },
         { id: "font-previewer-import", label: "Import Sources…", accelerator: "CmdOrCtrl+Shift+I", click: () => sendMenuCommand({ type: "open-import" }) },
-        { label: "Add Installed Fonts", click: () => sendMenuCommand({ type: "scan-installed" }) },
+        { label: "Browse Installed Fonts", click: () => sendMenuCommand({ type: "scan-installed" }) },
         { type: "separator" },
         { label: "Save Study", accelerator: "CmdOrCtrl+S", click: () => sendMenuCommand({ type: "save-study" }) },
         { label: "Save Study As…", accelerator: "CmdOrCtrl+Shift+S", click: () => sendMenuCommand({ type: "save-study-as" }) },
@@ -195,6 +202,7 @@ async function persistLocalState(): Promise<void> {
 
 function previewUrlForSource(sourceId: string, canonicalPath: string): string {
   const prior = sourceTokens.get(sourceId);
+  if (prior && pathsByToken.get(prior) === canonicalPath) return `pitch-font://asset/${prior}`;
   if (prior) pathsByToken.delete(prior);
   const token = randomUUID();
   sourceTokens.set(sourceId, token);
@@ -221,7 +229,7 @@ function watchSource(sourceId: string, canonicalPath: string): void {
   }
 }
 
-async function inspectFontPath(selectedPath: string, forcedSourceId?: string): Promise<ImportedSource> {
+async function inspectFontPath(selectedPath: string, forcedSourceId?: string, catalogOnly = false): Promise<ImportedSource> {
   const selectedMetadata = await lstat(selectedPath);
   if (selectedMetadata.isSymbolicLink() || !selectedMetadata.isFile()) throw new Error("Source must be a regular, non-symbolic-link file.");
   const canonicalPath = await realpath(selectedPath);
@@ -230,14 +238,21 @@ async function inspectFontPath(selectedPath: string, forcedSourceId?: string): P
   const metadata = await stat(canonicalPath);
   if (!metadata.isFile() || metadata.size <= 0 || metadata.size > maximumSourceBytes) throw new Error("Source is empty or exceeds 512 MB.");
   await access(canonicalPath, fsConstants.R_OK);
-  const sourceId = forcedSourceId ?? sourceIdsByCanonicalPath.get(canonicalPath) ?? `source:${randomUUID()}`;
+  const sourceId = forcedSourceId ?? sourceIdsByCanonicalPath.get(canonicalPath) ?? catalogSourceIdsByCanonicalPath.get(canonicalPath) ?? `source:${randomUUID()}`;
   if (forcedSourceId) {
     const priorPath = sourceBindings.get(forcedSourceId);
     if (priorPath) sourceIdsByCanonicalPath.delete(priorPath);
   }
-  sourceBindings.set(sourceId, canonicalPath);
-  sourceIdsByCanonicalPath.set(canonicalPath, sourceId);
-  watchSource(sourceId, canonicalPath);
+  if (catalogOnly && !sourceBindings.has(sourceId)) {
+    catalogSourceIdsByCanonicalPath.set(canonicalPath, sourceId);
+    catalogPathsBySourceId.set(sourceId, canonicalPath);
+  } else {
+    sourceBindings.set(sourceId, canonicalPath);
+    sourceIdsByCanonicalPath.set(canonicalPath, sourceId);
+    catalogSourceIdsByCanonicalPath.delete(canonicalPath);
+    catalogPathsBySourceId.delete(sourceId);
+    watchSource(sourceId, canonicalPath);
+  }
   const support = rendererSupportForPath(canonicalPath);
   return buildImportedSource({
     canonicalPath,
@@ -308,16 +323,85 @@ async function importPaths(roots: readonly string[], task: "import" | "catalog")
   return { type: "import-result", imports, rejected, truncated: collected.truncated };
 }
 
-async function installedFontPaths(): Promise<string[]> {
-  if (process.platform !== "linux") return [];
-  return new Promise((resolve) => {
-    const child = BunlessExecFile("/usr/bin/fc-list", ["-f", "%{file}\\n"], (error, stdout) => {
-      if (error) resolve([]);
-      else resolve([...new Set(stdout.split("\n").map((path) => path.trim()).filter(Boolean))].slice(0, maximumImportFiles));
+async function rebuildInstalledCatalog(): Promise<void> {
+  installedCatalogIndex = [];
+  installedCatalogTruncated = false;
+  catalogImportCache.clear();
+  if (process.platform !== "linux") return;
+  const records = await new Promise<string>((resolve) => {
+    const child = BunlessExecFile("/usr/bin/fc-list", ["-f", "%{file}\u001f%{family}\u001f%{style}\\n"], { maxBuffer: 16 * 1024 * 1024 }, (error, stdout) => {
+      resolve(error ? "" : stdout);
     });
-    const timer = setTimeout(() => { child.kill(); resolve([]); }, maximumImportMilliseconds);
+    const timer = setTimeout(() => { child.kill(); resolve(""); }, maximumImportMilliseconds);
     child.once("exit", () => clearTimeout(timer));
   });
+  const byPath = new Map<string, string>();
+  for (const line of records.split("\n")) {
+    const [pathValue, family = "", style = ""] = line.split("\u001f");
+    const path = pathValue?.trim();
+    if (!path || !FONT_EXTENSIONS.has(extname(path).toLocaleLowerCase())) continue;
+    const search = `${basename(path, extname(path))} ${family} ${style}`.normalize("NFKD").toLocaleLowerCase();
+    byPath.set(path, `${byPath.get(path) ?? ""} ${search}`.trim());
+    if (byPath.size > maximumCatalogEntries) {
+      installedCatalogTruncated = true;
+      break;
+    }
+  }
+  installedCatalogIndex = [...byPath]
+    .slice(0, maximumCatalogEntries)
+    .map(([path, searchText]) => ({ path, searchText }))
+    .sort((left, right) => left.searchText.localeCompare(right.searchText));
+}
+
+async function installedCatalogPage(request: Extract<HostRequest, { type: "scan-installed" }>): Promise<Extract<HostResponse, { type: "catalog-result" }>> {
+  if (request.refresh || installedCatalogIndex.length === 0) await rebuildInstalledCatalog();
+  const query = request.query.trim().normalize("NFKD").toLocaleLowerCase();
+  const matches = query ? installedCatalogIndex.filter((entry) => entry.searchText.includes(query)) : installedCatalogIndex;
+  const page = matches.slice(request.cursor, request.cursor + request.limit);
+  const imports: ImportedSource[] = [];
+  let rejected = 0;
+  for (const [index, entry] of page.entries()) {
+    try {
+      let imported = catalogImportCache.get(entry.path);
+      if (!imported) {
+        imported = await inspectFontPath(entry.path, undefined, true);
+        catalogImportCache.set(entry.path, imported);
+        if (catalogImportCache.size > maximumCatalogCache) catalogImportCache.delete(catalogImportCache.keys().next().value!);
+      }
+      imports.push(imported);
+    } catch {
+      rejected += 1;
+    }
+    if (index % 25 === 0 || index + 1 === page.length) {
+      sendHostEvent({ type: "task-progress", task: "catalog", completed: request.cursor + index + 1, total: matches.length });
+    }
+  }
+  const consumed = request.cursor + page.length;
+  return {
+    type: "catalog-result",
+    imports,
+    indexed: installedCatalogIndex.length,
+    total: matches.length,
+    rejected,
+    truncated: installedCatalogTruncated,
+    ...(consumed < matches.length ? { nextCursor: consumed } : {}),
+  };
+}
+
+function promoteCatalogBindings(document: StudyDocument): boolean {
+  let changed = false;
+  for (const source of document.sources) {
+    if (sourceBindings.has(source.id)) continue;
+    const path = catalogPathsBySourceId.get(source.id);
+    if (!path) continue;
+    sourceBindings.set(source.id, path);
+    sourceIdsByCanonicalPath.set(path, source.id);
+    catalogSourceIdsByCanonicalPath.delete(path);
+    catalogPathsBySourceId.delete(source.id);
+    watchSource(source.id, path);
+    changed = true;
+  }
+  return changed;
 }
 
 // Kept behind a tiny wrapper so no shell is ever involved.
@@ -420,7 +504,7 @@ async function handleHostRequest(event: IpcMainInvokeEvent, rawRequest: unknown)
       return result.canceled ? { type: "import-result", imports: [], rejected: 0, truncated: false } : importPaths(result.filePaths, "import");
     }
     case "scan-installed":
-      return importPaths(await installedFontPaths(), "catalog");
+      return installedCatalogPage(request);
     case "open-study": {
       if (!mainWindow) throw new Error("No active window.");
       const result = await dialog.showOpenDialog(mainWindow, { title: "Open Font Previewer Study", properties: ["openFile"], filters: [{ name: "Font Previewer Study", extensions: ["pitchfontstudy", "json"] }] });
@@ -445,6 +529,7 @@ async function handleHostRequest(event: IpcMainInvokeEvent, rawRequest: unknown)
     }
     case "mirror-study": {
       if (mirrored?.document.id === request.document.id && request.revision < mirrored.revision) throw new Error("Rejected stale recovery revision.");
+      if (promoteCatalogBindings(request.document)) await persistLocalState();
       mirrored = {
         version: 1,
         document: request.document,

@@ -281,6 +281,7 @@ const MAX_RECIPES = 256;
 const MAX_COMPARISONS = 256;
 const MAX_COPY_LENGTH = 20_000;
 const MAX_TRAY_SIZE = 4;
+export const STUDY_LIMITS = Object.freeze({ sources: MAX_SOURCES, faces: MAX_FACES, candidates: MAX_CANDIDATES });
 
 export class DomainError extends Error {
   override readonly name = "DomainError";
@@ -912,12 +913,27 @@ export function applyStudyCommand(session: StudySession, command: StudyCommand):
       return { ...session, bindings: command.bindings.map(parseBinding) };
     case "ingest-sources": {
       const existingSources = new Set(document.sources.map((source) => source.id));
-      const fresh = command.imports.filter(
-        (item, index, items) =>
-          !existingSources.has(item.source.id) && items.findIndex((other) => other.source.id === item.source.id) === index,
-      );
+      const seen = new Set(existingSources);
+      const fresh: ImportedSource[] = [];
+      let sourceCount = document.sources.length;
+      let faceCount = document.faces.length;
+      let candidateCount = document.candidates.length;
+      for (const item of command.imports) {
+        if (seen.has(item.source.id)) continue;
+        seen.add(item.source.id);
+        if (
+          sourceCount + 1 > MAX_SOURCES ||
+          faceCount + item.faces.length > MAX_FACES ||
+          candidateCount + item.faces.length > MAX_CANDIDATES
+        ) continue;
+        fresh.push(item);
+        sourceCount += 1;
+        faceCount += item.faces.length;
+        candidateCount += item.faces.length;
+      }
+      const acceptedIds = new Set([...existingSources, ...fresh.map((item) => item.source.id)]);
       const mergedBindings = new Map(session.bindings.map((binding) => [binding.sourceId, binding]));
-      command.imports.forEach((item) => mergedBindings.set(item.binding.sourceId, parseBinding(item.binding)));
+      command.imports.filter((item) => acceptedIds.has(item.source.id)).forEach((item) => mergedBindings.set(item.binding.sourceId, parseBinding(item.binding)));
       if (fresh.length === 0) return { ...session, bindings: [...mergedBindings.values()] };
       const newFaces = fresh.flatMap((item) => item.faces.map(parseFace));
       const newCandidates: Candidate[] = newFaces.map((face) => ({

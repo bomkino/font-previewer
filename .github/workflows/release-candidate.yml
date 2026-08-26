@@ -81,6 +81,14 @@ jobs:
             .keyboardAccessibility.candidateUnchanged == true and
             .keyboardAccessibility.trayUnchanged == true and
             .keyboardAccessibility.returnFocus == true and
+            .installedCatalog.count > 0 and
+            .installedCatalog.indexed > 0 and
+            .installedCatalog.pageBounded == true and
+            .installedCatalog.studyUnchanged == true and
+            .installedCatalog.pathLeak == false and
+            .installedCatalog.opaquePreviewUrls == true and
+            .installedCatalog.previewAvailable == true and
+            .installedCatalog.fontLoaded == true and
             (.semanticAudit.unnamed | length) == 0 and
             (.semanticAudit.duplicateIds | length) == 0 and
             .reloadRecovery.after.activeElement == "workspace-heading" and
@@ -104,6 +112,8 @@ jobs:
           dpkg-deb --info font-previewer_0.1.0_amd64.deb
           dpkg-deb --contents font-previewer_0.1.0_amd64.deb | grep -q -- '-rwsr-xr-x root/root.*chrome-sandbox'
           dpkg-deb --contents font-previewer_0.1.0_amd64.deb | grep -q 'usr/bin/font-previewer -> ../../opt/font-previewer/font-previewer'
+          dpkg-deb --contents font-previewer_0.1.0_amd64.deb | grep -q 'opt/font-previewer/resources/app/LICENSE.txt'
+          dpkg-deb --contents font-previewer_0.1.0_amd64.deb | grep -q 'opt/font-previewer/resources/app/THIRD_PARTY_NOTICES.md'
 
       - name: Upload Linux evidence
         if: always()
@@ -167,6 +177,8 @@ jobs:
           APP="$RUNNER_TEMP/font-previewer-macos-build/Font Previewer.app"
           test -x "$APP/Contents/MacOS/FontPreviewer"
           test -s "$APP/Contents/Resources/Studio/index.html"
+          test -s "$APP/Contents/Resources/LICENSE.txt"
+          test -s "$APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
           plutil -lint "$APP/Contents/Info.plist"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" = "dog.pitch.fontpreviewer"
           codesign --verify --deep --strict --verbose=2 "$APP"
@@ -209,6 +221,14 @@ jobs:
             .nativePanel.opened >= 1 and
             .nativePanel.cancelled >= 1 and
             .nativePanelFocus == "import-fonts-button" and
+            .installedCatalog.count > 0 and
+            .installedCatalog.indexed > 0 and
+            .installedCatalog.pageBounded == true and
+            .installedCatalog.studyUnchanged == true and
+            .installedCatalog.pathLeak == false and
+            .installedCatalog.opaquePreviewUrls == true and
+            .installedCatalog.previewAvailable == true and
+            .installedCatalog.fontLoaded == true and
             .security.attempts == .security.rejected and
             .security.nodeUnavailable == true and
             .keyboardAccessibility.forwardWrap == true and

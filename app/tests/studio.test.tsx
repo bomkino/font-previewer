@@ -12,7 +12,8 @@ const inertHost: HostPort = {
       recentDocuments: [],
     };
     if (request.type === "probe") return { type: "probe-result", serial: request.serial, host: "browser" };
-    if (request.type === "open-import" || request.type === "scan-installed") return { type: "import-result", imports: [], rejected: 0, truncated: false };
+    if (request.type === "open-import") return { type: "import-result", imports: [], rejected: 0, truncated: false };
+    if (request.type === "scan-installed") return { type: "catalog-result", imports: [], indexed: 0, total: 0, rejected: 0, truncated: false };
     if (request.type === "mirror-study") return { type: "mirror-ack", revision: request.revision, recoveryPersisted: false };
     if (request.type === "save-study") return { type: "save-result", revision: request.revision, displayName: "Test.pitchfontstudy", saved: true };
     if (request.type === "export-handoff") return { type: "export-result", displayName: "Test Handoff", exported: true, fileCount: 4 };
@@ -30,6 +31,7 @@ test("shared Studio renders the complete Review-to-Handoff product seam", () => 
   const html = renderToStaticMarkup(<App />);
   assert.match(html, /Study <span>24<\/span>/);
   assert.match(html, /Sources <span>4<\/span>/);
+  assert.match(html, /Catalog <span>0<\/span>/);
   assert.match(html, /Sets <span>1<\/span>/);
   assert.match(html, /Review/);
   assert.match(html, /Compare/);
@@ -38,6 +40,7 @@ test("shared Studio renders the complete Review-to-Handoff product seam", () => 
   assert.match(html, /Import/);
   assert.match(html, /Contact Sheet/);
   assert.match(html, /Comparison tray/);
+  assert.match(html, /Family Group/);
   assert.match(html, /aria-live="polite"/);
   assert.match(html, /aria-current="step"/);
   assert.equal((html.match(/<main/g) ?? []).length, 1);

@@ -207,6 +207,8 @@ async function securityAudit(window: BrowserWindow): Promise<Record<string, unkn
       { type: 'probe', serial: -1 },
       { type: 'read-file', path: '/etc/passwd' },
       { type: 'export-handoff', path: '/tmp' },
+      { type: 'scan-installed' },
+      { type: 'scan-installed', query: '', cursor: 0, limit: 10000, refresh: false },
     ];
     let rejected = 0;
     for (const request of invalid) {
@@ -220,6 +222,41 @@ async function securityAudit(window: BrowserWindow): Promise<Record<string, unkn
       hostKeys: Object.keys(window.fontPreviewerHost).sort(),
     };
   })()`, true));
+}
+
+async function installedCatalogAudit(window: BrowserWindow): Promise<Record<string, unknown>> {
+  return withTimeout("installed font catalog", window.webContents.executeJavaScript(`(async () => {
+    const studyCount = () => Number([...document.querySelectorAll('.catalog-switcher button')].find((item) => item.textContent?.trim().startsWith('Study'))?.querySelector('span')?.textContent ?? -1);
+    const beforeStudy = studyCount();
+    [...document.querySelectorAll('.catalog-switcher button')].find((item) => item.textContent?.trim().startsWith('Catalog'))?.click();
+    const deadline = performance.now() + 30000;
+    while (!document.querySelector('.catalog-results .catalog-source') && performance.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 50));
+    const afterStudy = studyCount();
+    const response = await window.fontPreviewerHost.request({ type: 'scan-installed', query: '', cursor: 0, limit: 40, refresh: false });
+    if (response.type !== 'catalog-result') throw new Error('Installed catalog returned the wrong response');
+    const serialized = JSON.stringify(response);
+    const preview = response.imports.find((item) => item.binding.previewUrl)?.binding.previewUrl;
+    let fontLoaded = false;
+    if (preview) {
+      const face = new FontFace('Font Previewer Evidence', 'url("' + preview + '")');
+      await face.load();
+      fontLoaded = face.status === 'loaded';
+    }
+    return {
+      count: response.imports.length,
+      indexed: response.indexed,
+      total: response.total,
+      rejected: response.rejected,
+      truncated: response.truncated,
+      pageBounded: response.imports.length <= 40,
+      studyUnchanged: beforeStudy >= 0 && beforeStudy === afterStudy,
+      rendered: document.querySelectorAll('.catalog-results .catalog-source').length,
+      pathLeak: /(?:file:\/\/|\/home\/|\/Users\/|[A-Za-z]:\\\\)/.test(serialized),
+      opaquePreviewUrls: response.imports.every((item) => !item.binding.previewUrl || item.binding.previewUrl.startsWith('pitch-font://asset/')),
+      previewAvailable: Boolean(preview),
+      fontLoaded,
+    };
+  })()`, true), 60_000);
 }
 
 async function checksumEvidence(output: string): Promise<void> {
@@ -291,6 +328,7 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   await capture(options.window, join(output, "04-handoff.png"));
   trace.semanticAudit = await semanticAudit(options.window);
   trace.securityAudit = await securityAudit(options.window);
+  trace.installedCatalog = await installedCatalogAudit(options.window);
 
   await waitFor(options.window, "durable recovery", `document.querySelector('.document-title > span:last-child')?.textContent?.includes('recovery ready')`, 20_000);
   if (options.verifyDurability) trace.durabilityArtifact = await options.verifyDurability();
@@ -324,8 +362,10 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   const audit = trace.semanticAudit as { unnamed?: unknown[]; duplicateIds?: unknown[] };
   const security = trace.securityAudit as { invalidRequests?: number; rejected?: number; nodeUnavailable?: boolean };
   const keyboard = trace.keyboardAccessibility as Record<string, boolean>;
+  const catalog = trace.installedCatalog as { count?: number; indexed?: number; pathLeak?: boolean; opaquePreviewUrls?: boolean; previewAvailable?: boolean; fontLoaded?: boolean; pageBounded?: boolean; studyUnchanged?: boolean };
   if (audit.unnamed?.length || audit.duplicateIds?.length) throw new Error("Semantic accessibility audit failed.");
   if (security.invalidRequests !== security.rejected || !security.nodeUnavailable) throw new Error("Host security audit failed.");
+  if (!catalog.count || !catalog.indexed || catalog.pathLeak || !catalog.opaquePreviewUrls || !catalog.previewAvailable || !catalog.fontLoaded || !catalog.pageBounded || !catalog.studyUnchanged) throw new Error("Installed font catalog audit failed.");
   if (!keyboard.forwardWrap || !keyboard.backwardWrap || !keyboard.candidateUnchanged || !keyboard.trayUnchanged || !keyboard.returnFocus) throw new Error("Keyboard accessibility audit failed.");
   if (afterReload.activeElement !== "workspace-heading" || afterReload.reviewState !== "Keep") throw new Error("Reload recovery or focus restoration failed.");
   await checksumEvidence(output);

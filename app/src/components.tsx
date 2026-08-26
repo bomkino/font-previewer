@@ -20,6 +20,7 @@ import {
   type ComparisonSet,
   type FitPolicy,
   type HandoffPreferences,
+  type ImportedSource,
   type Recipe,
   type ReviewState,
   type Stage,
@@ -33,6 +34,7 @@ import {
   specimenStyle,
   type StudyIndex,
 } from "./font-runtime.js";
+import { groupByFamily } from "./family-groups.js";
 import type { HostCapabilities } from "./protocol.js";
 
 export const stageLabels: Record<Stage, string> = {
@@ -74,7 +76,8 @@ const policyLabels: Record<FitPolicy, { label: string; detail: string }> = {
 
 export interface AppActions {
   readonly importSources: () => void;
-  readonly scanInstalled: () => void;
+  readonly scanInstalled: (query?: string, refresh?: boolean, cursor?: number) => void;
+  readonly addCatalogSources: (sourceIds: readonly string[]) => void;
   readonly openStudy: () => void;
   readonly saveStudy: (saveAs: boolean) => void;
   readonly exportHandoff: (sourcePermissionAcknowledged: boolean) => void;
@@ -82,6 +85,19 @@ export interface AppActions {
   readonly revealSource: (sourceId: string) => void;
   readonly newStudy: () => void;
   readonly loadSample: () => void;
+}
+
+export type NavigatorMode = "study" | "catalog" | "sources" | "sets";
+
+export interface InstalledCatalogView {
+  readonly query: string;
+  readonly cursor: number;
+  readonly imports: readonly ImportedSource[];
+  readonly indexed: number;
+  readonly total: number;
+  readonly rejected: number;
+  readonly truncated: boolean;
+  readonly nextCursor?: number;
 }
 
 interface WelcomeProps {
@@ -101,6 +117,7 @@ export function Welcome({ actions, capabilities }: WelcomeProps) {
         </p>
         <div className="welcome-actions">
           <button type="button" className="primary-button" onClick={actions.importSources}>Import Sources</button>
+          {capabilities?.installedCatalog ? <button type="button" className="quiet-button" onClick={() => actions.scanInstalled()}>Browse Installed</button> : null}
           <button type="button" className="quiet-button" onClick={actions.newStudy}>New Study</button>
           <button type="button" className="quiet-button" onClick={actions.openStudy}>Open Study</button>
         </div>
@@ -125,10 +142,13 @@ interface NavigatorProps {
   readonly index: StudyIndex;
   readonly dispatch: Dispatch<StudyCommand>;
   readonly actions: AppActions;
+  readonly mode: NavigatorMode;
+  readonly onModeChange: (mode: NavigatorMode) => void;
+  readonly catalog: InstalledCatalogView;
 }
 
-export function Navigator({ session, dispatch, actions }: NavigatorProps) {
-  const [mode, setMode] = useState<"study" | "sources" | "sets">("study");
+export function Navigator({ session, dispatch, actions, mode, onModeChange, catalog }: NavigatorProps) {
+  const [catalogSearch, setCatalogSearch] = useState(catalog.query);
   const deferredSearch = useDeferredValue(session.workspace.search.trim().toLocaleLowerCase());
   const visibleCandidates = useMemo(() => {
     const reviewFilter = session.workspace.reviewFilter;
@@ -141,13 +161,21 @@ export function Navigator({ session, dispatch, actions }: NavigatorProps) {
         .includes(deferredSearch);
     });
   }, [deferredSearch, session.document, session.workspace.reviewFilter]);
+  const familyGroups = useMemo(() => {
+    return groupByFamily(visibleCandidates, (candidate) => faceForCandidate(session.document, candidate).family);
+  }, [session.document, visibleCandidates]);
+  const catalogGroups = useMemo(() => {
+    return groupByFamily(catalog.imports, (imported) => imported.faces[0]?.family ?? imported.source.displayName);
+  }, [catalog.imports]);
+  const studySourceIds = useMemo(() => new Set(session.document.sources.map((source) => source.id)), [session.document.sources]);
 
   return (
     <aside className="catalog" aria-label="Study navigation">
       <div className="catalog-switcher" role="group" aria-label="Navigator">
-        <button type="button" className={mode === "study" ? "is-active" : ""} aria-pressed={mode === "study"} onClick={() => setMode("study")}>Study <span>{session.document.candidates.length}</span></button>
-        <button type="button" className={mode === "sources" ? "is-active" : ""} aria-pressed={mode === "sources"} onClick={() => setMode("sources")}>Sources <span>{session.document.sources.length}</span></button>
-        <button type="button" className={mode === "sets" ? "is-active" : ""} aria-pressed={mode === "sets"} onClick={() => setMode("sets")}>Sets <span>{session.document.comparisonSets.length}</span></button>
+        <button type="button" className={mode === "study" ? "is-active" : ""} aria-pressed={mode === "study"} onClick={() => onModeChange("study")}>Study <span>{session.document.candidates.length}</span></button>
+        <button type="button" className={mode === "catalog" ? "is-active" : ""} aria-pressed={mode === "catalog"} onClick={() => { onModeChange("catalog"); if (!catalog.indexed) actions.scanInstalled(); }}>Catalog <span>{catalog.total}</span></button>
+        <button type="button" className={mode === "sources" ? "is-active" : ""} aria-pressed={mode === "sources"} onClick={() => onModeChange("sources")}>Sources <span>{session.document.sources.length}</span></button>
+        <button type="button" className={mode === "sets" ? "is-active" : ""} aria-pressed={mode === "sets"} onClick={() => onModeChange("sets")}>Sets <span>{session.document.comparisonSets.length}</span></button>
       </div>
 
       {mode === "study" ? (
@@ -166,28 +194,63 @@ export function Navigator({ session, dispatch, actions }: NavigatorProps) {
             </label>
           </div>
           <div className="candidate-list" aria-label="Candidates">
-            {visibleCandidates.map((candidate) => {
-              const face = faceForCandidate(session.document, candidate);
-              const selected = candidate.id === session.workspace.selectedCandidateId;
-              const use = activeTypographySystem(session.document).fontUses.find((fontUse) => fontUse.originatingCandidateId === candidate.id);
-              return (
-                <button type="button" key={candidate.id} className={`candidate-row ${selected ? "is-selected" : ""}`} aria-current={selected ? "true" : undefined} onClick={() => dispatch({ type: "select-candidate", candidateId: candidate.id })}>
-                  <span className={`review-glyph review-${candidate.reviewState}`} aria-label={reviewLabels[candidate.reviewState]}>{reviewGlyphs[candidate.reviewState]}</span>
-                  <span className="candidate-name"><strong>{face.family}</strong><small>{candidate.label}{face.axes.length ? " · Variable" : ""}</small></span>
-                  {use ? <span className="role-tag">{roleLabels[use.role]}</span> : null}
-                </button>
-              );
+            {familyGroups.map((group) => {
+              const family = group.label;
+              const candidates = group.items;
+              const variableCount = candidates.filter((candidate) => faceForCandidate(session.document, candidate).axes.length > 0).length;
+              return <section className="family-group" aria-label={`${family} Family Group`} key={group.key}>
+                <div className="family-group-heading"><span><strong>{family}</strong><small>{candidates.length} {candidates.length === 1 ? "Candidate" : "Candidates"} · {group.confidence === "exact-metadata" ? "exact metadata" : "normalized metadata"}{variableCount ? ` · ${variableCount} variable` : " · static"}</small></span><button type="button" aria-label={`Compare ${family} family`} onClick={() => dispatch({ type: "set-tray", candidateIds: candidates.slice(0, 4).map((candidate) => candidate.id) })} disabled={candidates.length < 2}>Compare family</button></div>
+                {candidates.map((candidate) => {
+                  const face = faceForCandidate(session.document, candidate);
+                  const selected = candidate.id === session.workspace.selectedCandidateId;
+                  const use = activeTypographySystem(session.document).fontUses.find((fontUse) => fontUse.originatingCandidateId === candidate.id);
+                  return (
+                    <button type="button" key={candidate.id} className={`candidate-row ${selected ? "is-selected" : ""}`} aria-label={`${family} ${candidate.label}, ${reviewLabels[candidate.reviewState]}`} aria-current={selected ? "true" : undefined} onClick={() => dispatch({ type: "select-candidate", candidateId: candidate.id })}>
+                      <span className={`review-glyph review-${candidate.reviewState}`} aria-label={reviewLabels[candidate.reviewState]}>{reviewGlyphs[candidate.reviewState]}</span>
+                      <span className="candidate-name"><strong>{face.style}</strong><small>{candidate.label}{face.axes.length ? " · Variable" : " · Static"}</small></span>
+                      {use ? <span className="role-tag">{roleLabels[use.role]}</span> : null}
+                    </button>
+                  );
+                })}
+              </section>;
             })}
             {visibleCandidates.length === 0 ? <p className="empty-note">No Candidates match this view.</p> : null}
           </div>
         </>
       ) : null}
 
+      {mode === "catalog" ? (
+        <div className="installed-catalog">
+          <form className="catalog-tools catalog-search" onSubmit={(event) => { event.preventDefault(); actions.scanInstalled(catalogSearch); }}>
+            <label><span className="sr-only">Search installed fonts</span><input type="search" value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder="Search installed fonts" /></label>
+            <div><button type="submit" className="quiet-button">Search</button><button type="button" className="text-button" onClick={() => actions.scanInstalled(catalogSearch, true)}>Rebuild</button></div>
+          </form>
+          <p className="catalog-summary" role="status">{catalog.total} {catalog.total === 1 ? "match" : "matches"} · {catalog.indexed} indexed{catalog.truncated ? " · 10,000 limit" : ""}</p>
+          <div className="catalog-results" aria-label="Installed font Catalog">
+            {catalogGroups.map((group) => {
+              const family = group.label;
+              const imports = group.items;
+              const available = imports.filter((item) => !studySourceIds.has(item.source.id));
+              return <section className="catalog-family" aria-label={`${family} installed family`} key={group.key}>
+                <div className="catalog-family-heading"><span><strong>{family}</strong><small>{imports.reduce((count, item) => count + item.faces.length, 0)} Faces · {group.confidence === "exact-metadata" ? "exact metadata" : "normalized metadata"}</small></span><button type="button" className="quiet-button" aria-label={`Add ${family} family to Study`} disabled={!available.length} onClick={() => actions.addCatalogSources(available.map((item) => item.source.id))}>Add family</button></div>
+                {imports.map((item) => {
+                  const added = studySourceIds.has(item.source.id);
+                  const styles = item.faces.map((face) => face.style).slice(0, 3).join(" · ");
+                  return <article className="catalog-source" key={item.source.id}><span><strong>{item.source.displayName}</strong><small>{styles || item.source.hint.format}{item.faces.some((face) => face.axes.length) ? " · Variable" : " · Static"}</small></span><button type="button" disabled={added} aria-label={`${added ? "In Study" : "Add"} ${item.source.displayName}`} onClick={() => actions.addCatalogSources([item.source.id])}>{added ? "Added" : "Add"}</button></article>;
+                })}
+              </section>;
+            })}
+            {!catalog.indexed ? <p className="empty-note">Open the Host-local Catalog to index installed fonts.</p> : catalogGroups.length === 0 ? <p className="empty-note">No installed fonts match this search.</p> : null}
+          </div>
+          <div className="catalog-pagination"><button type="button" className="quiet-button" disabled={catalog.cursor === 0} onClick={() => actions.scanInstalled(catalog.query, false, Math.max(0, catalog.cursor - 80))}>Previous</button><span>{catalog.total ? `${catalog.cursor + 1}–${Math.min(catalog.cursor + catalog.imports.length, catalog.total)} of ${catalog.total}` : "0 results"}</span><button type="button" className="quiet-button" disabled={catalog.nextCursor === undefined} onClick={() => actions.scanInstalled(catalog.query, false, catalog.nextCursor)}>Next</button></div>
+        </div>
+      ) : null}
+
       {mode === "sources" ? (
         <div className="source-list">
           <div className="source-actions">
             <button type="button" className="quiet-button" onClick={actions.importSources}>Import</button>
-            <button type="button" className="quiet-button" onClick={actions.scanInstalled}>Installed</button>
+            <button type="button" className="quiet-button" onClick={() => actions.scanInstalled()}>Installed Catalog</button>
           </div>
           {session.document.sources.map((source) => {
             const binding = bindingForSource(session, source.id);

@@ -22,6 +22,8 @@ for (const required of [
   join(applicationRoot, "dist-electron", "electron", "main.js"),
   join(applicationRoot, "dist-electron", "electron", "preload.cjs"),
   join(applicationRoot, "node_modules", "electron", "dist", "electron"),
+  join(applicationRoot, "THIRD_PARTY_NOTICES.md"),
+  join(applicationRoot, "..", "LICENSE"),
 ]) {
   if (!(await lstat(required)).isFile()) throw new Error(`Missing build input: ${relative(applicationRoot, required)}`);
 }
@@ -37,6 +39,8 @@ await mkdir(packagedApplication, { recursive: true });
 await Promise.all([
   cp(join(applicationRoot, "dist"), join(packagedApplication, "dist"), { recursive: true }),
   cp(join(applicationRoot, "dist-electron"), join(packagedApplication, "dist-electron"), { recursive: true }),
+  cp(join(applicationRoot, "THIRD_PARTY_NOTICES.md"), join(packagedApplication, "THIRD_PARTY_NOTICES.md")),
+  cp(join(applicationRoot, "..", "LICENSE"), join(packagedApplication, "LICENSE.txt")),
 ]);
 await writeFile(join(packagedApplication, "package.json"), `${JSON.stringify({ name: "font-previewer", productName: "Font Previewer", version, private: true, type: "module", main: "dist-electron/electron/main.js" }, null, 2)}\n`);
 

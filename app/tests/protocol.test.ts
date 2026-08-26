@@ -14,6 +14,9 @@ function validImport() {
 test("HostBridge accepts only the bounded request vocabulary", () => {
   const session = createFixtureSession();
   assert.equal(isHostRequest({ type: "open-import" }), true);
+  assert.equal(isHostRequest({ type: "scan-installed", query: "sans", cursor: 0, limit: 80, refresh: false }), true);
+  assert.equal(isHostRequest({ type: "scan-installed" }), false);
+  assert.equal(isHostRequest({ type: "scan-installed", query: "", cursor: 0, limit: 201, refresh: false }), false);
   assert.equal(isHostRequest({ type: "probe", serial: 12 }), true);
   assert.equal(isHostRequest({ type: "probe", serial: -1 }), false);
   assert.equal(isHostRequest({ type: "open-import", path: "/private/font.otf" }), false);
@@ -28,6 +31,14 @@ test("import responses carry opaque capabilities, never filesystem paths", () =>
   leaked.path = "/private/font.otf";
   assert.equal(isHostResponse({ type: "import-result", imports: [leaked], rejected: 0, truncated: false }), false);
   assert.equal(isHostResponse({ type: "import-result", imports: [{ ...validImport(), binding: { ...validImport().binding, previewUrl: "file:///private/font.otf" } }], rejected: 0, truncated: false }), false);
+});
+
+test("installed Catalog responses are independently bounded and paginated", () => {
+  const result = { type: "catalog-result", imports: [validImport()], indexed: 10_000, total: 320, rejected: 0, truncated: false, nextCursor: 80 };
+  assert.equal(isHostResponse(result), true);
+  assert.equal(isHostResponse({ ...result, nextCursor: 321 }), false);
+  assert.equal(isHostResponse({ ...result, total: 10_001 }), false);
+  assert.equal(isHostResponse({ ...result, imports: [{ ...validImport(), binding: { ...validImport().binding, previewUrl: "file:///private/font.otf" } }] }), false);
 });
 
 test("native commands and Host events are runtime validated", () => {
