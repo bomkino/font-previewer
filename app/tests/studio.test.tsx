@@ -16,6 +16,7 @@ const inertHost: HostPort = {
     if (request.type === "scan-installed") return { type: "catalog-result", imports: [], indexed: 0, total: 0, rejected: 0, truncated: false, cancelled: false };
     if (request.type === "cancel-catalog") return { type: "ack", action: "cancel-catalog" };
     if (request.type === "mirror-study") return { type: "mirror-ack", revision: request.revision, recoveryPersisted: false };
+    if (request.type === "finish-terminate") return { type: "ack", action: "finish-terminate" };
     if (request.type === "save-study") return { type: "save-result", revision: request.revision, displayName: "Test.pitchfontstudy", saved: true };
     if (request.type === "export-handoff") return { type: "export-result", displayName: "Test Handoff", exported: true, fileCount: 4 };
     if (request.type === "relink-source") return { type: "relink-result", relinked: false };

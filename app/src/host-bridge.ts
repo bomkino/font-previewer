@@ -157,6 +157,8 @@ const browserPort: HostPort = {
       case "native-undo":
         document.execCommand("undo");
         return { type: "ack", action: "native-undo" };
+      case "finish-terminate":
+        return { type: "ack", action: "finish-terminate" };
       case "reload-studio":
         window.setTimeout(() => window.location.reload(), 30);
         return { type: "ack", action: "reload-studio" };

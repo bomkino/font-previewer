@@ -19,6 +19,8 @@ test("HostBridge accepts only the bounded request vocabulary", () => {
   assert.equal(isHostRequest({ type: "scan-installed" }), false);
   assert.equal(isHostRequest({ type: "scan-installed", query: "", cursor: 0, limit: 201, refresh: false }), false);
   assert.equal(isHostRequest({ type: "probe", serial: 12 }), true);
+  assert.equal(isHostRequest({ type: "finish-terminate", revision: 12, recoveryPersisted: true }), true);
+  assert.equal(isHostRequest({ type: "finish-terminate", revision: 12, recoveryPersisted: "yes" }), false);
   assert.equal(isHostRequest({ type: "probe", serial: -1 }), false);
   assert.equal(isHostRequest({ type: "open-import", path: "/private/font.otf" }), false);
   assert.equal(isHostRequest({ type: "read-file", path: "/private/font.otf" }), false);
@@ -47,6 +49,7 @@ test("native commands and Host events are runtime validated", () => {
   assert.equal(isMenuCommand({ type: "mark-keep" }), true);
   assert.equal(isMenuCommand({ type: "scan-installed" }), true);
   assert.equal(isMenuCommand({ type: "undo-study" }), true);
+  assert.equal(isMenuCommand({ type: "flush-recovery" }), true);
   assert.equal(isMenuCommand({ type: "set-stage", stage: "handoff" }), true);
   assert.equal(isMenuCommand({ type: "set-stage", stage: "inspect" }), false);
   assert.equal(isMenuCommand({ type: "open-import", path: "/tmp/font.otf" }), false);

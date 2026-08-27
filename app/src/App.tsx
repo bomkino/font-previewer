@@ -222,7 +222,7 @@ export default function App() {
     }
     dispatch({ type: "acknowledge-revision", revision: response.revision });
     setRecoveryAvailable(response.recoveryPersisted);
-    return true;
+    return response.recoveryPersisted;
   }, [dispatch, host]);
 
   const importSources = useCallback(() => {
@@ -417,9 +417,29 @@ export default function App() {
       }
       case "next-unreviewed": dispatch({ type: "select-next-unreviewed" }); break;
       case "set-stage": dispatch({ type: "set-stage", stage: command.stage }); break;
+      case "flush-recovery": {
+        void (async () => {
+          const activeElement = document.activeElement;
+          if (editableTarget(activeElement) && activeElement instanceof HTMLElement) {
+            activeElement.blur();
+            await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+          }
+          const current = sessionRef.current;
+          let recoveryPersisted = false;
+          try {
+            recoveryPersisted = await mirror(current);
+          } catch (cause) {
+            setRecoveryAvailable(false);
+            setError(cause instanceof Error ? cause.message : "Could not confirm the final recovery checkpoint.");
+          }
+          const response = await host.request({ type: "finish-terminate", revision: current.revision, recoveryPersisted });
+          if (response.type !== "ack" || response.action !== "finish-terminate") throw new Error("Host did not finish the quit checkpoint.");
+        })().catch((cause) => setError(cause instanceof Error ? cause.message : "Could not finish the quit checkpoint."));
+        break;
+      }
       case "reload-studio": void host.request({ type: "reload-studio" }); break;
     }
-  }, [dispatch, exportHandoff, host, importSources, newStudy, openStudy, saveAfterFocusedEdit, scanInstalled]);
+  }, [dispatch, exportHandoff, host, importSources, mirror, newStudy, openStudy, saveAfterFocusedEdit, scanInstalled]);
 
   useEffect(() => {
     let active = true;

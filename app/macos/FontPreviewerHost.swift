@@ -201,6 +201,7 @@ private enum HostRequest {
     case relinkSource(String)
     case revealSource(String)
     case nativeUndo
+    case finishTerminate(Int, Bool)
     case reloadStudio
     case probe(Int)
 }
@@ -263,6 +264,8 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     private var recentDocuments: [URL] = []
     private var evidenceRunner: MacEvidenceRunner?
     private var evidenceStarted = false
+    private var terminationReplyPending = false
+    private var terminationTimeout: DispatchWorkItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -277,6 +280,21 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !terminationReplyPending else { return .terminateLater }
+        terminationReplyPending = true
+        sendMenu(["type": "flush-recovery"])
+        let timeout = DispatchWorkItem { [weak self, weak sender] in
+            guard let self, let sender, self.terminationReplyPending else { return }
+            self.terminationReplyPending = false
+            self.terminationTimeout = nil
+            self.sendEvent(["type": "mirror-warning", "message": "Quit cancelled because the final recovery checkpoint was not confirmed."])
+            sender.reply(toApplicationShouldTerminate: false)
+        }
+        terminationTimeout = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: timeout)
+        return .terminateLater
+    }
     func applicationWillTerminate(_ notification: Notification) { scopedURLs.forEach { $0.stopAccessingSecurityScopedResource() } }
 
     private func configureStorage() throws {
@@ -454,6 +472,9 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         case "relink-source": guard exact(object, ["type", "sourceId"]), let id = object["sourceId"] as? String, !id.isEmpty else { return nil }; return .relinkSource(id)
         case "reveal-source": guard exact(object, ["type", "sourceId"]), let id = object["sourceId"] as? String, !id.isEmpty else { return nil }; return .revealSource(id)
         case "native-undo": return exact(object, ["type"]) ? .nativeUndo : nil
+        case "finish-terminate":
+            guard exact(object, ["type", "revision", "recoveryPersisted"]), let revision = integer(object["revision"]), let recoveryPersisted = object["recoveryPersisted"] as? Bool else { return nil }
+            return .finishTerminate(revision, recoveryPersisted)
         case "reload-studio": return exact(object, ["type"]) ? .reloadStudio : nil
         case "probe": guard exact(object, ["type", "serial"]), let serial = integer(object["serial"]) else { return nil }; return .probe(serial)
         default: return nil
@@ -493,6 +514,15 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
                 guard let url = sourceBindings[id] else { replyHandler(nil, "Source is not locally bound."); return }
                 NSWorkspace.shared.activateFileViewerSelecting([url]); replyHandler(["type": "ack", "action": "reveal-source"], nil)
             case .nativeUndo: window.makeFirstResponder(webView); if webView.undoManager?.canUndo == true { webView.undoManager?.undo() }; replyHandler(["type": "ack", "action": "native-undo"], nil)
+            case .finishTerminate(let revision, let recoveryPersisted):
+                guard terminationReplyPending else { replyHandler(nil, "No quit checkpoint is pending."); return }
+                let shouldTerminate = recoveryPersisted && mirroredRevision == revision
+                terminationTimeout?.cancel()
+                terminationTimeout = nil
+                terminationReplyPending = false
+                replyHandler(["type": "ack", "action": "finish-terminate"], nil)
+                if !shouldTerminate { sendEvent(["type": "mirror-warning", "message": "Quit cancelled because the latest edit could not be recovered safely."]) }
+                DispatchQueue.main.async { NSApp.reply(toApplicationShouldTerminate: shouldTerminate) }
             case .reloadStudio: replyHandler(["type": "ack", "action": "reload-studio"], nil); DispatchQueue.main.asyncAfter(deadline: .now() + 0.025) { [weak self] in self?.webView.reload() }
             case .probe(let serial): replyHandler(["type": "probe-result", "serial": serial, "host": "wkwebview"], nil)
             }

@@ -42,6 +42,7 @@ export type MenuCommand =
   | { readonly type: "mark-keep" }
   | { readonly type: "next-unreviewed" }
   | { readonly type: "set-stage"; readonly stage: Stage }
+  | { readonly type: "flush-recovery" }
   | { readonly type: "reload-studio" };
 
 export type HostEvent =
@@ -86,6 +87,7 @@ export type HostRequest =
   | { readonly type: "relink-source"; readonly sourceId: string }
   | { readonly type: "reveal-source"; readonly sourceId: string }
   | { readonly type: "native-undo" }
+  | { readonly type: "finish-terminate"; readonly revision: number; readonly recoveryPersisted: boolean }
   | { readonly type: "reload-studio" }
   | { readonly type: "probe"; readonly serial: number };
 
@@ -123,7 +125,7 @@ export type HostResponse =
   | { readonly type: "save-result"; readonly revision: number; readonly displayName: string; readonly saved: boolean }
   | { readonly type: "export-result"; readonly displayName: string; readonly exported: boolean; readonly fileCount: number }
   | { readonly type: "relink-result"; readonly import?: ImportedSource; readonly relinked: boolean }
-  | { readonly type: "ack"; readonly action: "native-undo" | "reload-studio" | "reveal-source" | "cancel-catalog" }
+  | { readonly type: "ack"; readonly action: "native-undo" | "finish-terminate" | "reload-studio" | "reveal-source" | "cancel-catalog" }
   | {
       readonly type: "probe-result";
       readonly serial: number;
@@ -301,6 +303,9 @@ export function isHostRequest(value: unknown): value is HostRequest {
     );
   }
   if (value.type === "probe") return exactKeys(value, ["type", "serial"]) && isInteger(value.serial);
+  if (value.type === "finish-terminate") {
+    return exactKeys(value, ["type", "revision", "recoveryPersisted"]) && isInteger(value.revision) && typeof value.recoveryPersisted === "boolean";
+  }
   if (value.type === "mirror-study") {
     return (
       exactKeys(value, ["type", "document", "workspace", "revision"]) &&
@@ -348,6 +353,7 @@ export function isMenuCommand(value: unknown): value is MenuCommand {
       "redo-study",
       "mark-keep",
       "next-unreviewed",
+      "flush-recovery",
       "reload-studio",
     ].includes(value.type)
   ) {
@@ -382,7 +388,7 @@ export function isHostResponse(value: unknown): value is HostResponse {
     return exactKeys(value, ["type", "serial", "host"]) && isInteger(value.serial) && ["browser", "electron", "wkwebview"].includes(String(value.host));
   }
   if (value.type === "ack") {
-    return exactKeys(value, ["type", "action"]) && ["native-undo", "reload-studio", "reveal-source", "cancel-catalog"].includes(String(value.action));
+    return exactKeys(value, ["type", "action"]) && ["native-undo", "finish-terminate", "reload-studio", "reveal-source", "cancel-catalog"].includes(String(value.action));
   }
   if (value.type === "mirror-ack") return exactKeys(value, ["type", "revision", "recoveryPersisted"]) && isInteger(value.revision) && typeof value.recoveryPersisted === "boolean";
   if (value.type === "save-result") {
