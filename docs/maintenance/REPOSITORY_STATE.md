@@ -32,8 +32,10 @@ Run IDs, conclusions, artifacts, and the source SHA remain available in GitHub A
 
 - Open release pull requests: none after finalisation.
 - Open stable-v1 gates: issues [#5](https://github.com/bomkino/font-previewer/issues/5), [#6](https://github.com/bomkino/font-previewer/issues/6), and [#7](https://github.com/bomkino/font-previewer/issues/7).
-- Superseded remote working branches are disposable after their commits and PR history are verified reachable from `main` or preserved tags.
-- Force-push and deletion protection belongs on `main`; merged working branches should be deleted automatically.
+- Remote branches: `main` only. The eight reviewed superseded branches were deleted after their useful history was proved merged, squash-equivalent, tagged, archived, or superseded.
+- Merged working branches delete automatically. `main` rejects force-push and deletion, including for administrators.
+- Required checks are not attached to branch protection because the workflows are deliberately path-filtered; missing checks would deadlock unrelated maintenance changes.
+- The unused repository wiki and classic-project surfaces are disabled. Issues remain enabled.
 
 ## Platform posture
 
