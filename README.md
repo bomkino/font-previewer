@@ -1,42 +1,50 @@
 # Font Previewer
 
-Font Previewer is a local desktop decision tool for choosing typography for pitch decks. One shared Studio runs inside a native AppKit/WKWebView Host on macOS and a sandboxed Electron Host on Linux. Both use the same portable `.pitchfontstudy` v4 document and the same workflow:
+Font Previewer is a local typography decision tool for pitch-deck work. One shared Studio runs inside a native AppKit/WKWebView Host on macOS and a sandboxed Electron Host on Linux:
 
 **Review → Compare → System → Handoff**
 
-## Public prerelease status
+It imports and inspects fonts, maintains portable `.pitchfontstudy` documents, compares Candidates, assembles typography systems, and creates transactional Handoff packages. It does not install, transform, anonymise, slant, interpolate, or repackage fonts. Those are FontBlind concerns; the products share no implementation.
 
-The owner approved the current v0.1 candidate for a free GitHub prerelease after exact-head CI. [PR #2](https://github.com/bomkino/font-previewer/pull/2) integrates the isolated hardening branch into `codex/v1-release-candidate`; it does not merge to `main`. Automated macOS and Linux gates build and launch the desktop Hosts, exercise displayed UI, native menus and dialogs, recovery, accessibility semantics, the installed-font Catalog, variable-font metadata, and transactional Handoff, then inspect package integrity.
+## Repository status
 
-The macOS archive is ad-hoc signed with hardened runtime, not Developer-ID signed or notarized. macOS may warn or block a normal first launch; Control-click the app and choose **Open** only if you trust this repository. Attended VoiceOver/Orca, typography review, independent reconstruction, hostile-font corpus testing, and independent clean-machine evidence remain unverified. Those are disclosed prerelease limitations, not completed claims.
+- Canonical branch: `main`
+- Source version: `0.1.0`
+- Current source posture: unreleased `v0.1.0-rc.2` candidate
+- Latest published release: [`v0.1.0-rc.1`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.1), fixed to commit `6ae51f5618387e1e4e39f4816f797da35aaee57b`
+- Public stable release: none
+
+Current `main` contains the RC, hardening, and pre-Mac work merged through PRs [#1](https://github.com/bomkino/font-previewer/pull/1), [#2](https://github.com/bomkino/font-previewer/pull/2), and [#3](https://github.com/bomkino/font-previewer/pull/3). The published `v0.1.0-rc.1` remains historically intact and does not include every change on current `main`.
+
+The exact current repository state, automated evidence, and remaining human gates live in [`docs/maintenance/REPOSITORY_STATE.md`](docs/maintenance/REPOSITORY_STATE.md).
 
 ## What works
 
-- Host-local file/folder import without font installation or upload.
-- A searchable, paginated installed-font Catalog indexing up to 10,000 entries; Catalog results enter a Study only through an explicit Add action.
+- Host-local file and folder import without font installation or upload.
+- A searchable, paginated installed-font Catalog bounded to 10,000 entries; browsing cannot mutate a Study.
 - Separate Source, local Binding, Face, Candidate, Recipe, Comparison Set, Font Use, Typography System, and Handoff entities.
-- Exact Face indices and Host-reported metadata, plus independent Candidate settings, casing, tags, notes, rationale, and review decisions. CoreText supplies variable axes on Mac; Linux uses a timeout/output-bounded parser child for axes and named instances.
-- Family Groups with normalized-name confidence, static/variable disclosure, bulk add, Candidate duplication, and family-to-Compare actions.
-- Contact Sheet, Focus, Waterfall, blind comparison, fit policies, deck scenes, Role assignment, and preflighted Handoff.
-- Host-owned recovery distinct from intentional Save, with stale-revision rejection and reload/focus restoration.
-- Transactional Handoff staging, checksums, privacy-safe manifests, and Source copies enabled by default for the internal workflow with an opt-out.
-- Native menus, native panels, source reveal/relink, semantic undo/redo, and a bounded path-free HostBridge.
+- Exact Face indices, Host-reported metadata, independent Candidate settings, casing, tags, notes, rationale, and review decisions.
+- Variable axes and named instances: CoreText on macOS; a bounded child parser on Linux.
+- Family Groups, duplicate Candidates, Contact Sheet, Focus, Waterfall, blind comparison, fit policies, deck scenes, Role assignment, and Handoff preflight.
+- Host-owned recovery distinct from intentional Save, with stale-revision rejection and focus restoration.
+- Transactional Handoff staging, checksums, privacy-safe manifests, and explicitly acknowledged Source copying.
+- Native menus and panels, source reveal/relink, semantic undo/redo, and a closed path-free HostBridge.
 
 ## Platforms and artifacts
 
-| Platform | Host | Current artifact |
-|---|---|---|
-| macOS 13+ arm64 | AppKit + WKWebView + CoreText discovery | Hardened-runtime, ad-hoc signed `.app` ZIP; not notarized |
-| Ubuntu/Debian x64 | Electron 44 + Fontconfig discovery | `.deb` and portable `.tar.gz` |
-| Browser | Development fallback only | No native Catalog, durable recovery, or transactional Handoff |
+| Platform | Host | Current package evidence | Boundary |
+|---|---|---|---|
+| macOS 13+ arm64 | AppKit + WKWebView + CoreText | Ad-hoc signed, hardened-runtime app ZIP | Not Developer-ID signed or notarised |
+| Ubuntu/Debian x64 | Electron 44 + Fontconfig | `.deb` and portable `.tar.gz` | Automated hosted X11/Wayland evidence; independent machines pending |
+| Browser | Development fallback | Renderer-only development server | No native Catalog, durable recovery, or transactional Handoff |
 
-Verified prerelease downloads are published on [GitHub Releases](https://github.com/bomkino/font-previewer/releases). CI artifacts remain exact-SHA evidence.
+The Mac package may trigger Gatekeeper warnings. Control-click **Open** only after verifying the release checksum and trusting this repository. No Apple notarisation, stapling, or Gatekeeper acceptance is claimed.
 
-Installation and first-launch details—including the unsigned Mac warning and Linux sandbox requirements—are in [`app/INSTALL.md`](app/INSTALL.md).
+See [`app/INSTALL.md`](app/INSTALL.md) before installing a release asset.
 
-## Build and run
+## Build and verify
 
-Use Node.js 24 or newer.
+Use Node.js `24.19.0` or a compatible Node.js 24 release.
 
 ```bash
 cd app
@@ -45,44 +53,61 @@ npm run electron:install
 npm run verify
 ```
 
-Linux:
+Linux development and packaging:
 
 ```bash
 npm run electron
 npm run package:linux
 ```
 
-macOS:
+macOS packaging:
 
 ```bash
+npm run build
 ./scripts/build-macos-host.sh
 open "output/macos-host/Font Previewer.app"
 ```
 
-The Mac builder requires Apple command-line developer tools, enables hardened runtime, and signs ad hoc. It does not use a Developer ID identity or notarize.
+`npm run verify` checks version surfaces, strict TypeScript, public-seam tests, production Studio and Host builds, SBOM generation, bundle hygiene, and high-severity npm audit. GitHub Actions adds displayed Host journeys, recovery and Handoff fault injection, accessibility semantics, package round trips, checksums, reproducibility, X11, native Wayland/Ozone smoke, and ad-hoc signature verification.
 
-## Architecture and evidence
+Permanent verification is defined by [`.github/workflows/verify.yml`](.github/workflows/verify.yml). Release preparation is manual, exact-SHA guarded, dry-run first, and non-overwriting; no release is published automatically.
 
-- [`app/README.md`](app/README.md) — application development and packaging
-- [`app/REPORT.md`](app/REPORT.md) — exact release-candidate evidence and open gates
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — authority, HostBridge, persistence, and security boundaries
-- [`docs/QA.md`](docs/QA.md) — automated and human release gates
-- [`docs/programme/STATUS.md`](docs/programme/STATUS.md) — current programme truth
-- [`docs/programme/CAPABILITY_PARITY.md`](docs/programme/CAPABILITY_PARITY.md) — reference/Host parity and migration disposition
-- [`docs/programme/RELEASE_DECISION_PACKET.md`](docs/programme/RELEASE_DECISION_PACKET.md) — owner choices, limitations, and release notes
+## Evidence versus claims
+
+Automated CI does not prove:
+
+- attended VoiceOver or Orca usability;
+- human typography or native-interface quality;
+- competent complex-script review;
+- independent clean-machine reconstruction;
+- broad hostile-font containment beyond the committed synthetic and malformed-input gates;
+- production signing, notarisation, stapling, or Gatekeeper acceptance.
+
+These remain explicit prerelease/stable-release gates. See [`docs/QA.md`](docs/QA.md) and the open GitHub issues.
+
+## Documentation
+
+- [`app/README.md`](app/README.md) — application development and package outputs
+- [`app/REPORT.md`](app/REPORT.md) — current implementation report
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — durable product and Host boundaries
+- [`docs/QA.md`](docs/QA.md) — reproducible automated and human gates
+- [`docs/PROVENANCE.md`](docs/PROVENANCE.md) — preserved native reference provenance
+- [`docs/maintenance/REPOSITORY_STATE.md`](docs/maintenance/REPOSITORY_STATE.md) — canonical current truth
+- [`docs/maintenance/BRANCH_POLICY.md`](docs/maintenance/BRANCH_POLICY.md) — branch lifecycle
+- [`docs/maintenance/RELEASE_POLICY.md`](docs/maintenance/RELEASE_POLICY.md) — release claims and safeguards
 - [`app/DEPENDENCIES.md`](app/DEPENDENCIES.md), [`app/sbom.cdx.json`](app/sbom.cdx.json), and [`app/THIRD_PARTY_NOTICES.md`](app/THIRD_PARTY_NOTICES.md) — supply-chain record
 
 ## Preserved reference
 
-`macos/` is the original native CoreText reference extracted from `bomkino/pitch-deck-tools` at commit `be77221cb7cb809fdf119945f3fee3d2e1e72ed6`. It remains an oracle and implementation seed, not the release-candidate application. See [`docs/PROVENANCE.md`](docs/PROVENANCE.md).
+The root `macos/` SwiftUI/CoreText application is a historical native reference extracted from `bomkino/pitch-deck-tools` at commit `be77221cb7cb809fdf119945f3fee3d2e1e72ed6`. It is an oracle and implementation seed, not the active product or package path.
 
 ## Product boundaries
 
-- Local-only V1: no account, analytics, upload, or required network.
+- Local-only: no account, analytics, upload, updater, or required network.
 - No font installation, activation, mutation, moving, or deletion.
-- No automatic winner or taste score.
-- No paid, client, system, or mystery font binaries in Git.
+- No automatic winner, taste score, or fake Figma integration.
+- No paid, client, copied system, or mystery font binaries in Git or packages.
 - No raster-parity claim between CoreText/WebKit and Chromium.
-- Public v0.1 prereleases are GitHub-only; stable `v1.0.0` remains separately gated.
+- Public prereleases are GitHub-only; stable `v1.0.0` remains separately gated.
 
 MIT licensed. See [`LICENSE`](LICENSE).

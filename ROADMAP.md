@@ -1,27 +1,30 @@
 # Font Previewer roadmap
 
-## Current: close the v0.1 release gate
+Completed implementation and repository history belong in the changelog and archived programme reports. This file contains future work only.
 
-- Run attended VoiceOver and Orca journeys on the packaged apps.
+## Stable-release gates
+
+- Run attended VoiceOver and Orca journeys on packaged applications and resolve blocking findings.
 - Review native window/menu quality and typography with 20–50 legally held production fonts.
-- Repeat the already-green 10,000-entry Catalog, cancellation, and 500-Face semantic soak on reference hardware; measure actual 500-Face import and 100-card scrolling.
-- Extend the proven bounded Linux malformed-metadata rejection into a hostile cross-format/process-containment corpus; induce WKWebView content-process termination.
-- Repeat the already-green disposable-runner package journeys on independent clean Mac/Linux machines, including Wayland/X11 and installed-data residue review.
-- Decide production renderer/format tiers and record the workspace/durability ADR verdicts.
-- Decide whether RPM and x86_64/universal Mac artifacts are V1 commitments.
-- Apply Developer ID/hardened signing, notarization, and stapling when credentials are deliberately supplied.
-- Obtain separate owner approval for PR readiness, merge, and public release.
+- Add competent-reader review for selected complex scripts; automated coverage metadata is insufficient.
+- Repeat import, visible-card, long-session, and recovery measurements on reference hardware.
+- Extend malformed-input coverage into a documented hostile cross-format font corpus and induce WKWebView content-process termination.
+- Reconstruct Studies and Handoffs independently on clean supported Mac and Linux machines; test install, launch, Save, recover, export, update, remove, and residue.
+- Decide production renderer/format tiers, workspace durability, Linux package scope, and any sandbox/process-isolation changes through ADRs.
+- Decide whether RPM, Linux arm64, Mac x86_64, or universal Mac artifacts are support commitments.
+- Adopt Developer ID signing, notarisation, and stapling only if credentials and maintenance responsibility are deliberately supplied.
+- Obtain explicit owner authorization for any new public release.
 
 ## Next product pass
 
-- Richer Character/Fallback/Metrics evidence with explicit confidence and Render Profile.
+- Richer Character, fallback, and metrics evidence with explicit confidence and Render Profile.
 - Dedicated fallback-stack and cascade testing.
 - Cross-Host reference-output corpus using redistributable fonts.
 - Named specimen Recipe editing and reusable Recipe packs.
-- Multi-select and bulk review/tag/Role operations.
+- Multi-select and bulk review, tag, and Role operations.
 - Better large-family paging beyond the visible Catalog page.
 - Handoff annotations and reconstruction diagnostics.
-- Optional RPM after demand and maintenance cost are confirmed.
+- Optional RPM only after demand and maintenance cost are confirmed.
 
 ## Typography research
 
@@ -34,7 +37,7 @@
 
 - Repeatable arm64/x86_64 or universal Mac production builds.
 - Opt-in updater only if privacy, rollback, signing, and maintenance evidence justify it.
-- Reproducible provenance/attestation after the first signed distribution path is stable.
+- Reproducible provenance and attestation after a signed distribution path exists.
 
 ## Not planned
 
@@ -42,5 +45,6 @@
 - Font installation or activation management.
 - Automatic “best font” scores or generative font imitation.
 - Silent copying of source fonts.
+- FontBlind transformation or packaging engines.
 - Fake Figma integration.
 - Pixel-identical Mac/Linux output claims.
