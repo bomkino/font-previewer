@@ -14,6 +14,7 @@ import {
   protocol as electronProtocol,
   session,
   shell,
+  webContents as electronWebContents,
   type IpcMainInvokeEvent,
   type MenuItemConstructorOptions,
 } from "electron";
@@ -710,7 +711,8 @@ void app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
   session.defaultSession.webRequest.onBeforeRequest({ urls: ["<all_urls>"] }, (details, callback) => {
-    callback({ cancel: !rendererRequestAllowed(details.url, join(applicationRoot, "dist", "renderer"), process.env.FONT_PREVIEWER_DEV_SERVER_URL) });
+    const renderer = details.webContentsId === undefined ? undefined : electronWebContents.fromId(details.webContentsId);
+    callback({ cancel: Boolean(renderer) && !rendererRequestAllowed(details.url, join(applicationRoot, "dist", "renderer"), process.env.FONT_PREVIEWER_DEV_SERVER_URL) });
   });
   Menu.setApplicationMenu(buildMenu());
   const firstWindow = await createWindow();
