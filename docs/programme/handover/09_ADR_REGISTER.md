@@ -82,9 +82,41 @@ Packaged applications and human gates matter.
 
 No merge, public release, deploy, updater, or third-party delivery without explicit approval.
 
+### ADR-014 — Shared Studio is the V1 semantic authority
+
+The React/TypeScript Studio owns portable Study semantics. AppKit/WKWebView and Electron remain narrow native Hosts.
+
+### ADR-015 — Host recovery plus explicit Save is the V1 durability model
+
+The Host mirrors acknowledged revisions for crash recovery. Intentional Save remains a separate user action and portable-file boundary.
+
+### ADR-016 — V1 renderer parity is semantic
+
+WKWebView/CoreText and Chromium render locally with declared platform differences. A shared HarfBuzz/FreeType raster profile is deferred until a measured corpus justifies it.
+
+### ADR-017 — V1 font format tiers
+
+`.otf`, `.ttf`, `.woff`, and `.woff2` receive full preview support. `.ttc`, `.otc`, and `.dfont` are metadata-only. Linux variable axes and named instances are extracted in a bounded child process.
+
+### ADR-018 — V1 distribution is free GitHub download
+
+macOS 13+ arm64 is distributed as an ad-hoc signed, hardened-runtime ZIP without App Sandbox, Developer ID, notarization, or updater. Linux x64 is distributed as `.deb` and portable tarball for X11 and Wayland. RPM and arm64 Linux are deferred.
+
+### ADR-019 — Internal Handoffs copy Sources by default
+
+New Studies include locally bound Source files in transactional Handoffs by default. The user can opt out. The product warns that internal policy is not a font licence.
+
+### ADR-020 — V1 remains local and integration-light
+
+No accounts, analytics, cloud processing, updater, or live Figma integration. JSON/CSV reference output is the supported Figma seam.
+
+### ADR-021 — Public v0.1 prerelease before stable V1
+
+The owner authorized integration into the isolated release-candidate branch and a public GitHub prerelease after exact-head automated gates pass. Human accessibility, typography, reconstruction, and independent-machine evidence remain explicit limitations and are required before a supported `v1.0.0` claim.
+
 ## Leading hypotheses
 
-### ADR-H01 — Full shared Studio workspace
+### ADR-H01 — Full shared Studio workspace (accepted as ADR-014)
 
 A full React/TypeScript workspace runs inside WKWebView/Electron.
 
@@ -96,7 +128,7 @@ Mac CoreText/Quartz and Linux native render service produce live/export assets.
 
 P2 vetoes it if interaction thresholds fail.
 
-### ADR-H03 — Optimistic Studio authority with asynchronous Host mirror
+### ADR-H03 — Optimistic Studio authority with asynchronous Host mirror (accepted as ADR-015)
 
 P3 vetoes it if recovery guarantees, Host validation, or reconciliation become unacceptably weak.
 
@@ -112,23 +144,23 @@ Drawing backend and implementation language remain open.
 
 P6 and real-device inventory decide.
 
-### ADR-H07 — Developer ID direct distribution without updater
+### ADR-H07 — Developer ID direct distribution without updater (replaced by ADR-018)
 
 Sandbox status remains open.
 
-### ADR-H08 — Linux deb and rpm first
+### ADR-H08 — Linux deb and rpm first (replaced by ADR-018)
 
 P7 may promote/demote AppImage or Flatpak.
 
 ## Open
 
-### ADR-O01 — Interactive render path
+### ADR-O01 — Interactive render path (closed by ADR-016)
 
 - native assets;
 - browser direct;
 - hybrid.
 
-### ADR-O02 — Study durability authority
+### ADR-O02 — Study durability authority (closed by ADR-015)
 
 - optimistic Studio;
 - synchronous two-phase;
@@ -141,7 +173,7 @@ P7 may promote/demote AppImage or Flatpak.
 - Rust stack;
 - another measured candidate.
 
-### ADR-O04 — Mac App Sandbox
+### ADR-O04 — Mac App Sandbox (closed by ADR-018 for V1)
 
 Hardened runtime without sandbox versus sandbox + bookmarks.
 
@@ -149,7 +181,7 @@ Hardened runtime without sandbox versus sandbox + bookmarks.
 
 `NSDocument` versus custom/SwiftUI document coordinator.
 
-### ADR-O06 — Exact V1 format tiers
+### ADR-O06 — Exact V1 format tiers (closed by ADR-017)
 
 Full, metadata-only, deferred.
 

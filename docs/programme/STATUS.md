@@ -16,14 +16,14 @@
 
 R3 — release-candidate hardening.
 
-The autonomous, credential-free hardening and hosted-runner evidence slice is complete. The milestone itself is not complete because attended accessibility/typography, independent reference-machine distribution/performance, production signing, decision, and owner release gates remain open.
+The autonomous hardening slice is complete and the owner authorized a free GitHub v0.1 prerelease after exact-head CI. Stable v1.0 remains incomplete because attended accessibility/typography, independent reconstruction/reference-machine evidence, and hostile-font corpus gates remain open. Apple Developer signing/notarization is explicitly out of scope for v0.1.
 
 ## Current frontier
 
 - T10 Family Groups: implementation and public-seam tests pass; attended design review remains.
-- T15 installed Catalog: Host-local separation, bounded index/search/paging/cache, explicit Add, rebuild, opaque font load, Study non-mutation, and cancellation pass. Current 10,000-entry search p95 is 0.408 ms hosted Linux / 0.253 ms hosted Mac. A 500-Face, 2,000-operation, 100-recovery-round-trip diagnostic passes on both hosted architectures with stable entity counts and about 1.55 MB final post-GC heap growth. Actual 500-Face import/100-card rendering and reference-hardware budgets remain.
+- T15 installed Catalog: Host-local separation, bounded index/search/paging/cache, explicit Add, rebuild, opaque font load, Study non-mutation, cancellation, and Linux variable-axis/named-instance discovery pass. Current 10,000-entry search p95 is 0.408 ms hosted Linux / 0.253 ms hosted Mac. A 500-Face, 2,000-operation, 100-recovery-round-trip diagnostic passes on both hosted architectures with stable entity counts and about 1.55 MB final post-GC heap growth. Actual 500-Face import/100-card rendering and reference-hardware budgets remain.
 - T17 hardening: automated keyboard, semantics, path redaction, 1,000 malformed bridge messages, 250 corrupt Study documents, stale-test-output rejection, reload/focus, cancellation, sandbox, transactional failure recovery, bounded Linux metadata parsing, and basic truncated-font rejection pass. VoiceOver, Orca, hostile-font process isolation, and attended native review remain.
-- T18 packaging: Mac ad-hoc `.app` ZIP and Linux `.deb`/portable archive pass integrity, notices, extraction/install, real displayed journey, removal, and residue checks on disposable hosted runners. Developer ID/notarization/stapling, independent clean reference machines, and owner decisions on RPM and Mac architecture remain.
+- T18 packaging: hardened-runtime/ad-hoc Mac `.app` ZIP and Linux `.deb`/portable archive pass integrity, notices, extraction/install, real displayed journey, removal, and residue checks on disposable hosted runners. V0.1 targets Mac 13+ arm64 and Linux x64; Developer ID/notarization, RPM, and Linux arm64 are out of scope.
 
 ## Implemented product
 
@@ -31,7 +31,7 @@ The autonomous, credential-free hardening and hosted-runner evidence slice is co
 - Study v4 with distinct Source, Binding, Face, Candidate, Recipe, Comparison Set, Font Use, Typography System, and Handoff concepts.
 - Review, Compare, System, and Handoff with native menu/dialog integration.
 - Host-owned recovery separate from intentional Save; revision barrier before Save/Handoff.
-- Transactional Handoff with checksums and permission-gated Source copies.
+- Transactional Handoff with checksums and visible default-on internal Source copies plus opt-out.
 - Secure bounded protocol v2 with no renderer filesystem capability or path-bearing preview URLs.
 - Real installed-font discovery through CoreText and Fontconfig.
 - Mac and Linux package-candidate workflows with immutable action pins, SBOM, audit, legal notices, and retained evidence.
@@ -40,15 +40,12 @@ The autonomous, credential-free hardening and hosted-runner evidence slice is co
 
 Accepted ADR-001 through ADR-013 remain unchanged. Implementation evidence strongly supports the leading full-shared-Studio and optimistic-Host-mirror hypotheses, but no open/leading ADR was silently accepted.
 
-Still owner/decision-gated:
+Stable-v1 follow-up:
 
-- production interactive/reference renderer and format tiers;
-- formal Study authority/durability ADR;
-- Mac App Sandbox/document/process-isolation policy;
-- Linux drawing/PDF backend and RPM requirement;
-- minimum macOS/architecture distribution policy;
-- Developer ID distribution model;
-- merge and public release.
+- hostile-font corpus and stronger process-termination evidence;
+- attended accessibility, native-window, typography, and reconstruction work;
+- independent clean/reference machines and displayed 500-Face budgets;
+- any future Developer ID/notarized distribution, RPM, or additional architecture work.
 
 ## Evidence
 
@@ -62,12 +59,11 @@ Still owner/decision-gated:
 - Exact-SHA soak artifacts record stable 500-Source/Face/Candidate counts across 2,000 operations and 100 recovery round trips. Hosted totals are 740.605 ms Linux and 618.764 ms Mac; final post-GC heap growth is 1,553,568 bytes Linux and 1,548,336 bytes Mac. These are diagnostic, not universal budgets.
 - Exact details: [`app/REPORT.md`](../../app/REPORT.md).
 
-## Owner gates
+## Owner authorization
 
-- No merge, release, deployment, production signing identity, or source-font delivery is authorized.
-- The PR remains draft.
-- Public artifacts remain CI evidence builds.
-- Human/credential gates must be recorded before marking R3 complete or converting the PR from draft.
+- Merge PR #2 into `codex/v1-release-candidate`, tag, and publish a GitHub prerelease after exact-head CI is green.
+- Do not merge to `main`, publish a stable v1.0, claim Apple signing/notarization, or claim attended evidence.
+- New internal Handoffs copy locally bound Sources by default; users remain responsible for font rights outside their team.
 
 ## Latest update
 

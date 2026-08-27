@@ -395,10 +395,7 @@ export default function App() {
       case "save-study": saveStudy(false); break;
       case "save-study-as": saveStudy(true); break;
       case "export-handoff": {
-        if (sessionRef.current.document.handoff.includeSources) {
-          dispatch({ type: "set-stage", stage: "handoff" });
-          setError("Confirm Source-copy permission in Handoff before exporting.");
-        } else exportHandoff(false);
+        exportHandoff(sessionRef.current.document.handoff.includeSources);
         break;
       }
       case "undo-study": historyDispatch({ type: "undo" }); break;

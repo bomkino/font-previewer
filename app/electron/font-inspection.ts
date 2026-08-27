@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { basename, extname } from "node:path";
-import type { ImportedSource, SourceBindingSummary } from "../src/domain.js";
+import { fileURLToPath } from "node:url";
+import type { AxisDefinition, ImportedSource, NamedInstance, SourceBindingSummary } from "../src/domain.js";
 
 export const FONT_EXTENSIONS = new Set([".otf", ".ttf", ".ttc", ".otc", ".dfont", ".woff", ".woff2"]);
 export const FULL_RENDER_EXTENSIONS = new Set([".otf", ".ttf", ".woff", ".woff2"]);
@@ -30,13 +31,66 @@ const MAXIMUM_FACES_PER_SOURCE = 256;
 const MAXIMUM_NAME_LENGTH = 512;
 const MAXIMUM_INSPECTION_MILLISECONDS = 3_000;
 
-export const FONTCONFIG_QUERY_FORMAT = `%{index}${FIELD_SEPARATOR}%{family[0]}${FIELD_SEPARATOR}%{style[0]}${FIELD_SEPARATOR}%{postscriptname[0]}${RECORD_SEPARATOR}`;
+export const FONTCONFIG_QUERY_FORMAT = `%{index}${FIELD_SEPARATOR}%{family[0]}${FIELD_SEPARATOR}%{style[0]}${FIELD_SEPARATOR}%{postscriptname[0]}${FIELD_SEPARATOR}%{variable}${RECORD_SEPARATOR}`;
 
 export interface InspectedFaceMetadata {
   readonly faceIndex: number;
   readonly family: string;
   readonly style: string;
   readonly postScriptName?: string;
+  readonly axes?: readonly AxisDefinition[];
+  readonly namedInstances?: readonly NamedInstance[];
+  readonly variable?: boolean;
+}
+
+interface VariationMetadata {
+  readonly faceIndex: number;
+  readonly axes: readonly AxisDefinition[];
+  readonly namedInstances: readonly NamedInstance[];
+}
+
+const variationWorkerPath = fileURLToPath(new URL("./font-variation-worker.js", import.meta.url));
+
+function parseVariationMetadata(output: string): readonly VariationMetadata[] {
+  if (!output || Buffer.byteLength(output, "utf8") > MAXIMUM_METADATA_OUTPUT) throw new Error("Variable font metadata is empty or exceeds the inspection limit.");
+  const parsed: unknown = JSON.parse(output);
+  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > MAXIMUM_FACES_PER_SOURCE) throw new Error("Variable font metadata has an invalid face count.");
+  return parsed.map((face): VariationMetadata => {
+    if (!face || typeof face !== "object") throw new Error("Variable font metadata is malformed.");
+    const value = face as Record<string, unknown>;
+    if (!Number.isInteger(value.faceIndex) || !Array.isArray(value.axes) || !Array.isArray(value.namedInstances)) throw new Error("Variable font metadata is malformed.");
+    return value as unknown as VariationMetadata;
+  });
+}
+
+async function inspectVariations(canonicalPath: string): Promise<readonly VariationMetadata[]> {
+  const output = await new Promise<string>((resolve, reject) => {
+    let settled = false;
+    let timer: NodeJS.Timeout | undefined;
+    const child = execFile(
+      process.execPath,
+      [variationWorkerPath, canonicalPath],
+      {
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", NODE_OPTIONS: "--max-old-space-size=128" },
+        killSignal: "SIGKILL",
+        maxBuffer: MAXIMUM_METADATA_OUTPUT,
+      },
+      (error, stdout) => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        if (error) reject(new Error("Variable font inspection failed."));
+        else resolve(stdout);
+      },
+    );
+    timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      child.kill("SIGKILL");
+      reject(new Error("Variable font inspection timed out."));
+    }, MAXIMUM_INSPECTION_MILLISECONDS);
+  });
+  return parseVariationMetadata(output);
 }
 
 function parseMetadataName(value: string, label: string, allowEmpty = false): string | undefined {
@@ -64,7 +118,7 @@ export function parseFontconfigQuery(output: string): readonly InspectedFaceMeta
   const seenIndexes = new Set<number>();
   return records.map((record) => {
     const fields = record.split(FIELD_SEPARATOR);
-    if (fields.length !== 4 || !/^\d{1,6}$/u.test(fields[0])) throw new Error("Font metadata record is malformed.");
+    if (fields.length !== 5 || !/^\d{1,6}$/u.test(fields[0]) || !["True", "False"].includes(fields[4])) throw new Error("Font metadata record is malformed.");
     const faceIndex = Number(fields[0]);
     if (!Number.isSafeInteger(faceIndex) || seenIndexes.has(faceIndex)) throw new Error("Font metadata has a duplicate or invalid face index.");
     seenIndexes.add(faceIndex);
@@ -76,6 +130,7 @@ export function parseFontconfigQuery(output: string): readonly InspectedFaceMeta
       family: family!,
       style: style!,
       ...(postScriptName ? { postScriptName } : {}),
+      variable: fields[4] === "True",
     };
   });
 }
@@ -88,7 +143,7 @@ export async function inspectFontFile(canonicalPath: string): Promise<readonly I
     const child = execFile(
       "/usr/bin/fc-query",
       ["--format", FONTCONFIG_QUERY_FORMAT, canonicalPath],
-      { maxBuffer: MAXIMUM_METADATA_OUTPUT },
+      { killSignal: "SIGKILL", maxBuffer: MAXIMUM_METADATA_OUTPUT },
       (error, stdout) => {
         if (settled) return;
         settled = true;
@@ -100,11 +155,18 @@ export async function inspectFontFile(canonicalPath: string): Promise<readonly I
     timer = setTimeout(() => {
       if (settled) return;
       settled = true;
-      child.kill();
+      child.kill("SIGKILL");
       reject(new Error("Font metadata inspection timed out."));
     }, MAXIMUM_INSPECTION_MILLISECONDS);
   });
-  return parseFontconfigQuery(output);
+  const faces = parseFontconfigQuery(output);
+  if (!FULL_RENDER_EXTENSIONS.has(extname(canonicalPath).toLocaleLowerCase()) || !faces.some((face) => face.variable)) return faces;
+  const variations = await inspectVariations(canonicalPath);
+  const byIndex = new Map(variations.map((face) => [face.faceIndex, face]));
+  return faces.map((face) => {
+    const variation = byIndex.get(face.faceIndex);
+    return variation ? { ...face, axes: variation.axes, namedInstances: variation.namedInstances } : face;
+  });
 }
 
 function titleCase(value: string): string {
@@ -163,8 +225,8 @@ export function buildImportedSource(options: {
       style: face.style,
       ...(face.postScriptName ? { postScriptName: face.postScriptName } : {}),
       faceIndex: face.faceIndex,
-      axes: [],
-      namedInstances: [],
+      axes: face.axes ?? [],
+      namedInstances: face.namedInstances ?? [],
       features: [
         { tag: "liga", name: "Standard ligatures", group: "ligatures", defaultEnabled: true },
         { tag: "kern", name: "Kerning", group: "other", defaultEnabled: true },

@@ -4,33 +4,33 @@ Font Previewer is a local desktop decision tool for choosing typography for pitc
 
 **Review → Compare → System → Handoff**
 
-## Release-candidate status
+## Public prerelease status
 
-The current v0.1 hardening candidate is isolated on [`codex/v1-release-candidate-hardening-02`](https://github.com/bomkino/font-previewer/tree/codex/v1-release-candidate-hardening-02) with [draft PR #2](https://github.com/bomkino/font-previewer/pull/2) into the release-candidate branch. Automated macOS and Linux gates build and launch the production desktop Hosts, exercise displayed UI, native menus and dialogs, recovery, accessibility semantics, the installed-font Catalog, and transactional Handoff, then inspect the package candidates and artifact integrity.
+The owner approved the current v0.1 candidate for a free GitHub prerelease after exact-head CI. [PR #2](https://github.com/bomkino/font-previewer/pull/2) integrates the isolated hardening branch into `codex/v1-release-candidate`; it does not merge to `main`. Automated macOS and Linux gates build and launch the desktop Hosts, exercise displayed UI, native menus and dialogs, recovery, accessibility semantics, the installed-font Catalog, variable-font metadata, and transactional Handoff, then inspect package integrity.
 
-This is not a public release. The remaining release blockers require a person or distribution credentials: attended VoiceOver and Orca journeys, typography review with legally held production fonts, clean-machine install/uninstall checks, Developer ID signing/notarization, and the owner’s merge/release decision.
+The macOS archive is ad-hoc signed with hardened runtime, not Developer-ID signed or notarized. macOS may warn or block a normal first launch; Control-click the app and choose **Open** only if you trust this repository. Attended VoiceOver/Orca, typography review, independent reconstruction, hostile-font corpus testing, and independent clean-machine evidence remain unverified. Those are disclosed prerelease limitations, not completed claims.
 
 ## What works
 
 - Host-local file/folder import without font installation or upload.
 - A searchable, paginated installed-font Catalog indexing up to 10,000 entries; Catalog results enter a Study only through an explicit Add action.
 - Separate Source, local Binding, Face, Candidate, Recipe, Comparison Set, Font Use, Typography System, and Handoff entities.
-- Exact Face indices and Host-reported metadata, plus independent Candidate settings, casing, tags, notes, rationale, and review decisions. CoreText supplies variable axes/instances on Mac; Linux axis discovery remains an explicit release limitation.
+- Exact Face indices and Host-reported metadata, plus independent Candidate settings, casing, tags, notes, rationale, and review decisions. CoreText supplies variable axes on Mac; Linux uses a timeout/output-bounded parser child for axes and named instances.
 - Family Groups with normalized-name confidence, static/variable disclosure, bulk add, Candidate duplication, and family-to-Compare actions.
 - Contact Sheet, Focus, Waterfall, blind comparison, fit policies, deck scenes, Role assignment, and preflighted Handoff.
 - Host-owned recovery distinct from intentional Save, with stale-revision rejection and reload/focus restoration.
-- Transactional Handoff staging, checksums, privacy-safe manifests, and an explicit permission gate before copying font Sources.
+- Transactional Handoff staging, checksums, privacy-safe manifests, and Source copies enabled by default for the internal workflow with an opt-out.
 - Native menus, native panels, source reveal/relink, semantic undo/redo, and a bounded path-free HostBridge.
 
 ## Platforms and artifacts
 
 | Platform | Host | Current artifact |
 |---|---|---|
-| macOS 13+ | AppKit + WKWebView + CoreText discovery | Current-architecture ad-hoc signed `.app` ZIP |
+| macOS 13+ arm64 | AppKit + WKWebView + CoreText discovery | Hardened-runtime, ad-hoc signed `.app` ZIP; not notarized |
 | Ubuntu/Debian x64 | Electron 44 + Fontconfig discovery | `.deb` and portable `.tar.gz` |
 | Browser | Development fallback only | No native Catalog, durable recovery, or transactional Handoff |
 
-CI artifacts are attached to the release-candidate workflow runs; they are evidence builds, not endorsed downloads.
+Verified prerelease downloads are published on [GitHub Releases](https://github.com/bomkino/font-previewer/releases). CI artifacts remain exact-SHA evidence.
 
 ## Build and run
 
@@ -57,7 +57,7 @@ macOS:
 open "output/macos-host/Font Previewer.app"
 ```
 
-The Mac builder requires Apple command-line developer tools and signs ad hoc. It does not use a Developer ID identity or notarize.
+The Mac builder requires Apple command-line developer tools, enables hardened runtime, and signs ad hoc. It does not use a Developer ID identity or notarize.
 
 ## Architecture and evidence
 
@@ -81,6 +81,6 @@ The Mac builder requires Apple command-line developer tools and signs ad hoc. It
 - No automatic winner or taste score.
 - No paid, client, system, or mystery font binaries in Git.
 - No raster-parity claim between CoreText/WebKit and Chromium.
-- No merge, release, signing-identity use, or deployment by inference.
+- Public v0.1 prereleases are GitHub-only; stable `v1.0.0` remains separately gated.
 
 MIT licensed. See [`LICENSE`](LICENSE).

@@ -21,7 +21,9 @@ for (const required of [
   join(applicationRoot, "dist", "renderer", "index.html"),
   join(applicationRoot, "dist-electron", "electron", "main.js"),
   join(applicationRoot, "dist-electron", "electron", "preload.cjs"),
+  join(applicationRoot, "dist-electron", "electron", "font-variation-worker.js"),
   join(applicationRoot, "node_modules", "electron", "dist", "electron"),
+  join(applicationRoot, "node_modules", "fontkit", "package.json"),
   join(applicationRoot, "THIRD_PARTY_NOTICES.md"),
   join(applicationRoot, "..", "LICENSE"),
 ]) {
@@ -42,6 +44,17 @@ await Promise.all([
   cp(join(applicationRoot, "THIRD_PARTY_NOTICES.md"), join(packagedApplication, "THIRD_PARTY_NOTICES.md")),
   cp(join(applicationRoot, "..", "LICENSE"), join(packagedApplication, "LICENSE.txt")),
 ]);
+const lock = JSON.parse(await readFile(join(applicationRoot, "package-lock.json"), "utf8"));
+for (const [packagePath, metadata] of Object.entries(lock.packages)) {
+  if (!packagePath.startsWith("node_modules/") || metadata.dev === true || metadata.optional === true) continue;
+  const source = join(applicationRoot, packagePath);
+  try {
+    if (!(await lstat(source)).isDirectory()) continue;
+  } catch {
+    continue;
+  }
+  await cp(source, join(packagedApplication, packagePath), { recursive: true, preserveTimestamps: true });
+}
 await writeFile(join(packagedApplication, "package.json"), `${JSON.stringify({ name: "font-previewer", productName: "Font Previewer", version, private: true, type: "module", main: "dist-electron/electron/main.js" }, null, 2)}\n`);
 
 const portableName = `Font-Previewer-${version}-linux-${process.arch}.tar.gz`;

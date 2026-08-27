@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -33,8 +34,8 @@ test("font inspection derives portable metadata and opaque preview capability", 
 
 test("Fontconfig inspection preserves exact collection face identity", () => {
   const inspected = parseFontconfigQuery(
-    "0\u001fExample Sans\u001fRegular\u001fExampleSans-Regular\u001e" +
-    "1\u001fExample Sans\u001fBold\u001fExampleSans-Bold\u001e",
+    "0\u001fExample Sans\u001fRegular\u001fExampleSans-Regular\u001fFalse\u001e" +
+    "1\u001fExample Sans\u001fBold\u001fExampleSans-Bold\u001fFalse\u001e",
   );
   const imported = buildImportedSource({
     canonicalPath: "/private/fonts/Example.ttc",
@@ -51,14 +52,43 @@ test("Fontconfig inspection preserves exact collection face identity", () => {
   assert.equal(imported.binding.rendererSupport, "metadata-only");
 });
 
+test("imported Linux metadata preserves variable axes and named instances", () => {
+  const imported = buildImportedSource({
+    canonicalPath: "/private/fonts/Variable.ttf",
+    sourceId: "source:variable",
+    byteLength: 42_000,
+    modifiedAt: "2026-08-27T00:00:00.000Z",
+    faces: [{
+      faceIndex: 0,
+      family: "Variable Sans",
+      style: "Regular",
+      axes: [{ tag: "wght", name: "Weight", minimum: 100, defaultValue: 400, maximum: 900 }],
+      namedInstances: [{ name: "Bold", coordinates: [{ tag: "wght", value: 700 }] }],
+    }],
+  });
+  assert.deepEqual(imported.faces[0].axes, [{ tag: "wght", name: "Weight", minimum: 100, defaultValue: 400, maximum: 900 }]);
+  assert.deepEqual(imported.faces[0].namedInstances, [{ name: "Bold", coordinates: [{ tag: "wght", value: 700 }] }]);
+});
+
+test("Linux variable-font worker discovers real axes", {
+  skip: process.platform !== "linux" || !existsSync("/usr/bin/fc-list"),
+}, async (context) => {
+  const variablePath = execFileSync("/usr/bin/fc-list", ["--format", "%{file}\n", ":variable=true"], { encoding: "utf8" })
+    .split("\n")
+    .find((path) => /\.(?:otf|ttf|woff|woff2)$/iu.test(path));
+  if (!variablePath) return context.skip("No variable font is installed.");
+  const faces = await inspectFontFile(variablePath);
+  assert.ok(faces.some((face) => face.axes?.some((axis) => axis.tag === "wght" || axis.maximum > axis.minimum)));
+});
+
 test("Fontconfig inspection rejects malformed, truncated, and duplicate-face metadata", () => {
   assert.throws(() => parseFontconfigQuery(""), /empty/);
-  assert.throws(() => parseFontconfigQuery("0\u001fFamily\u001fRegular\u001fName"), /truncated/);
+  assert.throws(() => parseFontconfigQuery("0\u001fFamily\u001fRegular\u001fName\u001fFalse"), /truncated/);
   assert.throws(
-    () => parseFontconfigQuery("0\u001fFamily\u001fRegular\u001fOne\u001e0\u001fFamily\u001fBold\u001fTwo\u001e"),
+    () => parseFontconfigQuery("0\u001fFamily\u001fRegular\u001fOne\u001fFalse\u001e0\u001fFamily\u001fBold\u001fTwo\u001fFalse\u001e"),
     /duplicate/,
   );
-  assert.throws(() => parseFontconfigQuery("0\u001fFamily\nInjected\u001fRegular\u001fName\u001e"), /invalid family/);
+  assert.throws(() => parseFontconfigQuery("0\u001fFamily\nInjected\u001fRegular\u001fName\u001fFalse\u001e"), /invalid family/);
 });
 
 test("Linux font inspection rejects a malformed font file before import", {

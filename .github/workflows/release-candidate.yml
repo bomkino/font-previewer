@@ -44,7 +44,7 @@ jobs:
       - name: Install displayed-app dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends dbus-x11 xauth xvfb
+          sudo apt-get install --yes --no-install-recommends dbus-x11 fonts-inter-variable xauth xvfb
 
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
@@ -273,6 +273,7 @@ jobs:
           test -s "$APP/Contents/Resources/LICENSE.txt"
           test -s "$APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
           plutil -lint "$APP/Contents/Info.plist"
+          codesign -d --verbose=4 "$APP" 2>&1 | grep -q 'flags=.*runtime'
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" = "dog.pitch.fontpreviewer"
           codesign --verify --deep --strict --verbose=2 "$APP"
           (

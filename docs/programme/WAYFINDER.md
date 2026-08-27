@@ -17,11 +17,11 @@ The root `macos/` application remains a preserved CoreText oracle. It is not the
 3. The release-candidate vertical slice replaced prototype recovery/import/Handoff seams with Host-owned durable implementations.
 4. The installed Catalog is now Host-local, bounded, searchable, paginated, and explicit-add; Family Groups preserve Candidate identity.
 5. CI now builds, launches, exercises, packages, and retains evidence for both Hosts.
-6. Human, performance, renderer-policy, signing, and owner gates remain before a supported release.
+6. The owner accepted the V1 workspace, durability, renderer, format, distribution, and internal Source-copy decisions. Human/reference gates remain before a supported stable v1.0.
 
-## Leading decision
+## Accepted V1 direction
 
-Full shared-Studio ownership remains the leading hypothesis. It has survived automated cross-Host vetoes for:
+Full shared-Studio ownership is the accepted V1 direction. It survived automated cross-Host vetoes for:
 
 - focus and native-panel return focus;
 - native semantic command routing;
@@ -31,18 +31,18 @@ Full shared-Studio ownership remains the leading hypothesis. It has survived aut
 - displayed composition and web accessibility semantics;
 - Mac and Linux packaging.
 
-It is not yet an accepted ADR because interactive VoiceOver/Orca, attended native-quality review, real production-font review, and induced WebKit termination have not run.
+Interactive VoiceOver/Orca, attended native-quality review, real production-font review, and induced WebKit termination remain unverified and block a stable v1.0 quality claim, not the disclosed v0.1 prerelease.
 
-## Next decision packet
+## Next stable-v1 evidence packet
 
-The owner should receive one consolidated packet after:
+Prepare one consolidated packet after:
 
 - attended Mac/VoiceOver and Linux/Orca journeys;
 - reference-hardware Catalog/import/scroll/long-session measurements;
 - renderer and format-tier comparison with redistributable fonts;
-- clean-machine packages and production Mac signing evidence.
+- independent clean-machine packages; production Mac signing evidence only if the owner later adopts paid Developer ID distribution.
 
-At that point, decide the workspace/durability/renderer/distribution ADRs, then separately decide PR readiness, merge, and release.
+At that point, decide whether the evidence supports a stable `v1.0.0` release.
 
 ## Discipline
 

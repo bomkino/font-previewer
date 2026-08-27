@@ -11,7 +11,7 @@ The isolated autonomous hardening slice is complete and exact-head cross-Host ev
 - Verified tree: `ebfbce480d26e05d75cdd6f5b2a0a92d24883dd9`
 - Exact-head automated run: [33043015559](https://github.com/bomkino/font-previewer/actions/runs/33043015559)
 
-No merge, public release, deployment, production signing, notarization, attended accessibility claim, or architecture ADR acceptance occurred.
+At the verified product commit named below, no merge, public release, deployment, production signing, notarization, attended accessibility claim, or architecture ADR acceptance had occurred. The later owner decision record authorizes only an exact-head-gated v0.1 GitHub prerelease and accepts the listed V1 ADRs.
 
 ## Hardening delivered
 
@@ -38,7 +38,7 @@ The product includes:
 - Family Groups that repair common `VF`/`Variable` naming noise, expose confidence and static/variable relationships, add a visible family in bulk, and place up to four family Candidates into Compare.
 - Independent Candidate duplication, axes, features, labels, decisions, notes, rationale, tags, and Font Uses.
 - Contact Sheet, Focus, Waterfall, exact-size/fit/locked-line comparison, blind reveal, saved Comparison Sets, deck scenes, and Role assignment.
-- Handoff preflight, selectable outputs, permission-gated Source copying, hidden staging, checksums, manifest, and atomic commit.
+- Handoff preflight, selectable outputs, default-on internal Source copying with opt-out, hidden staging, checksums, manifest, and atomic commit.
 - Native menus, panels, undo/redo, semantic commands, reload recovery, focus restoration, and accessible web semantics.
 
 Catalog discovery no longer mutates a Study. Only an explicit Add dispatches `ingest-sources`; evidence asserts the Study Candidate count is unchanged after browsing the real installed Catalog.
@@ -71,11 +71,11 @@ The CI gates use real fonts already installed on each runner but never commit or
 - Protocol and Study corruption corpora are deterministic, bounded, and exercise 1,250 invalid documents/messages without preserving rejected state.
 - Portable Studies contain no path or Binding. Host-local bindings persist separately; Mac accepts an installed-font path fallback only when the path is rediscovered through CoreText.
 - Recovery and intentional Save remain distinct. Both Hosts reject stale mirror revisions and require the exact mirrored revision before Save or Handoff. Injected write-commit failure leaves the prior intentional save byte-identical and cleans the temporary sidecar.
-- Handoff is staged and verified before the final directory move. Injected commit failure leaves the prior export byte-identical and removes staging. Source copying is off by default and requires an explicit redistribution acknowledgement.
+- Handoff is staged and verified before the final directory move. Injected commit failure leaves the prior export byte-identical and removes staging. New internal Studies copy Sources by default with a visible opt-out and licence warning under the recorded owner policy.
 
 ## Remaining release gates
 
-These remain outside the proven slice and require attended testing, independent reference hardware/machines or corpora, owner decisions, or signing credentials:
+These remain outside the proven slice and require attended testing, independent reference hardware/machines or corpora, or future signing credentials:
 
 1. Traverse the packaged Mac app with VoiceOver and the packaged Linux app with Orca.
 2. Review full native window/menu quality and typography with 20–50 legally held production fonts, including variable, collection, missing-glyph, and complex-script cases.
@@ -83,7 +83,7 @@ These remain outside the proven slice and require attended testing, independent 
 4. Run actual 500-Face import/100-card rendering, displayed long-session memory, hostile-font process containment, and reference-hardware budgets. The bounded 10,000-entry workload, semantic 500-Face soak, and basic malformed Linux metadata envelope already pass on hosted CI.
 5. Repeat Mac and Linux install/launch/uninstall on independent clean supported machines. Disposable hosted-runner ZIP/archive/`.deb` round trips already pass.
 6. Decide the production renderer/format tiers and accept or reject the leading workspace/durability ADRs.
-7. Supply Developer ID credentials for hardened signing, notarization, and stapling; decide whether RPM and additional Mac architectures are V1 requirements.
-8. Owner reviews the draft PR and separately authorizes merge and public release.
+7. If a future supported Mac distribution is desired, supply Developer ID credentials for signing, notarization, and stapling. RPM and additional architectures are outside v0.1.
+8. Stable v1.0 still requires a separate owner decision after the human/reference gates.
 
-Until those gates close, the artifacts are release candidates and evidence—not a supported public release.
+Until those gates close, public artifacts must remain clearly marked v0.1 prerelease—not a supported stable v1.0.

@@ -50,9 +50,9 @@ The cross-Host workflow additionally requires:
 
 Hosted-runner measurements are diagnostic, not universal performance claims. The package round trips use disposable hosted runners; they do not replace an independent clean-machine matrix.
 
-## Human release matrix
+## Human stable-v1 matrix
 
-Automation cannot judge typography, screen-reader usability, native feel, or redistribution rights. Before release, use legally held fonts covering:
+Automation cannot judge typography, screen-reader usability, native feel, or redistribution rights. Before a supported stable v1.0, use legally held fonts covering:
 
 - static CFF OTF and TrueType;
 - one-axis and multi-axis variable families;
@@ -85,7 +85,7 @@ Run the complete journey:
 
 ## Performance and stability gate
 
-The 10,000-entry search/cancellation and the semantic 500-Face long-session diagnostic pass on hosted CI. The following remain release blockers until measured on reference hardware or with the required corpus:
+The 10,000-entry search/cancellation and the semantic 500-Face long-session diagnostic pass on hosted CI. The following remain stable-v1 blockers until measured on reference hardware or with the required corpus:
 
 - responsive 500-Face import and 100 visible review cards;
 - bounded memory over a displayed long Review/Compare session on reference hardware;
@@ -97,9 +97,9 @@ The 10,000-entry search/cancellation and the semantic 500-Face long-session diag
 
 - Repeat install, launch, Save, recover, export, and uninstall on independent clean supported Linux images; the disposable Ubuntu 24.04 hosted-runner round trip is already green.
 - Repeat portable extraction and launch on an independent machine; the hosted-runner archive preserves the root-owned mode-4755 sandbox helper and completes the displayed journey.
-- Build Mac arm64 and any promised x86_64/universal artifact; sign with Developer ID, enable hardened runtime, notarize, staple, and verify with Gatekeeper.
+- Build Mac arm64 with hardened runtime. Developer ID signing, notarization, stapling, and Gatekeeper verification apply only if that future distribution model is adopted; v0.1 is explicitly ad-hoc and unnotarized.
 - Decide and test RPM if included in V1.
 - Verify notices/SBOM/checksums against the exact source SHA.
-- Owner reviews the draft PR and explicitly authorizes merge and release.
+- Owner authorization is recorded in [`programme/RELEASE_DECISION_PACKET.md`](programme/RELEASE_DECISION_PACKET.md); exact-head CI must still pass before every publication.
 
 No source font, Study, recovery file, Handoff, absolute client path, signing secret, or notarization credential may enter Git or CI artifacts.

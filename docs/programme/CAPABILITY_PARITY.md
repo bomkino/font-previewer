@@ -9,16 +9,16 @@ This matrix reconciles the preserved `macos/` reference with the active shared S
 | Source/folder import | Bounded traversal; Source, Binding, Face, and Candidate remain distinct | CoreText validates and enumerates descriptors | Fontconfig validates metadata; `fc-query` preserves collection face indices | Verified automatically; hostile-font process isolation remains unverified |
 | Installed Catalog | Host-local index, search, paging, cancellation, explicit Add | CoreText, 10,000-entry bound | Fontconfig, 10,000-entry bound | Verified; browsing cannot mutate Study |
 | Face identity | Durable Face ID plus exact source-local face index | Descriptor index and PostScript metadata | `fc-query` index and names; collection rendering remains metadata-only | Verified for metadata semantics; no raster-parity claim |
-| Variable fonts | Candidate axes are independent semantic values | CoreText reports axes and instances | Imported Fontconfig Sources currently expose no axis metadata | Partial; Linux variable-axis discovery is deferred to renderer/parser ADR |
+| Variable fonts | Candidate axes are independent semantic values | CoreText reports axes | Fontconfig identifies variable Faces; a bounded Fontkit child reports axes and named instances | Automated parity verified with a real Inter variable font in Linux CI; attended typography remains unverified |
 | Review | Contact Sheet, Focus, Waterfall, decisions, tags, notes, rationale | Shared Studio | Shared Studio | Verified automatically; attended typography review unverified |
 | Compare | Four-Candidate tray, blind reveal, size policies, saved sets | Shared Studio | Shared Studio | Verified automatically |
 | System | Roles create Font Uses without collapsing Candidates | Shared Studio | Shared Studio | Verified automatically |
 | Save/recovery | Portable Study v4; Host-local binding/recovery; atomic intentional Save | AppKit Host | Electron Host | Verified including injected atomic-commit failure |
 | Relink/watch | Binding replacement preserves portable identity | Native file monitoring | Node file watcher | Verified at public seams; attended replacement matrix unverified |
-| Handoff | Summary, JSON, CSV, PDF/screens, manifest/checksums, permission-gated Sources | Transactional Host export | Transactional Host export | Verified including injected commit failure; independent human reconstruction unverified |
+| Handoff | Summary, JSON, CSV, PDF/screens, manifest/checksums, default-on internal Source copies with opt-out | Transactional Host export | Transactional Host export | Verified including injected commit failure; independent human reconstruction and font rights remain user responsibilities |
 | Native integration | Menus, panels, undo/redo, focus return | AppKit | Electron | Displayed CI verified; attended native-feel review unverified |
 | Accessibility | Shared semantic UI and keyboard contract | Automated semantics/focus | Automated semantics/focus and Chromium AX tree | VoiceOver and Orca remain unverified |
-| Packaging | Notices, SBOM, checksums, displayed package journey | Ad-hoc signed app ZIP | Portable archive and installed `.deb` | Disposable CI verified; Developer ID/notarization and independent clean machines unverified |
+| Packaging | Notices, SBOM, checksums, displayed package journey | Hardened-runtime/ad-hoc app ZIP | Portable archive and installed `.deb` | Disposable CI verified; Developer ID/notarization deliberately absent from v0.1; independent clean machines unverified |
 
 ## Legacy migration
 
@@ -33,4 +33,4 @@ The root `macos/` application, `typeboards.html`, `figma-font-test-exporter.html
 
 ## T19 conclusion
 
-The autonomous T19 work is verified: capability disposition is explicit, v1–v3 migrations are exercised, the active application path is unambiguous, legacy artifacts contain no private font/Study evidence, documentation is current, and the work remains isolated in draft PR #2. Human and owner gates remain tracked in the release decision packet.
+The autonomous T19 work is verified: capability disposition is explicit, v1–v3 migrations are exercised, the active application path is unambiguous, legacy artifacts contain no private font/Study evidence, and documentation is current. Owner decisions are recorded in the release decision packet; human gates remain unverified rather than silently waived.

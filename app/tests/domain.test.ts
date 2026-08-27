@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createNewStudy } from "../src/fixture.js";
 import {
   DomainError,
   activeTypographySystem,
@@ -222,4 +223,7 @@ test("Study parser contains seeded corruption at the portable document seam", ()
     corruptions[(state >>> 0) % corruptions.length](document);
     assert.throws(() => parseStudyDocument(JSON.stringify(document)), DomainError);
   }
+});
+test("new internal studies include bound Sources in Handoff by default", () => {
+  assert.equal(createNewStudy().document.handoff.includeSources, true);
 });

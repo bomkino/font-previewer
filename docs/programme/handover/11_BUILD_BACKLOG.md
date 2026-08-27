@@ -844,7 +844,7 @@ Catalog
 - [ ] source health.
 - [ ] coverage/fallback.
 - [ ] Figma reference JSON/CSV.
-- [ ] permission-gated Source copies.
+- [x] visible default-on internal Source copies with opt-out and licence warning.
 - [ ] independent reconstruction.
 
 ### Public seam / evidence surface

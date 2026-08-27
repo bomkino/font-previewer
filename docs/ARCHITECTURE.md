@@ -65,7 +65,7 @@ An explicit Add action sends selected `ImportedSource` records through the seman
 
 Both current Hosts use the Studio’s CSS/`FontFace` interactive path with opaque Host-served font URLs. macOS uses CoreText for installed-font discovery and metadata; Linux uses Fontconfig plus bounded local inspection. The renderer declares its Host profile.
 
-The product claims semantic parity, not raster parity. WebKit/CoreText and Chromium may shape or rasterize differently. Complex-script coverage metadata is evidence, not a promise of typographic correctness. A production reference-renderer/format-tier ADR remains open.
+The product claims semantic parity, not raster parity. WebKit/CoreText and Chromium may shape or rasterize differently. Complex-script coverage metadata is evidence, not a promise of typographic correctness. V1 gives full preview support to OTF/TTF/WOFF/WOFF2 and metadata-only support to TTC/OTC/DFONT.
 
 ## Recovery and intentional Save
 
@@ -77,7 +77,7 @@ Save and Handoff first require the exact current revision to be mirrored. Intent
 
 The Host:
 
-1. validates revision, outputs, permission, and destination;
+1. validates revision, outputs, the visible internal Source-copy policy, and destination;
 2. creates a hidden staging directory inside the destination;
 3. writes selected screenshots/PDF/summary/JSON/CSV;
 4. optionally copies unique Sources only after explicit redistribution acknowledgement;
@@ -97,7 +97,7 @@ Font files, Studies, Catalog output, bridge messages, recovery files, and export
 
 Linux packages the exact Electron runtime as a portable archive and root-owned `.deb`; the Chromium sandbox helper must be root/root mode 4755. macOS compiles the Host against the current SDK, embeds the production Studio, signs ad hoc, verifies strictly, and creates a ZIP/checksum.
 
-Both carry the repository licence and third-party notices. Production Developer ID signing/notarization and clean-machine distribution remain external release gates.
+Both carry the repository licence and third-party notices. The v0.1 Mac ZIP enables hardened runtime and uses only an ad-hoc identity; Developer ID signing/notarization are deliberately absent and never claimed.
 
 ## Preserved reference
 
