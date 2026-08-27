@@ -191,7 +191,7 @@ final class AppModel: ObservableObject {
         mutateStudy(actionName: "Change Preview Mode") { $0.layout = layout }
     }
 
-    func setAlignment(_ alignment: TextAlignment) {
+    func setAlignment(_ alignment: FontPreviewerCore.TextAlignment) {
         mutateStudy(actionName: "Change Alignment") { $0.alignment = alignment }
     }
 
@@ -359,6 +359,8 @@ final class AppModel: ObservableObject {
         let runtimes = runtimeFonts
         exportTask?.cancel()
         exportTask = Task { [weak self] in
+            guard let self else { return }
+            let progressTarget = self
             do {
                 let result = try await Task.detached(priority: .userInitiated) {
                     try await BoardExporter.export(
@@ -367,22 +369,22 @@ final class AppModel: ObservableObject {
                         runtimeFonts: runtimes,
                         options: options,
                         progress: { update in
-                            Task { @MainActor [weak self] in self?.exportProgress = update }
+                            Task { @MainActor in progressTarget.exportProgress = update }
                         }
                     )
                 }.value
-                guard !Task.isCancelled, let self else { return }
+                guard !Task.isCancelled else { return }
                 self.lastExportURL = result.folderURL
                 self.isExporting = false
                 self.exportProgress = nil
                 NSWorkspace.shared.activateFileViewerSelecting([result.folderURL])
             } catch is CancellationError {
-                self?.isExporting = false
-                self?.exportProgress = nil
+                self.isExporting = false
+                self.exportProgress = nil
             } catch {
-                self?.isExporting = false
-                self?.exportProgress = nil
-                self?.show(error: error, title: "Export failed")
+                self.isExporting = false
+                self.exportProgress = nil
+                self.show(error: error, title: "Export failed")
             }
         }
     }
@@ -591,7 +593,8 @@ final class AppModel: ObservableObject {
     private func refreshWatcher() {
         let urls = study.records.map { sourceURL(for: $0) }
         watcher.replace(urls: urls) { [weak self] changedURL in
-            Task { @MainActor in self?.scheduleReload(for: changedURL) }
+            guard let model = self else { return }
+            Task { @MainActor in model.scheduleReload(for: changedURL) }
         }
     }
 
