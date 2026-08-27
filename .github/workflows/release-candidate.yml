@@ -277,7 +277,7 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$APP"
           (
             cd "$RUNNER_TEMP/font-previewer-macos-build"
-            test "$(awk '{print $2}' 'Font Previewer.zip.sha256')" = "Font Previewer.zip"
+            test "$(cut -c 67- 'Font Previewer.zip.sha256')" = "Font Previewer.zip"
             shasum -a 256 -c "Font Previewer.zip.sha256"
           )
 
