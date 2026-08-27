@@ -6,7 +6,7 @@ Font Previewer is a local desktop decision tool for choosing typography for pitc
 
 ## Release-candidate status
 
-The v0.1 implementation is isolated on [`codex/v1-release-candidate`](https://github.com/bomkino/font-previewer/tree/codex/v1-release-candidate) with a [draft pull request](https://github.com/bomkino/font-previewer/pull/1). Automated macOS and Linux gates build and launch the production desktop Hosts, exercise displayed UI, native menus and dialogs, recovery, accessibility semantics, the installed-font Catalog, and transactional Handoff, then inspect the package candidates and artifact integrity.
+The current v0.1 hardening candidate is isolated on [`codex/v1-release-candidate-hardening-02`](https://github.com/bomkino/font-previewer/tree/codex/v1-release-candidate-hardening-02) with [draft PR #2](https://github.com/bomkino/font-previewer/pull/2) into the release-candidate branch. Automated macOS and Linux gates build and launch the production desktop Hosts, exercise displayed UI, native menus and dialogs, recovery, accessibility semantics, the installed-font Catalog, and transactional Handoff, then inspect the package candidates and artifact integrity.
 
 This is not a public release. The remaining release blockers require a person or distribution credentials: attended VoiceOver and Orca journeys, typography review with legally held production fonts, clean-machine install/uninstall checks, Developer ID signing/notarization, and the owner’s merge/release decision.
 
@@ -15,7 +15,7 @@ This is not a public release. The remaining release blockers require a person or
 - Host-local file/folder import without font installation or upload.
 - A searchable, paginated installed-font Catalog indexing up to 10,000 entries; Catalog results enter a Study only through an explicit Add action.
 - Separate Source, local Binding, Face, Candidate, Recipe, Comparison Set, Font Use, Typography System, and Handoff entities.
-- Exact Face indices, variable axes, named instances, OpenType features, casing, tags, notes, rationale, and review decisions.
+- Exact Face indices and Host-reported metadata, plus independent Candidate settings, casing, tags, notes, rationale, and review decisions. CoreText supplies variable axes/instances on Mac; Linux axis discovery remains an explicit release limitation.
 - Family Groups with normalized-name confidence, static/variable disclosure, bulk add, Candidate duplication, and family-to-Compare actions.
 - Contact Sheet, Focus, Waterfall, blind comparison, fit policies, deck scenes, Role assignment, and preflighted Handoff.
 - Host-owned recovery distinct from intentional Save, with stale-revision rejection and reload/focus restoration.
@@ -66,6 +66,8 @@ The Mac builder requires Apple command-line developer tools and signs ad hoc. It
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — authority, HostBridge, persistence, and security boundaries
 - [`docs/QA.md`](docs/QA.md) — automated and human release gates
 - [`docs/programme/STATUS.md`](docs/programme/STATUS.md) — current programme truth
+- [`docs/programme/CAPABILITY_PARITY.md`](docs/programme/CAPABILITY_PARITY.md) — reference/Host parity and migration disposition
+- [`docs/programme/RELEASE_DECISION_PACKET.md`](docs/programme/RELEASE_DECISION_PACKET.md) — owner choices, limitations, and release notes
 - [`app/DEPENDENCIES.md`](app/DEPENDENCIES.md), [`app/sbom.cdx.json`](app/sbom.cdx.json), and [`app/THIRD_PARTY_NOTICES.md`](app/THIRD_PARTY_NOTICES.md) — supply-chain record
 
 ## Preserved reference

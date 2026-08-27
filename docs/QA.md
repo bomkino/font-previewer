@@ -26,6 +26,8 @@ The cross-Host workflow additionally requires:
 - no Study mutation from Catalog browsing;
 - explicit Catalog cancellation with acknowledgement within 100 ms and obsolete-result rejection;
 - a bounded 10,000-entry synthetic Catalog workload with a provisional 75 ms search budget;
+- exact Linux collection-face metadata and rejection of malformed/truncated metadata plus an actual truncated font file;
+- a retained 500-Face, 2,000-operation, 100-recovery-round-trip diagnostic on both runner architectures;
 - transactional Handoff and durable recovery;
 - injected atomic-save and Handoff-commit failures that preserve prior data and remove staging residue;
 - reload with review decision and workspace focus restored;
@@ -35,15 +37,16 @@ The cross-Host workflow additionally requires:
 
 ## Current automated result
 
-- Remote product/evidence commit: `a5dd924265d85ec37d8022732b923ccc89cedad4`
-- Exact tree: `73f865a661f6b05d6f5fad67d9af6a823c532f37`
-- Exact-head workflow: [33040027604](https://github.com/bomkino/font-previewer/actions/runs/33040027604)
-- Tests: 25/25
+- Remote product/evidence commit: `5d368650436bd2b1aca6f7efdf8825087a65d4e3`
+- Exact tree: `ebfbce480d26e05d75cdd6f5b2a0a92d24883dd9`
+- Exact-head workflow: [33043015559](https://github.com/bomkino/font-previewer/actions/runs/33043015559)
+- Tests: Linux 28/28; Mac 27 pass plus one Linux-only skip
 - Audit: zero known vulnerabilities
 - Mac and Linux displayed/package jobs: pass
-- 10,000-entry warm-search p95: 0.477 ms on hosted Linux; 0.906 ms on hosted Mac
+- 10,000-entry warm-search p95: 0.408 ms on hosted Linux; 0.253 ms on hosted Mac
+- 500-Face soak: stable counts across 2,000 operations/100 recovery round trips; final post-GC heap growth about 1.55 MB on each Host
 - Catalog cancellation: 3.9 ms in the primary hosted Linux journey; 15 ms in the primary hosted Mac journey
-- Package smoke artifacts: [Linux](https://github.com/bomkino/font-previewer/actions/runs/33040027604) and [Mac](https://github.com/bomkino/font-previewer/actions/runs/33040027604), retained with exact-SHA names
+- Package, displayed, package-smoke, and soak artifacts: [exact-head workflow](https://github.com/bomkino/font-previewer/actions/runs/33043015559), eight retained exact-SHA archives
 
 Hosted-runner measurements are diagnostic, not universal performance claims. The package round trips use disposable hosted runners; they do not replace an independent clean-machine matrix.
 
@@ -82,11 +85,11 @@ Run the complete journey:
 
 ## Performance and stability gate
 
-The 10,000-entry search and cancellation budgets pass on hosted CI. The following remain release blockers until measured on reference hardware or with the required corpus:
+The 10,000-entry search/cancellation and the semantic 500-Face long-session diagnostic pass on hosted CI. The following remain release blockers until measured on reference hardware or with the required corpus:
 
 - responsive 500-Face import and 100 visible review cards;
-- bounded memory over a long Review/Compare session;
-- malformed-font failure containment;
+- bounded memory over a displayed long Review/Compare session on reference hardware;
+- hostile-font failure containment beyond the proven Linux metadata envelope;
 - induced WKWebView content-process termination and recovery;
 - no per-frame font-file reads or unbounded watcher/token growth.
 

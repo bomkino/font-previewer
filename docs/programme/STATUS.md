@@ -8,9 +8,9 @@
 - Draft PR: [#1](https://github.com/bomkino/font-previewer/pull/1)
 - Isolated hardening branch: `codex/v1-release-candidate-hardening-02`
 - Hardening draft PR: [#2](https://github.com/bomkino/font-previewer/pull/2)
-- Latest verified product/evidence SHA: `a5dd924265d85ec37d8022732b923ccc89cedad4`
-- Exact verified tree: `73f865a661f6b05d6f5fad67d9af6a823c532f37`
-- Exact-head Cross-Host workflow: [33040027604](https://github.com/bomkino/font-previewer/actions/runs/33040027604)
+- Latest verified product/evidence SHA: `5d368650436bd2b1aca6f7efdf8825087a65d4e3`
+- Exact verified tree: `ebfbce480d26e05d75cdd6f5b2a0a92d24883dd9`
+- Exact-head Cross-Host workflow: [33043015559](https://github.com/bomkino/font-previewer/actions/runs/33043015559)
 
 ## Current milestone
 
@@ -21,8 +21,8 @@ The autonomous, credential-free hardening and hosted-runner evidence slice is co
 ## Current frontier
 
 - T10 Family Groups: implementation and public-seam tests pass; attended design review remains.
-- T15 installed Catalog: Host-local separation, bounded index/search/paging/cache, explicit Add, rebuild, opaque font load, Study non-mutation, and cancellation pass. The 10,000-entry synthetic search p95 is 0.477 ms on hosted Linux and 0.906 ms on hosted Mac; reference-hardware, 500-Face, and long-session memory evidence remain.
-- T17 hardening: automated keyboard, semantics, path redaction, 1,000 malformed bridge messages, 250 corrupt Study documents, stale-test-output rejection, reload/focus, cancellation, sandbox, and transactional failure recovery pass. VoiceOver, Orca, hostile-font containment, long-session, and attended native review remain.
+- T15 installed Catalog: Host-local separation, bounded index/search/paging/cache, explicit Add, rebuild, opaque font load, Study non-mutation, and cancellation pass. Current 10,000-entry search p95 is 0.408 ms hosted Linux / 0.253 ms hosted Mac. A 500-Face, 2,000-operation, 100-recovery-round-trip diagnostic passes on both hosted architectures with stable entity counts and about 1.55 MB final post-GC heap growth. Actual 500-Face import/100-card rendering and reference-hardware budgets remain.
+- T17 hardening: automated keyboard, semantics, path redaction, 1,000 malformed bridge messages, 250 corrupt Study documents, stale-test-output rejection, reload/focus, cancellation, sandbox, transactional failure recovery, bounded Linux metadata parsing, and basic truncated-font rejection pass. VoiceOver, Orca, hostile-font process isolation, and attended native review remain.
 - T18 packaging: Mac ad-hoc `.app` ZIP and Linux `.deb`/portable archive pass integrity, notices, extraction/install, real displayed journey, removal, and residue checks on disposable hosted runners. Developer ID/notarization/stapling, independent clean reference machines, and owner decisions on RPM and Mac architecture remain.
 
 ## Implemented product
@@ -52,13 +52,14 @@ Still owner/decision-gated:
 
 ## Evidence
 
-- 25/25 domain, grouping, protocol, Host-utility, durability, Catalog, and surface tests pass. The runner deletes compiled test output first and proves a planted stale test cannot execute.
+- Linux passes 28/28 domain, grouping, protocol, Host-utility, durability, Catalog, font-inspection, migration, and surface tests. Mac passes 27 with the Linux-only malformed-font execution test explicitly not applicable. The runner deletes compiled test output first and proves a planted stale test cannot execute.
 - Strict Studio, Electron main, and sandboxed preload builds pass.
 - Renderer bundle is approximately 86.1 kB gzip; preload is approximately 6.5 kB gzip.
 - CycloneDX 1.6 SBOM contains 81 resolved components; npm audit reports zero known vulnerabilities.
 - macOS displayed evidence passes warning-free Host compilation, AppKit menu dispatch, real panel open/cancel/focus, actual CoreText Catalog font load, Catalog/Study separation, 15 ms cancellation, transactional Handoff commit-failure recovery, semantics, layout, security, reload recovery, and six snapshots.
 - Linux displayed evidence passes native menu semantics, actual Fontconfig Catalog font load, Catalog/Study separation, 3.9 ms cancellation, Chromium AX tree, layout, security, transactional Handoff, reload recovery, and six screenshots.
 - Packaged-app round trips pass from the extracted Mac ZIP, extracted Linux archive, and installed Linux `.deb`; checksums, ad-hoc Mac integrity, SUID sandbox ownership, application journey, uninstall, and installed-file removal are asserted. These are disposable hosted-runner checks, not independent clean-machine or notarization evidence.
+- Exact-SHA soak artifacts record stable 500-Source/Face/Candidate counts across 2,000 operations and 100 recovery round trips. Hosted totals are 740.605 ms Linux and 618.764 ms Mac; final post-GC heap growth is 1,553,568 bytes Linux and 1,548,336 bytes Mac. These are diagnostic, not universal budgets.
 - Exact details: [`app/REPORT.md`](../../app/REPORT.md).
 
 ## Owner gates
@@ -72,4 +73,4 @@ Still owner/decision-gated:
 
 - Date: 2026-08-27
 - Author: primary agent
-- Summary: isolated hardening now adds deterministic fresh-test discovery, bounded 10,000-entry Catalog diagnostics, explicit cross-Host cancellation, malformed protocol/Study corpora, injected save/Handoff commit failures, and packaged-app round trips. Exact-head Mac and Linux CI is green; no merge, release, production signing, notarization, or attended accessibility claim occurred.
+- Summary: exact-head Mac/Linux CI now also verifies Linux exact collection-face metadata, bounded malformed-font rejection, v1/v2/v3 migrations, and retained 500-Face long-session/memory diagnostics. T19 capability reconciliation and the T20 owner packet are prepared separately; no merge, release, production signing, notarization, or attended accessibility claim occurred.

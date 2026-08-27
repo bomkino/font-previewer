@@ -4,8 +4,8 @@
 
 - Run attended VoiceOver and Orca journeys on the packaged apps.
 - Review native window/menu quality and typography with 20–50 legally held production fonts.
-- Repeat the already-green 10,000-entry Catalog and cancellation diagnostics on reference hardware; measure 500-Face import, 100-card scrolling, and long-session memory.
-- Exercise malformed-font containment and induced WKWebView content-process termination.
+- Repeat the already-green 10,000-entry Catalog, cancellation, and 500-Face semantic soak on reference hardware; measure actual 500-Face import and 100-card scrolling.
+- Extend the proven bounded Linux malformed-metadata rejection into a hostile cross-format/process-containment corpus; induce WKWebView content-process termination.
 - Repeat the already-green disposable-runner package journeys on independent clean Mac/Linux machines, including Wayland/X11 and installed-data residue review.
 - Decide production renderer/format tiers and record the workspace/durability ADR verdicts.
 - Decide whether RPM and x86_64/universal Mac artifacts are V1 commitments.

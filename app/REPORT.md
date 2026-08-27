@@ -7,9 +7,9 @@ The isolated autonomous hardening slice is complete and exact-head cross-Host ev
 - Release-candidate base: `codex/v1-release-candidate` at `a31777e2b2bd30bc76c49a540c19715068d8e6b7`
 - Isolated branch: `codex/v1-release-candidate-hardening-02`
 - Draft PR: [#2](https://github.com/bomkino/font-previewer/pull/2)
-- Verified product/evidence commit: [`a5dd924`](https://github.com/bomkino/font-previewer/commit/a5dd924265d85ec37d8022732b923ccc89cedad4)
-- Verified tree: `73f865a661f6b05d6f5fad67d9af6a823c532f37`
-- Exact-head automated run: [33040027604](https://github.com/bomkino/font-previewer/actions/runs/33040027604)
+- Verified product/evidence commit: [`5d36865`](https://github.com/bomkino/font-previewer/commit/5d368650436bd2b1aca6f7efdf8825087a65d4e3)
+- Verified tree: `ebfbce480d26e05d75cdd6f5b2a0a92d24883dd9`
+- Exact-head automated run: [33043015559](https://github.com/bomkino/font-previewer/actions/runs/33043015559)
 
 No merge, public release, deployment, production signing, notarization, attended accessibility claim, or architecture ADR acceptance occurred.
 
@@ -22,6 +22,9 @@ No merge, public release, deployment, production signing, notarization, attended
 - Atomic Study writes clean their temporary sidecar on every failure. Injected commit failures preserve the previous intentional save byte-for-byte.
 - Transactional Handoff commit failures preserve the prior export, remove staging, and leave no failed final directory; Mac displayed evidence exercises this path.
 - The extracted Mac ZIP, extracted Linux archive, and installed Linux `.deb` each run the displayed critical journey. The Linux test then removes the package and asserts its symlink, application tree, desktop entry, and icon are absent.
+- Linux no longer guesses one Face from a filename. A bounded Fontconfig subprocess validates the file and returns exact collection indices/family/style/PostScript metadata; malformed/truncated output, duplicate indices, control-bearing names, and an actual truncated font file fail before Study mutation.
+- Every supported legacy schema (v1, v2, v3) is now exercised through the v4 migration seam with `Maybe` provenance and path stripping intact.
+- Both runner architectures retain a JSON diagnostic for a 500-Source/Face/Candidate Study across 2,000 operations and 100 recovery round trips.
 
 ## User journey delivered
 
@@ -45,19 +48,20 @@ Catalog discovery no longer mutates a Study. Only an explicit Add dispatches `in
 | Gate | Result |
 |---|---|
 | Strict renderer types | Pass |
-| Public-seam tests | 25/25 pass; stale compiled output rejected |
+| Public-seam tests | Linux 28/28; Mac 27 pass plus one Linux-only skip; stale compiled output rejected |
 | Renderer production bundle | 288.6 kB raw / 86.1 kB gzip |
 | Electron main and sandboxed CJS preload | Pass |
 | Mac Host compiler | Pass with zero warnings |
 | CycloneDX SBOM | 81 components |
 | npm audit | 0 known vulnerabilities |
-| Synthetic Catalog | 10,000-entry bound; 100 warm searches; p95 0.477 ms Linux / 0.906 ms Mac on hosted runners |
+| Synthetic Catalog | 10,000-entry bound; 100 warm searches; p95 0.408 ms Linux / 0.253 ms Mac on hosted runners |
+| Long-session diagnostic | 500 Faces, 2,000 operations, 100 recovery round trips, stable counts/path-free Study; total 740.605 ms Linux / 618.764 ms Mac; final post-GC heap growth 1,553,568 / 1,548,336 bytes |
 | Linux displayed app | Native menu, semantic undo/redo, 6 screenshots, AX tree, layout, security, actual installed-font load, Catalog/Study separation, 3.9 ms cancellation, transactional Handoff, reload/focus pass |
 | macOS displayed app | AppKit menu, real panel open/cancel, 6 snapshots, layout, security, CoreText Catalog, actual installed-font load, Catalog/Study separation, 15 ms cancellation, Handoff fault recovery, reload/focus pass |
 | Linux packages | `.deb` and portable archive, SHA-256, root-owned mode-4755 sandbox helper, displayed journeys, install/removal/residue assertions, desktop entry, symlink, licence/notices pass |
-| Mac package | App build, ad-hoc signature integrity, strict verification, ZIP/checksum, extracted displayed journey, removal, licence/notices pass |
+| Mac package | App build, ad-hoc signature integrity, strict verification, ZIP/portable checksum, extracted displayed journey, removal, licence/notices pass |
 
-The CI gates use real fonts already installed on each runner but never commit or upload font binaries. Bridge responses are checked for `file://`, home-directory, user-directory, and drive-path leakage; preview URLs must use opaque `pitch-font://asset/` tokens and load through `FontFace`. Hosted timings and disposable-runner package journeys are diagnostic evidence, not reference-hardware or independent clean-machine claims.
+The CI gates use real fonts already installed on each runner but never commit or upload font binaries. Bridge responses are checked for `file://`, home-directory, user-directory, and drive-path leakage; preview URLs must use opaque `pitch-font://asset/` tokens and load through `FontFace`. Eight exact-SHA artifacts retain packages, displayed evidence, package-smoke evidence, and soak JSON for both Hosts. Hosted timings and disposable-runner package journeys are diagnostic evidence, not reference-hardware or independent clean-machine claims.
 
 ## Security and durability
 
@@ -76,7 +80,7 @@ These remain outside the proven slice and require attended testing, independent 
 1. Traverse the packaged Mac app with VoiceOver and the packaged Linux app with Orca.
 2. Review full native window/menu quality and typography with 20–50 legally held production fonts, including variable, collection, missing-glyph, and complex-script cases.
 3. Induce WKWebView content-process termination and inspect recovery; automated reload is already proven.
-4. Run 500-Face/100-card, long-session memory, hostile-font containment, and reference-hardware budgets. The bounded 10,000-entry hosted diagnostic and basic corrupt-input corpora already pass.
+4. Run actual 500-Face import/100-card rendering, displayed long-session memory, hostile-font process containment, and reference-hardware budgets. The bounded 10,000-entry workload, semantic 500-Face soak, and basic malformed Linux metadata envelope already pass on hosted CI.
 5. Repeat Mac and Linux install/launch/uninstall on independent clean supported machines. Disposable hosted-runner ZIP/archive/`.deb` round trips already pass.
 6. Decide the production renderer/format tiers and accept or reject the leading workspace/durability ADRs.
 7. Supply Developer ID credentials for hardened signing, notarization, and stapling; decide whether RPM and additional Mac architectures are V1 requirements.
