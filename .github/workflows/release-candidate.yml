@@ -156,7 +156,7 @@ jobs:
             (.commandLine | index("--ozone-platform=wayland")) != null and
             (.renderer.heading | type) == "string" and
             (.renderer.host | contains("electron")) and
-            (.renderer.stage | contains("Review")) and
+            (.renderer.stage | test("Review|Compare|System|Handoff")) and
             .renderer.candidates > 0
           ' "$FONT_PREVIEWER_WAYLAND_SMOKE_PATH" >/dev/null
           cp "$RUNNER_TEMP/weston.log" "$evidence/weston.log"
