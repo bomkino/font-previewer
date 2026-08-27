@@ -6,7 +6,7 @@ export default defineConfig({
     outDir: "dist-electron/electron",
     emptyOutDir: false,
     minify: false,
-    sourcemap: true,
+    sourcemap: false,
     lib: {
       entry: "electron/preload.ts",
       formats: ["cjs"],

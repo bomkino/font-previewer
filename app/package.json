@@ -6,13 +6,15 @@
   "description": "A local typography decision Studio for reviewing, comparing, systemizing, and handing off fonts.",
   "main": "dist-electron/electron/main.js",
   "scripts": {
-    "build": "npm run check && npm run test && vite build && tsc -p tsconfig.electron.json && vite build --config vite.preload.config.ts",
+    "build": "node scripts/clean-build.mjs && npm run check && npm run test && vite build && tsc -p tsconfig.electron.json && vite build --config vite.preload.config.ts && npm run audit:bundle",
+    "audit:bundle": "node scripts/audit-built-app.mjs",
+    "audit:package": "node scripts/audit-package.mjs release/linux-unpacked",
     "check": "tsc --noEmit",
     "dev": "vite --host 127.0.0.1",
     "electron": "electron .",
     "electron:install": "install-electron",
     "evidence:soak": "npm test && node --expose-gc scripts/run-soak.mjs",
-    "package:linux": "npm run build && node scripts/package-linux.mjs",
+    "package:linux": "npm run build && node scripts/package-linux.mjs && npm run audit:package",
     "sbom": "node scripts/build-sbom.mjs",
     "test": "node scripts/run-tests.mjs",
     "verify": "npm run build && npm run sbom && npm audit --audit-level=high"

@@ -7,7 +7,7 @@
     "skipLibCheck": true,
     "rootDir": ".",
     "outDir": "dist-electron",
-    "sourceMap": true,
+    "sourceMap": false,
     "types": ["node"]
   },
   "include": ["electron/main.ts", "electron/evidence.ts", "electron/font-variation-worker.ts"]

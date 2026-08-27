@@ -352,6 +352,14 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   if (options.verifyDurability) trace.durabilityArtifact = await options.verifyDurability();
   if (options.exportHandoff) trace.transactionalHandoff = await options.exportHandoff();
 
+  const beforeCrash = await inspectWorkspace(options.window);
+  const crashReloaded = new Promise<void>((resolveLoaded) => options.window.webContents.once("did-finish-load", () => resolveLoaded()));
+  options.window.webContents.forcefullyCrashRenderer();
+  await withTimeout("forced renderer crash recovery", crashReloaded, 20_000);
+  await waitFor(options.window, "recovered Studio after renderer crash", `document.querySelector('#workspace-heading') && document.activeElement?.id === 'workspace-heading' && document.querySelector('.candidate-row[aria-current="true"] .review-glyph')?.getAttribute('aria-label') === 'Keep'`, 20_000);
+  const afterCrash = await inspectWorkspace(options.window);
+  trace.rendererCrashRecovery = { forced: true, before: beforeCrash, after: afterCrash };
+
   const beforeReload = await inspectWorkspace(options.window);
   const loaded = new Promise<void>((resolveLoaded) => options.window.webContents.once("did-finish-load", () => resolveLoaded()));
   options.window.webContents.reload();
@@ -385,6 +393,7 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   if (security.invalidRequests !== security.rejected || !security.nodeUnavailable) throw new Error("Host security audit failed.");
   if (!catalog.count || !catalog.indexed || catalog.pathLeak || !catalog.opaquePreviewUrls || !catalog.previewAvailable || !catalog.fontLoaded || !catalog.pageBounded || !catalog.studyUnchanged || !catalog.cancellation?.acknowledged || !catalog.cancellation.obsoleteResultCancelled || catalog.cancellation.durationMs === undefined || catalog.cancellation.durationMs > 100) throw new Error("Installed font catalog audit failed.");
   if (!keyboard.forwardWrap || !keyboard.backwardWrap || !keyboard.candidateUnchanged || !keyboard.trayUnchanged || !keyboard.returnFocus) throw new Error("Keyboard accessibility audit failed.");
+  if ((trace.rendererCrashRecovery as { after?: { activeElement?: string; reviewState?: string } }).after?.activeElement !== "workspace-heading" || (trace.rendererCrashRecovery as { after?: { activeElement?: string; reviewState?: string } }).after?.reviewState !== "Keep") throw new Error("Forced renderer crash recovery failed.");
   if (afterReload.activeElement !== "workspace-heading" || afterReload.reviewState !== "Keep") throw new Error("Reload recovery or focus restoration failed.");
   await checksumEvidence(output);
 }

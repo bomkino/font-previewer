@@ -32,6 +32,8 @@ The macOS archive is ad-hoc signed with hardened runtime, not Developer-ID signe
 
 Verified prerelease downloads are published on [GitHub Releases](https://github.com/bomkino/font-previewer/releases). CI artifacts remain exact-SHA evidence.
 
+Installation and first-launch details—including the unsigned Mac warning and Linux sandbox requirements—are in [`app/INSTALL.md`](app/INSTALL.md).
+
 ## Build and run
 
 Use Node.js 24 or newer.

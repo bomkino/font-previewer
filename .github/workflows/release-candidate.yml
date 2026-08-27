@@ -4,8 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches:
+      - main
       - codex/v1-release-candidate
       - codex/v1-release-candidate-hardening-*
+      - codex/v0.2-pre-mac
     paths:
       - ".github/workflows/release-candidate.yml"
       - "app/**"
@@ -44,13 +46,16 @@ jobs:
       - name: Install displayed-app dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends dbus-x11 fonts-inter-variable xauth xvfb
+          sudo apt-get install --yes --no-install-recommends dbus-x11 fonts-inter-variable weston xauth xvfb
 
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
 
       - name: Install exact Electron binary
         run: npm run electron:install
+
+      - name: Set reproducible package epoch
+        run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
 
       - name: Configure production sandbox
         run: |
@@ -104,6 +109,9 @@ jobs:
             .semanticAudit.roleHelpSeparated == true and
             .reloadRecovery.after.activeElement == "workspace-heading" and
             .reloadRecovery.after.reviewState == "Keep" and
+            .rendererCrashRecovery.forced == true and
+            .rendererCrashRecovery.after.activeElement == "workspace-heading" and
+            .rendererCrashRecovery.after.reviewState == "Keep" and
             .transactionalHandoff.fileCount >= 2
           ' "$EVIDENCE/trace.json" >/dev/null
           for image in 01-review 02-compare 03-system 04-handoff 05-recovered 06-catalog; do
@@ -113,8 +121,50 @@ jobs:
           cd "$EVIDENCE"
           sha256sum -c checksums.sha256
 
+      - name: Run native Wayland/Ozone evidence
+        env:
+          FONT_PREVIEWER_EVIDENCE_DIR: ${{ runner.temp }}/font-previewer-wayland-evidence
+          ELECTRON_ENABLE_LOGGING: "1"
+        run: |
+          runtime="$RUNNER_TEMP/font-previewer-wayland-runtime"
+          mkdir -p "$runtime"
+          chmod 700 "$runtime"
+          XDG_RUNTIME_DIR="$runtime" weston --backend=headless-backend.so --socket=wayland-font-previewer --idle-time=0 --log="$RUNNER_TEMP/weston.log" &
+          weston_pid=$!
+          cleanup_wayland() { kill "$weston_pid" 2>/dev/null || true; wait "$weston_pid" 2>/dev/null || true; }
+          trap cleanup_wayland EXIT
+          for _ in $(seq 1 100); do test -S "$runtime/wayland-font-previewer" && break; sleep 0.1; done
+          test -S "$runtime/wayland-font-previewer"
+          env -u DISPLAY \
+            XDG_RUNTIME_DIR="$runtime" \
+            WAYLAND_DISPLAY=wayland-font-previewer \
+            XDG_SESSION_TYPE=wayland \
+            ELECTRON_OZONE_PLATFORM_HINT=wayland \
+            timeout --signal=TERM --kill-after=10s 4m \
+            dbus-run-session -- npm run electron -- \
+              --ozone-platform=wayland \
+              --enable-features=UseOzonePlatform \
+              --disable-gpu \
+              --disable-dev-shm-usage
+          jq -e '
+            .platform == "linux" and
+            .rendererCrashRecovery.forced == true and
+            .rendererCrashRecovery.after.reviewState == "Keep" and
+            .installedCatalog.fontLoaded == true and
+            .reloadRecovery.after.activeElement == "workspace-heading"
+          ' "$FONT_PREVIEWER_EVIDENCE_DIR/trace.json" >/dev/null
+          (cd "$FONT_PREVIEWER_EVIDENCE_DIR" && sha256sum -c checksums.sha256)
+
       - name: Assemble Linux release candidates
         run: node scripts/package-linux.mjs
+
+      - name: Verify Linux package reproducibility and hygiene
+        run: |
+          cp release/checksums.sha256 "$RUNNER_TEMP/first-package-checksums.sha256"
+          npm run audit:package
+          node scripts/package-linux.mjs
+          cmp "$RUNNER_TEMP/first-package-checksums.sha256" release/checksums.sha256
+          npm run audit:package
 
       - name: Inspect Linux packages
         run: |
@@ -125,6 +175,8 @@ jobs:
           dpkg-deb --contents font-previewer_0.1.0_amd64.deb | grep -q 'usr/bin/font-previewer -> ../../opt/font-previewer/font-previewer'
           dpkg-deb --contents font-previewer_0.1.0_amd64.deb | grep -q 'opt/font-previewer/resources/app/LICENSE.txt'
           dpkg-deb --contents font-previewer_0.1.0_amd64.deb | grep -q 'opt/font-previewer/resources/app/THIRD_PARTY_NOTICES.md'
+          dpkg-deb --contents font-previewer_0.1.0_amd64.deb | grep -q 'opt/font-previewer/resources/app/sbom.cdx.json'
+          dpkg-deb --contents font-previewer_0.1.0_amd64.deb | grep -q 'opt/font-previewer/resources/app/INSTALL.md'
 
       - name: Round-trip Linux portable and installed packages
         run: |
@@ -212,6 +264,15 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Upload Wayland evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: font-previewer-wayland-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/font-previewer-wayland-evidence
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload Linux packages
         if: success()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
@@ -254,6 +315,9 @@ jobs:
           ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
         run: npm ci --no-audit --no-fund
 
+      - name: Set reproducible package epoch
+        run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
+
       - name: Verify shared Studio
         run: npm run build
 
@@ -272,6 +336,8 @@ jobs:
           test -s "$APP/Contents/Resources/Studio/index.html"
           test -s "$APP/Contents/Resources/LICENSE.txt"
           test -s "$APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
+          test -s "$APP/Contents/Resources/sbom.cdx.json"
+          test -s "$APP/Contents/Resources/INSTALL.md"
           plutil -lint "$APP/Contents/Info.plist"
           codesign -d --verbose=4 "$APP" 2>&1 | grep -q 'flags=.*runtime'
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" = "dog.pitch.fontpreviewer"
@@ -346,7 +412,11 @@ jobs:
             .semantics.horizontalOverflow == false and
             .semantics.roleHelpSeparated == true and
             .reload.after.activeElement == "workspace-heading" and
-            .reload.after.reviewState == "Keep"
+            .reload.after.reviewState == "Keep" and
+            .terminationCallbackRecovery.simulatedDelegateCallback == true and
+            .terminationCallbackRecovery.counterAdvanced == true and
+            .terminationCallbackRecovery.after.activeElement == "workspace-heading" and
+            .terminationCallbackRecovery.after.reviewState == "Keep"
           ' "$EVIDENCE/run.json" >/dev/null
           for image in 01-review 02-compare 03-system 04-handoff 05-recovered 06-catalog; do
             test -s "$EVIDENCE/$image.png"

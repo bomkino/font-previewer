@@ -1973,6 +1973,28 @@ kbd {
   }
 }
 
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid CanvasText;
+  }
+
+  button,
+  input,
+  select,
+  textarea,
+  .candidate-row,
+  .catalog-source,
+  .new-study-dialog {
+    border-color: CanvasText;
+  }
+
+  .review-glyph,
+  .save-dot,
+  .task-status > span {
+    forced-color-adjust: auto;
+  }
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;

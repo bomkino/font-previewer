@@ -6,6 +6,7 @@ import test from "node:test";
 import type { BrowserWindow } from "electron";
 import { exportTransactionalHandoff } from "../electron/handoff.js";
 import { atomicWrite } from "../electron/host-storage.js";
+import { parseRecoveryDisk } from "../electron/recovery.js";
 import { assertStudyDocument } from "../src/domain.js";
 import { createFixtureSession } from "../src/fixture.js";
 
@@ -63,4 +64,50 @@ test("transactional Handoff leaves the prior export byte-identical and cleans fa
   assert.deepEqual(await readFile(priorManifestPath), priorManifest);
   assert.deepEqual(await readdir(targetDirectory), [committed.displayName]);
   assert.equal((await readdir(targetDirectory)).some((name) => name.includes(".staging-")), false);
+});
+
+test("corrupt, future, and impossible recovery envelopes cannot replace valid state", () => {
+  const fixture = createFixtureSession();
+  const valid = parseRecoveryDisk(JSON.stringify({
+    version: 1,
+    document: fixture.document,
+    workspace: fixture.workspace,
+    revision: 8,
+    intentionallySavedRevision: 20,
+  }));
+  assert.equal(valid.revision, 8);
+  assert.equal(valid.intentionallySavedRevision, 8);
+  assert.equal(valid.document.id, fixture.document.id);
+
+  for (const invalid of [
+    "{",
+    JSON.stringify({ version: 2, document: fixture.document, workspace: fixture.workspace, revision: 8, intentionallySavedRevision: 3 }),
+    JSON.stringify({ version: 1, document: fixture.document, workspace: fixture.workspace, revision: -1, intentionallySavedRevision: 0 }),
+    JSON.stringify({ version: 1, document: { ...fixture.document, schemaVersion: 999 }, workspace: fixture.workspace, revision: 1, intentionallySavedRevision: 0 }),
+  ]) assert.throws(() => parseRecoveryDisk(invalid));
+});
+
+test("interrupted Handoff rendering removes staging and commits nothing", async (context) => {
+  const targetDirectory = await temporaryDirectory(context);
+  const fixture = createFixtureSession();
+  const document = assertStudyDocument({
+    ...fixture.document,
+    title: "Interrupted Handoff",
+    handoff: { profile: "technical", outputs: ["summary", "review-png"], includeSources: false },
+  });
+  const window = {
+    webContents: {
+      executeJavaScript: async () => { throw new Error("injected renderer termination"); },
+    },
+  } as unknown as BrowserWindow;
+
+  await assert.rejects(exportTransactionalHandoff({
+    window,
+    document,
+    targetDirectory,
+    sourcePaths: new Map<string, string>(),
+    includeSources: false,
+    sourcePermissionAcknowledged: false,
+  }), /injected renderer termination/);
+  assert.deepEqual(await readdir(targetDirectory), []);
 });

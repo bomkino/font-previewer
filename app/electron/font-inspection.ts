@@ -1,7 +1,7 @@
-import { execFile } from "node:child_process";
 import { basename, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AxisDefinition, ImportedSource, NamedInstance, SourceBindingSummary } from "../src/domain.js";
+import { runBoundedProcess } from "./bounded-process.js";
 
 export const FONT_EXTENSIONS = new Set([".otf", ".ttf", ".ttc", ".otc", ".dfont", ".woff", ".woff2"]);
 export const FULL_RENDER_EXTENSIONS = new Set([".otf", ".ttf", ".woff", ".woff2"]);
@@ -64,32 +64,13 @@ function parseVariationMetadata(output: string): readonly VariationMetadata[] {
 }
 
 async function inspectVariations(canonicalPath: string): Promise<readonly VariationMetadata[]> {
-  const output = await new Promise<string>((resolve, reject) => {
-    let settled = false;
-    let timer: NodeJS.Timeout | undefined;
-    const child = execFile(
-      process.execPath,
-      [variationWorkerPath, canonicalPath],
-      {
-        env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", NODE_OPTIONS: "--max-old-space-size=128" },
-        killSignal: "SIGKILL",
-        maxBuffer: MAXIMUM_METADATA_OUTPUT,
-      },
-      (error, stdout) => {
-        if (settled) return;
-        settled = true;
-        if (timer) clearTimeout(timer);
-        if (error) reject(new Error("Variable font inspection failed."));
-        else resolve(stdout);
-      },
-    );
-    timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      child.kill("SIGKILL");
-      reject(new Error("Variable font inspection timed out."));
-    }, MAXIMUM_INSPECTION_MILLISECONDS);
-  });
+  const output = await runBoundedProcess({
+    executable: process.execPath,
+    args: [variationWorkerPath, canonicalPath],
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", NODE_OPTIONS: "--max-old-space-size=128" },
+    timeoutMilliseconds: MAXIMUM_INSPECTION_MILLISECONDS,
+    maximumOutputBytes: MAXIMUM_METADATA_OUTPUT,
+  }).catch(() => { throw new Error("Variable font inspection failed within its safety envelope."); });
   return parseVariationMetadata(output);
 }
 
@@ -152,28 +133,12 @@ export function parseFontconfigQuery(output: string): readonly InspectedFaceMeta
 
 export async function inspectFontFile(canonicalPath: string): Promise<readonly InspectedFaceMetadata[]> {
   if (process.platform !== "linux") throw new Error("Fontconfig inspection is available on Linux only.");
-  const output = await new Promise<string>((resolve, reject) => {
-    let settled = false;
-    let timer: NodeJS.Timeout | undefined;
-    const child = execFile(
-      "/usr/bin/fc-query",
-      ["--format", FONTCONFIG_QUERY_FORMAT, canonicalPath],
-      { killSignal: "SIGKILL", maxBuffer: MAXIMUM_METADATA_OUTPUT },
-      (error, stdout) => {
-        if (settled) return;
-        settled = true;
-        if (timer) clearTimeout(timer);
-        if (error) reject(new Error("Font metadata inspection failed."));
-        else resolve(stdout);
-      },
-    );
-    timer = setTimeout(() => {
-      if (settled) return;
-      settled = true;
-      child.kill("SIGKILL");
-      reject(new Error("Font metadata inspection timed out."));
-    }, MAXIMUM_INSPECTION_MILLISECONDS);
-  });
+  const output = await runBoundedProcess({
+    executable: "/usr/bin/fc-query",
+    args: ["--format", FONTCONFIG_QUERY_FORMAT, canonicalPath],
+    timeoutMilliseconds: MAXIMUM_INSPECTION_MILLISECONDS,
+    maximumOutputBytes: MAXIMUM_METADATA_OUTPUT,
+  }).catch(() => { throw new Error("Font metadata inspection failed within its safety envelope."); });
   const faces = parseFontconfigQuery(output);
   if (!FULL_RENDER_EXTENSIONS.has(extname(canonicalPath).toLocaleLowerCase()) || !faces.some((face) => face.variable)) return faces;
   const variations = await inspectVariations(canonicalPath);

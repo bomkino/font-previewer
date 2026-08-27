@@ -118,6 +118,27 @@ test("Linux font inspection rejects a malformed font file before import", {
   }
 });
 
+test("Linux font inspection contains hostile headers across every supported format tier", {
+  skip: process.platform !== "linux" || !existsSync("/usr/bin/fc-query"),
+}, async (context) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "font-previewer-hostile-formats-"));
+  context.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const hostileHeaders = new Map<string, Buffer>([
+    ["otf", Buffer.from("4f54544f00010000", "hex")],
+    ["ttf", Buffer.from("0001000000010000", "hex")],
+    ["woff", Buffer.from("774f464600010000", "hex")],
+    ["woff2", Buffer.from("774f463200010000", "hex")],
+    ["ttc", Buffer.from("7474636600020000", "hex")],
+    ["otc", Buffer.from("7474636600020000", "hex")],
+    ["dfont", Buffer.from("0000010000000100", "hex")],
+  ]);
+  for (const [extension, header] of hostileHeaders) {
+    const path = join(temporaryRoot, `hostile.${extension}`);
+    await writeFile(path, Buffer.concat([header, Buffer.alloc(31, 0xff)]));
+    await assert.rejects(inspectFontFile(path), /safety envelope|metadata is empty/, extension);
+  }
+});
+
 test("Handoff filenames and CSV cells neutralize platform and spreadsheet hazards", () => {
   assert.equal(safeFileStem("  Client / Pitch: Final?  "), "Client Pitch Final");
   assert.equal(safeFileStem("..."), "Font Previewer");

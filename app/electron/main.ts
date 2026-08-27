@@ -51,6 +51,8 @@ import {
 } from "./font-inspection.js";
 import { exportTransactionalHandoff } from "./handoff.js";
 import { atomicWrite, readBoundedText, safeFileStem } from "./host-storage.js";
+import { parseRecoveryDisk, type RecoveryDisk } from "./recovery.js";
+import { rendererRequestAllowed } from "./request-policy.js";
 
 electronProtocol.registerSchemesAsPrivileged([{
   scheme: "pitch-font",
@@ -79,14 +81,6 @@ interface LocalStateDisk {
   readonly version: 1;
   readonly bindings: readonly PersistedBinding[];
   readonly recentDocuments: readonly string[];
-}
-
-interface RecoveryDisk {
-  readonly version: 1;
-  readonly document: StudyDocument;
-  readonly workspace: WorkspaceState;
-  readonly revision: number;
-  readonly intentionallySavedRevision: number;
 }
 
 let mainWindow: BrowserWindow | undefined;
@@ -481,16 +475,7 @@ async function writeRecovery(): Promise<void> {
 
 async function loadRecovery(): Promise<RecoveryEnvelope | undefined> {
   try {
-    const raw = JSON.parse(await readBoundedText(recoveryPath, maximumStudyBytes * 2)) as Partial<RecoveryDisk>;
-    if (raw.version !== 1 || typeof raw.revision !== "number" || !Number.isSafeInteger(raw.revision) || raw.revision < 0 || typeof raw.intentionallySavedRevision !== "number" || !raw.document || !raw.workspace) return undefined;
-    const sessionState = createSession(parseStudyDocument(JSON.stringify(raw.document)), [], raw.workspace, raw.revision);
-    mirrored = {
-      version: 1,
-      document: sessionState.document,
-      workspace: sessionState.workspace,
-      revision: raw.revision,
-      intentionallySavedRevision: Math.min(Math.max(0, raw.intentionallySavedRevision), raw.revision),
-    };
+    mirrored = parseRecoveryDisk(await readBoundedText(recoveryPath, maximumStudyBytes * 2));
     return {
       document: mirrored.document,
       workspace: mirrored.workspace,
@@ -670,6 +655,18 @@ async function createWindow(): Promise<BrowserWindow> {
     },
   });
   mainWindow = window;
+  const rendererFailures: number[] = [];
+  window.webContents.on("render-process-gone", (_event, details) => {
+    if (details.reason === "clean-exit" || window.isDestroyed()) return;
+    const now = Date.now();
+    rendererFailures.push(now);
+    while (rendererFailures[0] !== undefined && rendererFailures[0] < now - 60_000) rendererFailures.shift();
+    if (rendererFailures.length > 3) {
+      console.error("Font Previewer stopped automatic renderer recovery after repeated failures.");
+      return;
+    }
+    setTimeout(() => { if (!window.isDestroyed()) window.webContents.reload(); }, 100);
+  });
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event, url) => {
     if (url !== window.webContents.getURL()) event.preventDefault();
@@ -712,6 +709,9 @@ void app.whenReady().then(async () => {
   });
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
   session.defaultSession.setPermissionCheckHandler(() => false);
+  session.defaultSession.webRequest.onBeforeRequest({ urls: ["<all_urls>"] }, (details, callback) => {
+    callback({ cancel: !rendererRequestAllowed(details.url, join(applicationRoot, "dist", "renderer"), process.env.FONT_PREVIEWER_DEV_SERVER_URL) });
+  });
   Menu.setApplicationMenu(buildMenu());
   const firstWindow = await createWindow();
   if (evidenceDirectory) {
