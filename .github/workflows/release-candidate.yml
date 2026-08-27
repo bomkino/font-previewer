@@ -275,7 +275,11 @@ jobs:
           plutil -lint "$APP/Contents/Info.plist"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" = "dog.pitch.fontpreviewer"
           codesign --verify --deep --strict --verbose=2 "$APP"
-          shasum -a 256 -c "$RUNNER_TEMP/font-previewer-macos-build/Font Previewer.zip.sha256"
+          (
+            cd "$RUNNER_TEMP/font-previewer-macos-build"
+            test "$(awk '{print $2}' 'Font Previewer.zip.sha256')" = "Font Previewer.zip"
+            shasum -a 256 -c "Font Previewer.zip.sha256"
+          )
 
       - name: Run displayed WKWebView release evidence
         env:

@@ -71,6 +71,9 @@ codesign --verify --deep --strict --verbose=2 "$APP"
 
 ARCHIVE="$OUTPUT_DIR/Font Previewer.zip"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ARCHIVE"
-shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"
+(
+  cd "$OUTPUT_DIR"
+  shasum -a 256 "Font Previewer.zip" > "Font Previewer.zip.sha256"
+)
 
 echo "$APP"
