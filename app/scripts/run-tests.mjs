@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { access, mkdir, readdir, rm, writeFile } from "node:fs/promises";
-import { join, resolve, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 const applicationRoot = resolve(import.meta.dirname, "..");
 const outputRoot = join(applicationRoot, ".test-dist");
@@ -39,4 +39,9 @@ async function testFilesWithin(directory) {
 
 const testFiles = (await testFilesWithin(join(outputRoot, "tests"))).sort();
 if (testFiles.length === 0) throw new Error("The test compiler emitted no test files.");
-run(process.execPath, ["--test", ...testFiles]);
+// Node 26 treats absolute test paths as glob patterns. Workspace names may
+// legitimately contain glob metacharacters such as `[` and `]`, causing a
+// false-green run with zero discovered tests. Paths relative to the fixed cwd
+// contain only repository-controlled segments and identify every emitted file.
+const relativeTestFiles = testFiles.map((file) => `./${relative(applicationRoot, file)}`);
+run(process.execPath, ["--test", ...relativeTestFiles]);
