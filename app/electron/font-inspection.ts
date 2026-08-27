@@ -122,15 +122,16 @@ export function parseFontconfigQuery(output: string): readonly InspectedFaceMeta
     if (fields.length !== 5 || !/^\d{1,6}$/u.test(fields[0]) || !["True", "False"].includes(fields[4])) throw new Error("Font metadata record is malformed.");
     const faceIndex = Number(fields[0]);
     if (!Number.isSafeInteger(faceIndex)) throw new Error("Font metadata has an invalid face index.");
+    const variable = fields[4] === "True";
     const family = parseMetadataName(fields[1], "family");
-    const style = parseMetadataName(fields[2], "style");
+    const style = parseMetadataName(fields[2], "style", variable) ?? "Variable";
     const postScriptName = parseMetadataName(fields[3], "PostScript name", true);
     const face: InspectedFaceMetadata = {
       faceIndex,
       family: family!,
       style: style!,
       ...(postScriptName ? { postScriptName } : {}),
-      variable: fields[4] === "True",
+      variable,
     };
     const existing = facesByIndex.get(faceIndex);
     if (existing) {

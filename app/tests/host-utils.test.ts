@@ -93,11 +93,12 @@ test("Fontconfig inspection rejects malformed, truncated, and duplicate-face met
 
 test("Fontconfig collapses named-instance records only for one variable Face", () => {
   const inspected = parseFontconfigQuery(
-    "0\u001fInter\u001fRegular\u001fInter-Regular\u001fTrue\u001e" +
+    "0\u001fInter\u001f\u001f\u001fTrue\u001e" +
     "0\u001fInter\u001fBold\u001fInter-Bold\u001fTrue\u001e",
   );
   assert.equal(inspected.length, 1);
   assert.equal(inspected[0].variable, true);
+  assert.equal(inspected[0].style, "Variable");
   assert.throws(
     () => parseFontconfigQuery(
       "0\u001fInter\u001fRegular\u001fInter-Regular\u001fTrue\u001e" +

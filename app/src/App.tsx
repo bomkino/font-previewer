@@ -451,7 +451,7 @@ export default function App() {
     if (event.type === "task-progress") setNotice(`${event.task}: ${event.completed}${event.total ? `/${event.total}` : ""}`);
   }), [dispatch, host]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!newStudyOpen) return;
     const dialog = newStudyDialogRef.current;
     const returnTarget = newStudyReturnFocusRef.current;
