@@ -651,7 +651,7 @@ async function createWindow(): Promise<BrowserWindow> {
       webviewTag: false,
       spellcheck: false,
       backgroundThrottling: !evidenceMode,
-      offscreen: evidenceMode,
+      offscreen: false,
     },
   });
   mainWindow = window;
@@ -673,7 +673,7 @@ async function createWindow(): Promise<BrowserWindow> {
   });
   window.webContents.on("will-attach-webview", (event) => event.preventDefault());
   window.webContents.session.on("will-download", (event) => event.preventDefault());
-  if (!evidenceMode) window.once("ready-to-show", () => window.show());
+  window.once("ready-to-show", () => window.show());
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = undefined;
   });

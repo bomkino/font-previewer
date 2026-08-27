@@ -16,6 +16,7 @@ The test runner removes the compiled test directory before every run, plants a d
 The cross-Host workflow additionally requires:
 
 - a real displayed Electron run under Xvfb and isolated D-Bus;
+- a second displayed Electron run through native Wayland/Ozone under a headless compositor;
 - a real displayed AppKit/WKWebView run on macOS;
 - native menu and panel routes;
 - semantic undo/redo and keyboard-collision checks;
@@ -31,9 +32,11 @@ The cross-Host workflow additionally requires:
 - transactional Handoff and durable recovery;
 - injected atomic-save and Handoff-commit failures that preserve prior data and remove staging residue;
 - reload with review decision and workspace focus restored;
+- forced Electron renderer termination with automatic recovery, preserved decision, and restored focus;
 - six non-empty screenshots/snapshots per Host, including the installed Catalog, and a Chromium AX tree;
 - packaged licence/notices, checksums, ad-hoc Mac signature integrity, package structure, and Linux sandbox ownership;
 - a displayed journey from the extracted Mac ZIP, extracted Linux archive, and installed Linux `.deb`, followed by package/file removal assertions.
+- two byte-identical Linux package builds plus payload inventory, private-path, credential-marker, and application-source-map audits.
 
 ## Current automated result
 
@@ -85,11 +88,11 @@ Run the complete journey:
 
 ## Performance and stability gate
 
-The 10,000-entry search/cancellation and the semantic 500-Face long-session diagnostic pass on hosted CI. The following remain stable-v1 blockers until measured on reference hardware or with the required corpus:
+The 10,000-entry search/cancellation and the semantic 500-Face long-session diagnostic pass on hosted CI. Synthetic hostile headers now exercise every supported extension through the bounded Linux inspector, and forced Electron renderer termination is an automated evidence gate. The following remain stable-v1 blockers until measured on reference hardware or with the required corpus:
 
 - responsive 500-Face import and 100 visible review cards;
 - bounded memory over a displayed long Review/Compare session on reference hardware;
-- hostile-font failure containment beyond the proven Linux metadata envelope;
+- hostile-font failure containment with a genuine adversarial multi-format corpus beyond synthetic headers;
 - induced WKWebView content-process termination and recovery;
 - no per-frame font-file reads or unbounded watcher/token growth.
 

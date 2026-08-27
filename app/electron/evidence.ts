@@ -353,12 +353,16 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   if (options.exportHandoff) trace.transactionalHandoff = await options.exportHandoff();
 
   const beforeCrash = await inspectWorkspace(options.window);
+  await writeFile(join(output, "renderer-crash-before.json"), `${JSON.stringify(beforeCrash, null, 2)}\n`, { mode: 0o600 });
+  const crashGone = new Promise<Record<string, unknown>>((resolveGone) => options.window.webContents.once("render-process-gone", (_event, details) => resolveGone({ reason: details.reason, exitCode: details.exitCode })));
   const crashReloaded = new Promise<void>((resolveLoaded) => options.window.webContents.once("did-finish-load", () => resolveLoaded()));
   options.window.webContents.forcefullyCrashRenderer();
+  const crashDetails = await withTimeout("forced renderer termination", crashGone, 20_000);
+  await writeFile(join(output, "renderer-crash-gone.json"), `${JSON.stringify(crashDetails, null, 2)}\n`, { mode: 0o600 });
   await withTimeout("forced renderer crash recovery", crashReloaded, 20_000);
   await waitFor(options.window, "recovered Studio after renderer crash", `document.querySelector('#workspace-heading') && document.activeElement?.id === 'workspace-heading' && document.querySelector('.candidate-row[aria-current="true"] .review-glyph')?.getAttribute('aria-label') === 'Keep'`, 20_000);
   const afterCrash = await inspectWorkspace(options.window);
-  trace.rendererCrashRecovery = { forced: true, before: beforeCrash, after: afterCrash };
+  trace.rendererCrashRecovery = { forced: true, details: crashDetails, before: beforeCrash, after: afterCrash };
 
   const beforeReload = await inspectWorkspace(options.window);
   const loaded = new Promise<void>((resolveLoaded) => options.window.webContents.once("did-finish-load", () => resolveLoaded()));

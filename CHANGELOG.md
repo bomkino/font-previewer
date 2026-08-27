@@ -1,5 +1,16 @@
 # Changelog
 
+## Pre-Mac hardening
+
+- Added bounded subprocess supervision for Linux font metadata and variation inspection, with forced termination, output ceilings, and normalized failures.
+- Added synthetic hostile headers across every supported font extension, strict recovery-envelope parsing, interrupted-Handoff cleanup, and real forced Electron renderer-crash recovery.
+- Denied renderer requests outside the bundled Studio, opaque font capabilities, and an explicit local development origin.
+- Added forced-colors support while retaining reduced-motion behavior.
+- Removed production source maps and added bundle/package inventory, private-path, credential-marker, and application-source-map audits.
+- Embedded installation guidance, SBOM, dependency inventory, licence, and notices in package candidates.
+- Made Linux tar/deb packaging reproducible from `SOURCE_DATE_EPOCH`; repeated local package builds produce identical checksums.
+- Added a hosted native Wayland/Ozone displayed-evidence path alongside X11 and labelled the Mac termination-callback simulation honestly.
+
 ## 0.1.0 — Release candidate
 
 ### Added
