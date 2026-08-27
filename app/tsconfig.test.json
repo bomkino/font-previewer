@@ -17,6 +17,7 @@
     "src/fixture.ts",
     "src/host-bridge.ts",
     "src/protocol.ts",
+    "electron/catalog-index.ts",
     "tests/**/*.ts",
     "tests/**/*.tsx"
   ]

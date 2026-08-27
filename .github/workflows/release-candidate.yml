@@ -89,6 +89,9 @@ jobs:
             .installedCatalog.opaquePreviewUrls == true and
             .installedCatalog.previewAvailable == true and
             .installedCatalog.fontLoaded == true and
+            .installedCatalog.cancellation.acknowledged == true and
+            .installedCatalog.cancellation.obsoleteResultCancelled == true and
+            .installedCatalog.cancellation.durationMs <= 100 and
             (.semanticAudit.unnamed | length) == 0 and
             (.semanticAudit.duplicateIds | length) == 0 and
             .semanticAudit.horizontalOverflow == false and
@@ -231,6 +234,9 @@ jobs:
             .installedCatalog.opaquePreviewUrls == true and
             .installedCatalog.previewAvailable == true and
             .installedCatalog.fontLoaded == true and
+            .installedCatalog.cancellation.acknowledged == true and
+            .installedCatalog.cancellation.obsoleteResultCancelled == true and
+            .installedCatalog.cancellation.durationMs <= 100 and
             .security.attempts == .security.rejected and
             .security.nodeUnavailable == true and
             .keyboardAccessibility.forwardWrap == true and

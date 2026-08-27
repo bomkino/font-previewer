@@ -13,7 +13,8 @@ const inertHost: HostPort = {
     };
     if (request.type === "probe") return { type: "probe-result", serial: request.serial, host: "browser" };
     if (request.type === "open-import") return { type: "import-result", imports: [], rejected: 0, truncated: false };
-    if (request.type === "scan-installed") return { type: "catalog-result", imports: [], indexed: 0, total: 0, rejected: 0, truncated: false };
+    if (request.type === "scan-installed") return { type: "catalog-result", imports: [], indexed: 0, total: 0, rejected: 0, truncated: false, cancelled: false };
+    if (request.type === "cancel-catalog") return { type: "ack", action: "cancel-catalog" };
     if (request.type === "mirror-study") return { type: "mirror-ack", revision: request.revision, recoveryPersisted: false };
     if (request.type === "save-study") return { type: "save-result", revision: request.revision, displayName: "Test.pitchfontstudy", saved: true };
     if (request.type === "export-handoff") return { type: "export-result", displayName: "Test Handoff", exported: true, fileCount: 4 };

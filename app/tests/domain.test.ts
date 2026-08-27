@@ -197,3 +197,26 @@ test("createSession repairs invalid workspace references instead of reviving sta
   assert.equal(repaired.workspace.activeRecipeId, fixture.document.recipes[0].id);
   assert.deepEqual(repaired.workspace.trayIds, [fixture.document.candidates[2].id]);
 });
+
+test("Study parser contains seeded corruption at the portable document seam", () => {
+  const serialized = serializeStudyDocument(createFixtureSession().document);
+  const corruptions: Array<(document: Record<string, any>) => void> = [
+    (document) => { document.schemaVersion = 99; },
+    (document) => { document.sources[1].id = document.sources[0].id; },
+    (document) => { document.sources[0].hint.fileSize = Number.MAX_SAFE_INTEGER + 1; },
+    (document) => { document.faces[0].coverage.supportedCodePointCount = -1; },
+    (document) => { document.candidates[0].faceId = "face:absent"; },
+    (document) => { document.candidates[0].reviewState = "approved"; },
+    (document) => { document.recipes[0].copy = "x".repeat(20_001); },
+    (document) => { document.comparisonSets[0].candidateIds[0] = "candidate:absent"; },
+    (document) => { document.typographySystems[0].fontUses[0].role = "not-a-role"; },
+    (document) => { document.activeSystemId = "system:absent"; },
+  ];
+  let state = 0x1a2b3c4d;
+  for (let index = 0; index < 250; index += 1) {
+    state = (Math.imul(state ^ state >>> 16, 0x45d9f3b) + index) | 0;
+    const document = JSON.parse(serialized) as Record<string, any>;
+    corruptions[(state >>> 0) % corruptions.length](document);
+    assert.throws(() => parseStudyDocument(JSON.stringify(document)), DomainError);
+  }
+});

@@ -77,6 +77,7 @@ const policyLabels: Record<FitPolicy, { label: string; detail: string }> = {
 export interface AppActions {
   readonly importSources: () => void;
   readonly scanInstalled: (query?: string, refresh?: boolean, cursor?: number) => void;
+  readonly cancelCatalog: () => void;
   readonly addCatalogSources: (sourceIds: readonly string[]) => void;
   readonly openStudy: () => void;
   readonly saveStudy: (saveAs: boolean) => void;
@@ -145,9 +146,10 @@ interface NavigatorProps {
   readonly mode: NavigatorMode;
   readonly onModeChange: (mode: NavigatorMode) => void;
   readonly catalog: InstalledCatalogView;
+  readonly catalogBusy: boolean;
 }
 
-export function Navigator({ session, dispatch, actions, mode, onModeChange, catalog }: NavigatorProps) {
+export function Navigator({ session, dispatch, actions, mode, onModeChange, catalog, catalogBusy }: NavigatorProps) {
   const [catalogSearch, setCatalogSearch] = useState(catalog.query);
   const deferredSearch = useDeferredValue(session.workspace.search.trim().toLocaleLowerCase());
   const visibleCandidates = useMemo(() => {
@@ -223,7 +225,7 @@ export function Navigator({ session, dispatch, actions, mode, onModeChange, cata
         <div className="installed-catalog">
           <form className="catalog-tools catalog-search" onSubmit={(event) => { event.preventDefault(); actions.scanInstalled(catalogSearch); }}>
             <label><span className="sr-only">Search installed fonts</span><input type="search" value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder="Search installed fonts" /></label>
-            <div><button type="submit" className="quiet-button">Search</button><button type="button" className="text-button" onClick={() => actions.scanInstalled(catalogSearch, true)}>Rebuild</button></div>
+            <div><button type="submit" className="quiet-button">Search</button><button type="button" className="text-button" onClick={() => actions.scanInstalled(catalogSearch, true)}>Rebuild</button>{catalogBusy ? <button type="button" className="text-button" onClick={actions.cancelCatalog}>Cancel</button> : null}</div>
           </form>
           <p className="catalog-summary" role="status">{catalog.total} {catalog.total === 1 ? "match" : "matches"} · {catalog.indexed} indexed{catalog.truncated ? " · 10,000 limit" : ""}</p>
           <div className="catalog-results" aria-label="Installed font Catalog">

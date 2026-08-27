@@ -246,14 +246,31 @@ export default function App() {
     catalogRequestRef.current = serial;
     setNavigatorMode("catalog");
     setShowWelcome(false);
-    void runTask("Scanning installed fonts", async () => {
-      const response = await host.request({ type: "scan-installed", query: query.slice(0, 200), cursor, limit: CATALOG_PAGE_SIZE, refresh });
-      if (response.type !== "catalog-result") throw new Error("Host returned the wrong catalog response.");
-      if (catalogRequestRef.current !== serial) return;
-      setCatalog({ query: query.slice(0, 200), cursor, imports: response.imports, indexed: response.indexed, total: response.total, rejected: response.rejected, truncated: response.truncated, ...(response.nextCursor === undefined ? {} : { nextCursor: response.nextCursor }) });
-      setNotice(response.indexed ? `${response.total} installed ${response.total === 1 ? "Source" : "Sources"} match. Add only what belongs in this Study.` : "Installed-font Catalog is unavailable in this Host.");
-    });
-  }, [host, runTask]);
+    setBusyTask("Scanning installed fonts");
+    setError("");
+    void (async () => {
+      try {
+        const response = await host.request({ type: "scan-installed", query: query.slice(0, 200), cursor, limit: CATALOG_PAGE_SIZE, refresh });
+        if (response.type !== "catalog-result") throw new Error("Host returned the wrong catalog response.");
+        if (catalogRequestRef.current !== serial || response.cancelled) return;
+        setCatalog({ query: query.slice(0, 200), cursor, imports: response.imports, indexed: response.indexed, total: response.total, rejected: response.rejected, truncated: response.truncated, ...(response.nextCursor === undefined ? {} : { nextCursor: response.nextCursor }) });
+        setNotice(response.indexed ? `${response.total} installed ${response.total === 1 ? "Source" : "Sources"} match. Add only what belongs in this Study.` : "Installed-font Catalog is unavailable in this Host.");
+      } catch (cause) {
+        if (catalogRequestRef.current === serial) setError(cause instanceof Error ? cause.message : "Could not scan installed fonts.");
+      } finally {
+        if (catalogRequestRef.current === serial) setBusyTask(undefined);
+      }
+    })();
+  }, [host]);
+
+  const cancelCatalog = useCallback(() => {
+    catalogRequestRef.current += 1;
+    setBusyTask(undefined);
+    void host.request({ type: "cancel-catalog" }).then((response) => {
+      if (response.type !== "ack" || response.action !== "cancel-catalog") throw new Error("Host did not acknowledge Catalog cancellation.");
+      setNotice("Catalog scan cancelled.");
+    }).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Could not cancel the Catalog scan."));
+  }, [host]);
 
   const addCatalogSources = useCallback((sourceIds: readonly string[]) => {
     const current = sessionRef.current.document;
@@ -358,6 +375,7 @@ export default function App() {
   const actions = useMemo<AppActions>(() => ({
     importSources,
     scanInstalled,
+    cancelCatalog,
     addCatalogSources,
     openStudy,
     saveStudy,
@@ -366,7 +384,7 @@ export default function App() {
     revealSource,
     newStudy,
     loadSample,
-  }), [addCatalogSources, exportHandoff, importSources, loadSample, newStudy, openStudy, relinkSource, revealSource, saveStudy, scanInstalled]);
+  }), [addCatalogSources, cancelCatalog, exportHandoff, importSources, loadSample, newStudy, openStudy, relinkSource, revealSource, saveStudy, scanInstalled]);
 
   const handleMenu = useCallback((command: MenuCommand) => {
     switch (command.type) {
@@ -556,7 +574,7 @@ export default function App() {
       {showWelcome ? <Welcome actions={actions} capabilities={capabilities} /> : (
         <>
           <nav className="stage-nav" aria-label="Workflow stages">{STAGES.map((stage, stageIndex) => <button type="button" key={stage} className={session.workspace.stage === stage ? "is-active" : ""} aria-current={session.workspace.stage === stage ? "step" : undefined} onClick={() => setStage(stage)}><span>{String(stageIndex + 1).padStart(2, "0")}</span>{stageLabels[stage]}</button>)}</nav>
-          <Navigator session={session} index={index} dispatch={dispatch} actions={actions} mode={navigatorMode} onModeChange={setNavigatorMode} catalog={catalog} />
+          <Navigator session={session} index={index} dispatch={dispatch} actions={actions} mode={navigatorMode} onModeChange={setNavigatorMode} catalog={catalog} catalogBusy={busyTask === "Scanning installed fonts"} />
           <Workspace session={session} index={index} dispatch={dispatch} fontStates={fontStates} headingRef={headingRef} actions={actions} capabilities={capabilities} />
           <Inspector key={session.workspace.selectedCandidateId ?? "none"} session={session} dispatch={dispatch} fontStates={fontStates} actions={actions} blindIdentityHidden={blindIdentityHidden} />
           <Tray session={session} dispatch={dispatch} />

@@ -15,6 +15,7 @@ test("HostBridge accepts only the bounded request vocabulary", () => {
   const session = createFixtureSession();
   assert.equal(isHostRequest({ type: "open-import" }), true);
   assert.equal(isHostRequest({ type: "scan-installed", query: "sans", cursor: 0, limit: 80, refresh: false }), true);
+  assert.equal(isHostRequest({ type: "cancel-catalog" }), true);
   assert.equal(isHostRequest({ type: "scan-installed" }), false);
   assert.equal(isHostRequest({ type: "scan-installed", query: "", cursor: 0, limit: 201, refresh: false }), false);
   assert.equal(isHostRequest({ type: "probe", serial: 12 }), true);
@@ -34,10 +35,11 @@ test("import responses carry opaque capabilities, never filesystem paths", () =>
 });
 
 test("installed Catalog responses are independently bounded and paginated", () => {
-  const result = { type: "catalog-result", imports: [validImport()], indexed: 10_000, total: 320, rejected: 0, truncated: false, nextCursor: 80 };
+  const result = { type: "catalog-result", imports: [validImport()], indexed: 10_000, total: 320, rejected: 0, truncated: false, cancelled: false, nextCursor: 80 };
   assert.equal(isHostResponse(result), true);
   assert.equal(isHostResponse({ ...result, nextCursor: 321 }), false);
   assert.equal(isHostResponse({ ...result, total: 10_001 }), false);
+  assert.equal(isHostResponse({ ...result, cancelled: "no" }), false);
   assert.equal(isHostResponse({ ...result, imports: [{ ...validImport(), binding: { ...validImport().binding, previewUrl: "file:///private/font.otf" } }] }), false);
 });
 
@@ -63,4 +65,50 @@ test("launch recovery envelope validates all portable and Host-local seams", () 
   } as const;
   assert.equal(isHostResponse(response), true);
   assert.equal(isHostResponse({ ...response, recovery: { ...response.recovery, revision: -1 } }), false);
+});
+
+test("HostBridge validators contain a deterministic malformed-message corpus", () => {
+  let state = 0x6d2b79f5;
+  const next = () => {
+    state = (Math.imul(state ^ state >>> 15, 1 | state) + 0x6d2b79f5) | 0;
+    return (state >>> 0) / 4_294_967_296;
+  };
+  const atom = () => [null, true, false, "", "x".repeat(2_049), -1, Number.MAX_SAFE_INTEGER + 1, 1.5][Math.floor(next() * 8)];
+  const types = ["scan-installed", "mirror-study", "export-handoff", "probe", "task-progress", "catalog-result", "set-stage", "read-file"];
+  const validators = [isHostRequest, isHostResponse, isHostEvent, isMenuCommand];
+
+  for (let index = 0; index < 1_000; index += 1) {
+    const value = {
+      type: types[Math.floor(next() * types.length)],
+      query: atom(),
+      cursor: atom(),
+      limit: atom(),
+      refresh: atom(),
+      document: { schemaVersion: atom(), nested: [atom(), { value: atom() }] },
+      payload: Array.from({ length: Math.floor(next() * 8) }, atom),
+      unexpected: true,
+    };
+    for (const validate of validators) {
+      assert.doesNotThrow(() => validate(value));
+      assert.equal(validate(value), false);
+    }
+  }
+
+  const edgeCases = [
+    { type: "scan-installed", query: "", cursor: Number.MAX_SAFE_INTEGER + 1, limit: 80, refresh: false },
+    { type: "scan-installed", query: "x".repeat(201), cursor: 0, limit: 80, refresh: false },
+    { type: "cancel-catalog", task: "catalog" },
+    { type: "ack", action: "cancel-catalog", path: "/private/font.otf" },
+    { type: "catalog-result", imports: [], indexed: 0, total: 0, rejected: 0, truncated: false, cancelled: false, nextCursor: 1 },
+    { type: "task-progress", task: "catalog", completed: 2, total: 1 },
+  ];
+  for (const value of edgeCases) {
+    for (const validate of validators) assert.doesNotThrow(() => validate(value));
+  }
+  assert.equal(isHostRequest(edgeCases[0]), false);
+  assert.equal(isHostRequest(edgeCases[1]), false);
+  assert.equal(isHostRequest(edgeCases[2]), false);
+  assert.equal(isHostResponse(edgeCases[3]), false);
+  assert.equal(isHostResponse(edgeCases[4]), false);
+  assert.equal(isHostEvent(edgeCases[5]), false);
 });
