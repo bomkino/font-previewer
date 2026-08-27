@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0-rc.2 — Unreleased
+## 0.1.0-rc.2 — 2026-08-28
 
 ### Changed
 
@@ -22,6 +22,11 @@
 - Made Linux tar/deb packaging reproducible from `SOURCE_DATE_EPOCH`.
 - Added native Wayland/Ozone launch evidence alongside the full X11 displayed journey.
 - Labelled the Mac web-content termination-callback simulation honestly.
+- Made the AppKit/WKWebView Host the default Mac build, run, package, and install path while retaining the SwiftUI implementation as an explicit reference target.
+- Rejected OTF, TTF, WOFF, and WOFF2 inputs when CoreText returns no font descriptors, before any preview capability is issued.
+- Preserved native text-field undo, fixed Save after a focused draft edit, and flushed an acknowledged recovery checkpoint before ordinary quit or last-window close.
+- Added a focusable welcome skip-link destination and a 100-card Review regression surface.
+- Fixed the test launcher in paths containing square brackets and made zero-test runs fail closed.
 
 ### Not claimed
 

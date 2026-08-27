@@ -10,11 +10,11 @@ It imports and inspects fonts, maintains portable `.pitchfontstudy` documents, c
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Current source posture: unreleased `v0.1.0-rc.2` candidate
-- Latest published release: [`v0.1.0-rc.1`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.1), fixed to commit `6ae51f5618387e1e4e39f4816f797da35aaee57b`
+- Current source posture: `v0.1.0-rc.2` prerelease
+- Latest published release: [`v0.1.0-rc.2`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.2)
 - Public stable release: none
 
-Current `main` contains the RC, hardening, and pre-Mac work merged through PRs [#1](https://github.com/bomkino/font-previewer/pull/1), [#2](https://github.com/bomkino/font-previewer/pull/2), and [#3](https://github.com/bomkino/font-previewer/pull/3). The published `v0.1.0-rc.1` remains historically intact and does not include every change on current `main`.
+The published `v0.1.0-rc.1` remains historically intact. `v0.1.0-rc.2` adds the canonical repository, Host hardening, active Mac packaging, exact-SHA release controls, and documentation repair accumulated after that first prerelease.
 
 The exact current repository state, automated evidence, and remaining human gates live in [`docs/maintenance/REPOSITORY_STATE.md`](docs/maintenance/REPOSITORY_STATE.md).
 
@@ -25,7 +25,7 @@ The exact current repository state, automated evidence, and remaining human gate
 - Separate Source, local Binding, Face, Candidate, Recipe, Comparison Set, Font Use, Typography System, and Handoff entities.
 - Exact Face indices, Host-reported metadata, independent Candidate settings, casing, tags, notes, rationale, and review decisions.
 - Variable axes and named instances: CoreText on macOS; a bounded child parser on Linux.
-- Family Groups, duplicate Candidates, Contact Sheet, Focus, Waterfall, blind comparison, fit policies, deck scenes, Role assignment, and Handoff preflight.
+- Family Groups, duplicate Candidates, Contact Sheet, Focus, Waterfall, live two-to-four-font comparison, saved comparison sets, fit policies, deck scenes, Role assignment, and Handoff preflight.
 - Host-owned recovery distinct from intentional Save, with stale-revision rejection and focus restoration.
 - Transactional Handoff staging, checksums, privacy-safe manifests, and explicitly acknowledged Source copying.
 - Native menus and panels, source reveal/relink, semantic undo/redo, and a closed path-free HostBridge.
@@ -60,12 +60,17 @@ npm run electron
 npm run package:linux
 ```
 
-macOS packaging:
+macOS active Host package without installation:
 
 ```bash
-npm run build
-./scripts/build-macos-host.sh
-open "output/macos-host/Font Previewer.app"
+cd ..
+./build-font-previewer-app.command --no-install
+```
+
+Build, verify, install to `/Applications`, and launch:
+
+```bash
+./build-font-previewer-app.command
 ```
 
 `npm run verify` checks version surfaces, strict TypeScript, public-seam tests, production Studio and Host builds, SBOM generation, bundle hygiene, and high-severity npm audit. GitHub Actions adds displayed Host journeys, recovery and Handoff fault injection, accessibility semantics, package round trips, checksums, reproducibility, X11, native Wayland/Ozone smoke, and ad-hoc signature verification.

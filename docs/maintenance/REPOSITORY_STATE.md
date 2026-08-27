@@ -10,32 +10,30 @@ Font Previewer is a local typography decision tool. The active product is the sh
 
 - Canonical branch: `main`
 - Default branch: `main`
-- Remote `main` observed during this review: `806b419f00f6f0662783bef9b00c9bcfd526edb0`
-- Observed tree: `116639a2679b37edf48005b0782b1b337371bf0c`
-- Product-integration commit: `671e9feeebcf39c7333d5abf7296d24b9641e74b`
 - Source version: `0.1.0`
-- Verified product base before repository-only canonicalisation: `f1a6df73246eab2d52b0ac582af8e9f737fcafd0`
-- Current source posture: unreleased `v0.1.0-rc.2` candidate
-- Latest published release: `v0.1.0-rc.1`
-- Published tag commit: `6ae51f5618387e1e4e39f4816f797da35aaee57b`
+- Current source posture: published `v0.1.0-rc.2` prerelease
+- Latest published release: `v0.1.0-rc.2`
+- Exact release source: the commit named by the immutable tag and `SOURCE_SHA` release asset
+- Prior published release: `v0.1.0-rc.1` at `6ae51f5618387e1e4e39f4816f797da35aaee57b`
 - Stable release: none
 
-At the 2026-08-28 readback, remote `main` was a documentation-only child of the product-integration commit. Their `app/` subtree (`3fe70d8a3e66433cf14fcc24b7d2e202764cc301`) and workflow subtree (`f2f61bea38e243a52a08ed0353bd01cafa682766`) were identical; the only intervening file change was the cleanup receipt. The RC, hardening, and pre-Mac product work entered `main` through PRs #1, #2, and #3; repository canonicalisation entered through PR #4.
+The RC, hardening, pre-Mac product work, canonicalisation, and Mac finalisation all reached `main` through reviewed pull requests. Published tags and releases remain immutable; exact source-to-package correspondence is carried by the release tag, workflow run, artifact names, checksums, and `SOURCE_SHA`.
 
 ## Current workflow evidence
 
-- [`Repository truth` run 33120587354](https://github.com/bomkino/font-previewer/actions/runs/33120587354) passed at exact readback `main` commit `806b419f00f6f0662783bef9b00c9bcfd526edb0`.
-- [`Verify Font Previewer` run 33119845596](https://github.com/bomkino/font-previewer/actions/runs/33119845596) passed both macOS and Linux jobs at product-integration commit `671e9feeebcf39c7333d5abf7296d24b9641e74b` and published nine exact-SHA evidence/package artifacts.
-- [`macOS reference` run 33119845491](https://github.com/bomkino/font-previewer/actions/runs/33119845491) passed at that same product-integration commit and published two exact-SHA artifacts.
+- The release workflow accepted only a successful `Verify Font Previewer` run whose `head_sha` equalled the exact current `main` commit.
+- That run produced separately named macOS and Linux evidence/package artifacts with matching `SOURCE_SHA` manifests.
+- The exact-main repository-truth and preserved-reference workflows remained separate gates; a green application workflow is not substituted for either.
+- The public release assets were re-downloaded and checked against `SHA256SUMS` after publication.
 
-The application and reference workflows did not run at `806b419f00f6f0662783bef9b00c9bcfd526edb0`: their path filters excluded the cleanup-receipt-only change. Their successful evidence therefore belongs to `671e9feeebcf39c7333d5abf7296d24b9641e74b`, whose application and workflow subtrees matched the readback `main`; it was not an exact-readback-head run.
+Run IDs, conclusions, artifacts, and the source SHA remain available in GitHub Actions and the immutable release rather than being copied into a self-referential source file.
 
 ## Current GitHub maintenance state
 
-- Open pull requests: none; PRs #1 through #4 are merged.
+- Open release pull requests: none after finalisation.
 - Open stable-v1 gates: issues [#5](https://github.com/bomkino/font-previewer/issues/5), [#6](https://github.com/bomkino/font-previewer/issues/6), and [#7](https://github.com/bomkino/font-previewer/issues/7).
-- Eight reviewed non-`main` branches remain. Their recorded deletion dispositions are unchanged; no branch deletion was performed during this readback.
-- `main` has no branch protection or repository ruleset, and automatic merged-branch deletion is disabled. These are repository-maintenance gaps, not product verification failures.
+- Superseded remote working branches are disposable after their commits and PR history are verified reachable from `main` or preserved tags.
+- Force-push and deletion protection belongs on `main`; merged working branches should be deleted automatically.
 
 ## Platform posture
 
@@ -66,15 +64,15 @@ The application and reference workflows did not run at `806b419f00f6f0662783bef9
 - Human typography, native-interface, and competent complex-script review.
 - Independent clean-machine Study/Handoff reconstruction.
 - Reference-hardware import, scrolling, long-session, and memory measurements.
-- Hostile cross-format font corpus beyond current synthetic/malformed fixtures.
+- Broader hostile cross-format font corpus beyond the retained disposable 24-case/mutated-font run.
 - Induced WKWebView content-process termination on a packaged real session.
-- Developer ID signing/notarisation only if that distribution path is deliberately adopted.
+- Developer ID signing/notarisation is outside the current free distribution path; it would require a separate future decision.
 
 These gates prohibit stable `v1.0.0`, broad support claims, attended accessibility claims, and production signing/notarisation claims. They do not make current verified source unsuitable for canonical `main`.
 
 ## Release posture
 
-The latest public prerelease remains intact. Current source is newer and unreleased. `.github/workflows/release.yml` is manual, exact-SHA guarded, exact-run guarded, non-overwriting, and dry-run first. No automatic release occurs on a push, PR, tag, or successful verification run.
+`v0.1.0-rc.2` is the latest public prerelease. `.github/workflows/release.yml` remains manual, exact-SHA guarded, exact-run guarded, non-overwriting, and dry-run first. No later release occurs automatically on a push, PR, tag, or successful verification run.
 
 ## Current documents
 
