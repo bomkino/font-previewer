@@ -129,7 +129,7 @@ jobs:
           runtime="$RUNNER_TEMP/font-previewer-wayland-runtime"
           mkdir -p "$runtime"
           chmod 700 "$runtime"
-          XDG_RUNTIME_DIR="$runtime" weston --backend=headless-backend.so --socket=wayland-font-previewer --idle-time=0 --log="$RUNNER_TEMP/weston.log" &
+          XDG_RUNTIME_DIR="$runtime" weston --backend=headless-backend.so --use-pixman --socket=wayland-font-previewer --idle-time=0 --log="$RUNNER_TEMP/weston.log" &
           weston_pid=$!
           cleanup_wayland() { kill "$weston_pid" 2>/dev/null || true; wait "$weston_pid" 2>/dev/null || true; }
           trap cleanup_wayland EXIT
@@ -144,7 +144,6 @@ jobs:
             dbus-run-session -- npm run electron -- \
               --ozone-platform=wayland \
               --enable-features=UseOzonePlatform \
-              --disable-gpu \
               --disable-dev-shm-usage
           jq -e '
             .platform == "linux" and
