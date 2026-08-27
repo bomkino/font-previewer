@@ -1,18 +1,20 @@
 # Font Previewer application
 
-This directory contains the v0.1 shared Studio and both thin desktop Hosts.
+This directory contains the active shared Studio and the two desktop Hosts. The root `macos/` directory is a preserved native reference, not this application.
 
 ## Layout
 
 - `src/` — React/TypeScript Studio, Study v4 domain, Family Groups, runtime font registry, and HostBridge protocol.
-- `electron/` — sandboxed Linux Host, font inspection, transactional Handoff, storage, preload, and displayed evidence runner.
+- `electron/` — sandboxed Linux Host, bounded font inspection, transactional Handoff, storage, preload, and displayed evidence runner.
 - `macos/FontPreviewerHost.swift` — AppKit/WKWebView Host with CoreText discovery, native menus/panels, persistence, export, and displayed evidence runner.
-- `tests/` — public-seam domain, protocol, Catalog, grouping, Host utility, and rendered-surface tests.
-- `scripts/` — SBOM, Linux packaging, and macOS app assembly.
+- `tests/` — public-seam domain, protocol, Catalog, grouping, migration, recovery, Handoff, accessibility, and Host tests.
+- `scripts/` — deterministic test/build cleanup, version checks, SBOM generation, package audits, Linux packaging, and macOS assembly.
+
+Source version is `0.1.0`. Current `main` is preparing the unreleased `v0.1.0-rc.2` candidate; the latest published prerelease is `v0.1.0-rc.1`.
 
 ## Prerequisites
 
-- Node.js 24+
+- Node.js `24.19.0` or compatible Node.js 24
 - Linux: Fontconfig, GTK/Electron runtime libraries, and `dpkg-deb` for `.deb` assembly
 - macOS: macOS 13+ and Apple command-line developer tools
 
@@ -23,7 +25,7 @@ npm ci
 npm run electron:install
 ```
 
-Electron binary acquisition is explicit; the package does not download it during `npm ci`.
+Electron acquisition is explicit; `npm ci` does not silently download the runtime.
 
 ## Development
 
@@ -40,7 +42,7 @@ npm run build
 npm run electron
 ```
 
-The browser fallback can import browser-readable files and download a Study, but it deliberately reports native Catalog, recovery, source reveal, and transactional Handoff as unavailable.
+The browser fallback can import browser-readable files and download a Study. It deliberately reports native Catalog, recovery, source reveal, and transactional Handoff as unavailable.
 
 ## Verification
 
@@ -48,7 +50,18 @@ The browser fallback can import browser-readable files and download a Study, but
 npm run verify
 ```
 
-This runs strict renderer types, public-seam tests, the production Studio bundle, Electron main/preload compilation, CycloneDX generation, and `npm audit --audit-level=high`.
+This runs:
+
+1. version-surface consistency;
+2. strict renderer types;
+3. public-seam tests;
+4. production Studio bundle;
+5. Electron main/preload compilation;
+6. bundle inventory and private-data checks;
+7. CycloneDX SBOM generation;
+8. `npm audit --audit-level=high`.
+
+The full hosted gate is [`.github/workflows/verify.yml`](../.github/workflows/verify.yml). It adds displayed Electron and WKWebView journeys, Catalog and migration tests, malformed-input rejection, recovery and transactional Handoff fault injection, forced Electron renderer recovery, accessibility semantics, X11 and native Wayland/Ozone evidence, package round trips, package-content/privacy audits, checksums, reproducibility, and macOS ad-hoc signature verification.
 
 ## Package candidates
 
@@ -79,14 +92,12 @@ Outputs under `output/macos-host/`:
 - `Font Previewer.zip`
 - `Font Previewer.zip.sha256`
 
-The current Mac package is ad-hoc signed for verification. Developer ID signing, hardened runtime, notarization, and stapling are intentionally not claimed.
+The Mac package enables hardened runtime and is signed ad hoc for integrity checks. It is not Developer-ID signed or notarised. No Gatekeeper acceptance claim follows from CI.
 
-Both package paths include the project licence and third-party notices. Linux additionally retains Electron/Chromium licence payloads.
+Both package paths include the project licence, third-party notices, installation guidance, and SBOM. Linux additionally retains required Electron/Chromium licence payloads.
 
-## Displayed evidence
+## Evidence controls
 
-`.github/workflows/release-candidate.yml` runs the exact branch tree on Ubuntu 24.04 under Xvfb/D-Bus and on a macOS 14 arm64 runner. It hard-fails on malformed bridge acceptance, missing native routes, unnamed controls, page overflow or Inspector-help collision, Catalog path leakage or implicit Study mutation, font-load failure, reload/focus loss, broken checksums, missing notices, or package-integrity errors. Each Host retains six states, including a dedicated installed-Catalog view.
+`FONT_PREVIEWER_EVIDENCE_DIR` and `FONT_PREVIEWER_MAC_EVIDENCE_DIR` are CI evidence controls. They run a destructive fixture journey and exit; do not set them for normal use.
 
-`FONT_PREVIEWER_EVIDENCE_DIR` and `FONT_PREVIEWER_MAC_EVIDENCE_DIR` are CI evidence controls. They run a destructive fixture journey and quit; do not set them for normal use.
-
-See [`REPORT.md`](REPORT.md) for the exact verified commit and remaining human gates.
+See [`REPORT.md`](REPORT.md) for current implementation status and [`../docs/maintenance/REPOSITORY_STATE.md`](../docs/maintenance/REPOSITORY_STATE.md) for canonical repository truth.

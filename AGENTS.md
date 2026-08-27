@@ -2,225 +2,100 @@
 
 ## Mission
 
-Build one local typography-decision product delivered as:
+Maintain one local typography-decision product delivered through:
 
-- a Mac AppKit/WKWebView Host using the shared Studio;
-- a first-class Linux Electron Host using the same Study semantics and Studio.
+- a macOS AppKit/WKWebView Host using the shared Studio;
+- a Linux Electron Host using the same Study semantics and Studio.
 
-The root SwiftUI/CoreText Mac application is a preserved reference, not the active product.
+The root SwiftUI/CoreText application is preserved reference material, not the active package.
 
-## Before any task
+## Current truth
 
-Read:
+Read these before changing product or release claims:
 
-1. `00_MASTER_HANDOFF.md`
-2. relevant Product/UX section
-3. `03_DOMAIN_MODEL.md`
-4. accepted ADRs
-5. current STATUS
-6. current ticket
-7. `12_TEST_SECURITY_RELEASE.md`
-8. relevant reference-branch code
+1. `docs/maintenance/REPOSITORY_STATE.md`
+2. `docs/ARCHITECTURE.md`
+3. `docs/QA.md`
+4. `docs/maintenance/BRANCH_POLICY.md`
+5. `docs/maintenance/RELEASE_POLICY.md`
+6. the relevant ADR or historical programme source when needed
 
-## Authority
-
-Accepted ADR > Master Handoff > Product Spec > Domain Model > Architecture > current decision/ticket > implementation comment.
-
-Surface conflict. Do not silently choose.
+`main` is canonical. Old RC, hardening, pre-Mac, publishing, prototype, and agent branch names are history, not architecture.
 
 ## Domain invariants
 
 - Source ≠ Face.
 - Face ≠ Candidate.
 - Candidate ≠ Font Use.
-- Family is not identity.
-- Catalog is Host-local.
-- Study is portable.
+- Family is grouping evidence, not identity.
+- Catalog is Host-local; Study is portable.
 - Recipe ≠ Scene.
 - Review State ≠ Tag.
 - local Source Binding ≠ portable Source hint.
-- recovery ≠ intentional save.
+- recovery ≠ intentional Save.
 - Handoff ≠ automatic Source package.
 - new Candidates are Unreviewed.
 
 ## Product invariants
 
-- Review / Compare / System / Handoff.
-- Inspect contextual.
-- no deck builder.
-- no font manager.
-- no taste score.
-- no fake Figma integration.
-- no cloud/account/analytics.
-- no required network.
-- no source copying by default.
-- no cross-platform pixel-parity claim.
+- Review → Compare → System → Handoff.
+- Inspect remains contextual.
+- No deck builder, font manager, taste score, cloud/account/analytics layer, or fake Figma integration.
+- No required network.
+- No source copying without the explicit Handoff rights acknowledgement and selected policy.
+- No cross-platform raster-parity claim.
+- No FontBlind anonymisation, transformation, mechanical oblique, interpolation, or font-packaging implementation.
 
 ## Architecture invariants
 
-Accepted:
-
-- one product, two Hosts;
-- shared semantics;
-- platform-native privileged operations;
-- durable IDs;
-- Catalog/Study separation;
-- explicit Render Profile;
-- expand–contract migration.
-
-Open programme/release decisions:
-
-- full shared Studio;
-- interactive renderer path;
-- Study authority/durability;
-- Linux backend;
-- Mac sandbox/document/XPC;
-- final renderer and format tiers;
-- Mac sandbox/signing/document/process-isolation policy;
-- Linux package matrix;
-- production merge and release.
-
-The `codex/v1-release-candidate` implementation is evidence for leading hypotheses. It does not silently accept them.
-
-Do not treat a leading hypothesis as accepted.
+- One product, two Hosts, shared semantics.
+- Privileged operations stay platform-native and outside the Studio.
+- Durable IDs are not paths, names, PostScript names, or digests.
+- Catalog and Study remain separate.
+- HostBridge is closed, path-free, runtime-validated, and bounded.
+- Study migration is explicit and fail-closed.
+- Font files, Studies, bridge messages, recovery data, and Handoff destinations are untrusted.
 
 ## Security
 
-Fonts and Studies are untrusted.
-
-- no arbitrary filesystem in web renderer;
-- no path-bearing preview URL;
-- runtime-validate bridge;
-- sandbox Electron;
-- bundled local web content only;
-- process-isolate parsing/rendering where accepted;
-- bound scan/file/task/memory/time;
-- canonicalize paths;
-- protect symlink/package traversal;
-- redact logs;
-- stage exports;
-- clean cancellation;
-- no font/private binary in Git.
+- No arbitrary filesystem access in web content.
+- No path-bearing preview URL.
+- Electron remains sandboxed with context isolation and no Node integration.
+- WKWebView uses bounded local schemes and a named content world.
+- Parsing, traversal, tasks, output, memory, and time remain bounded.
+- Canonicalize paths; reject symlink/package traversal; redact logs; clean failed staging.
+- Never commit paid, client, copied system, private, or mystery font binaries.
 
 ## Development
 
-### Prototypes
+- Work on a temporary branch from current `main`.
+- Keep one coherent product change per PR where practical.
+- Test at agreed public seams, not private implementation details.
+- Add abstractions only for a demonstrated product or security need.
+- Preserve the native reference until a deliberate replacement decision records equivalent evidence.
+- Do not publish, move tags, overwrite releases, add credentials, or change distribution claims without explicit owner authorization.
 
-- one question;
-- throwaway branch;
-- runnable;
-- measured;
-- no broad architecture;
-- accept/reject ADR;
-- archive/delete losing code.
+## Required verification
 
-### Production
+```bash
+cd app
+npm ci
+npm run electron:install
+npm run verify
+```
 
-- one vertical ticket;
-- blockers closed;
-- one branch;
-- smallest complete user path;
-- one writer per shared package;
-- fresh verification;
-- coherent commit;
-- no merge.
+Application and release changes must also pass `.github/workflows/verify.yml` at the exact proposed head. Semantic labels are not an attended screen-reader pass. Hosted package journeys are not independent-machine evidence. An ad-hoc signature is not Developer ID signing or notarisation.
 
-### Refactors
+## Completion record
 
-Only when:
+Record:
 
-- required by ticket;
-- makes the change easy;
-- deepens a real module;
-- improves locality/leverage;
-- or removes measured friction.
-
-Do not perform architecture gardening.
-
-## Testing
-
-Only at agreed public seams:
-
-- Study Session;
-- HostBridge;
-- Render Service;
-- Catalog/Binding;
-- Handoff Builder;
-- packaged App.
-
-No:
-
-- private-method tests;
-- tautologies;
-- test-count target;
-- broad snapshots;
-- Mac/Linux pixel equality;
-- accessibility-by-label-only.
-
-## UI
-
-- typography dominates;
-- stable geometry;
-- progressive loading;
-- keyboard complete;
-- semantic equivalent for visual assets;
-- no shortcut while editing;
-- no color-only state;
-- advanced evidence disclosed contextually;
-- Mac does not imitate Electron;
-- Linux does not imitate Mac chrome.
-
-## Performance
-
-- no UI-thread parse/render;
-- visible-first scheduling;
-- cancellation;
-- bounded cache;
-- virtualized Catalog;
-- no whole Catalog in Study;
-- measure reference hardware;
-- preserve provisional budgets until evidence revises them.
-
-## Open-source use
-
-Before direct code/dependency:
-
-- exact version;
-- licence/transitives;
-- notice;
-- security/maintenance;
-- product need;
-- seam;
-- removal plan;
-- SBOM.
-
-GPL product references are patterns unless licence posture deliberately changes.
-
-## Repository safety
-
-- preserve `codex/native-macos-font-lab` reference;
-- no paid/client Fonts;
-- no private exports;
-- clean status;
-- one coherent commit;
-- report base/head;
-- no merge;
-- no release/deploy.
-
-## Completion report
-
-Must include:
-
-- branch;
-- base/head;
-- files;
-- user behavior/decision;
-- commands;
-- evidence;
-- performance/security impact;
-- limitations;
-- risks changed;
-- docs/status;
-- not-merged state.
+- base and exact head SHA;
+- files and behavior changed;
+- commands and workflow run;
+- package/checksum evidence;
+- security, privacy, performance, and accessibility impact;
+- claims newly supported;
+- limitations and gates still open.
 
 Never claim completion without fresh evidence.

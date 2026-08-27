@@ -1,61 +1,75 @@
 # Font Previewer QA
 
-## Automated release-candidate gate
+## Reproducible local gate
+
+From a fresh checkout with Node.js 24:
+
+```bash
+cd app
+npm ci
+npm run electron:install
+npm run verify
+```
 
 `npm run verify` must pass:
 
-1. strict Studio types;
-2. public-seam domain, grouping, protocol, Host-utility, and rendered-surface tests;
-3. production Studio bundle;
-4. Electron main and sandboxed preload compilation;
-5. CycloneDX SBOM generation;
-6. high-severity npm audit.
+1. source/package/version consistency;
+2. strict Studio types;
+3. public-seam domain, migration, grouping, protocol, Host-utility, accessibility, and rendered-surface tests;
+4. production Studio bundle;
+5. Electron main and sandboxed preload compilation;
+6. bundle inventory and private-data audit;
+7. CycloneDX SBOM generation;
+8. high-severity npm audit.
 
-The test runner removes the compiled test directory before every run, plants a deliberately failing stale artifact, and proves that no stale output survives before it discovers the freshly emitted tests explicitly.
+The test runner removes compiled output before every run, plants a deliberately failing stale artifact, and proves that only newly emitted test files execute.
 
-The cross-Host workflow additionally requires:
+## Exact-head hosted gate
 
-- a real displayed Electron run under Xvfb and isolated D-Bus;
-- a native Wayland/Ozone launch-and-render smoke under a headless compositor with `DISPLAY` absent; the complete displayed journey remains the X11 gate because hosted Weston has no input seat;
-- a real displayed AppKit/WKWebView run on macOS;
-- native menu and panel routes;
-- semantic undo/redo and keyboard-collision checks;
-- named interactive controls, no duplicate IDs, no page overflow, and no Inspector-help collision;
-- malformed/path-bearing bridge-request rejection;
-- deterministic malformed-input corpora: 1,000 bridge messages and 250 corrupt Study documents;
-- actual installed Catalog discovery and font loading through an opaque URL;
-- no Study mutation from Catalog browsing;
-- explicit Catalog cancellation with acknowledgement within 100 ms and obsolete-result rejection;
-- a bounded 10,000-entry synthetic Catalog workload with a provisional 75 ms search budget;
-- exact Linux collection-face metadata and rejection of malformed/truncated metadata plus an actual truncated font file;
-- a retained 500-Face, 2,000-operation, 100-recovery-round-trip diagnostic on both runner architectures;
-- transactional Handoff and durable recovery;
-- injected atomic-save and Handoff-commit failures that preserve prior data and remove staging residue;
-- reload with review decision and workspace focus restored;
-- forced Electron renderer termination with automatic recovery, preserved decision, and restored focus;
-- six non-empty screenshots/snapshots per Host, including the installed Catalog, and a Chromium AX tree;
-- packaged licence/notices, checksums, ad-hoc Mac signature integrity, package structure, and Linux sandbox ownership;
-- a displayed journey from the extracted Mac ZIP, extracted Linux archive, and installed Linux `.deb`, followed by package/file removal assertions.
-- two byte-identical Linux package builds plus payload inventory, private-path, credential-marker, and application-source-map audits.
+`.github/workflows/verify.yml` checks the exact pull-request head or push SHA. A successful run on another commit is not evidence for the candidate.
 
-## Current automated result
+### Linux Host
 
-- Remote product/evidence commit: `5d368650436bd2b1aca6f7efdf8825087a65d4e3`
-- Exact tree: `ebfbce480d26e05d75cdd6f5b2a0a92d24883dd9`
-- Exact-head workflow: [33043015559](https://github.com/bomkino/font-previewer/actions/runs/33043015559)
-- Tests: Linux 28/28; Mac 27 pass plus one Linux-only skip
-- Audit: zero known vulnerabilities
-- Mac and Linux displayed/package jobs: pass
-- 10,000-entry warm-search p95: 0.408 ms on hosted Linux; 0.253 ms on hosted Mac
-- 500-Face soak: stable counts across 2,000 operations/100 recovery round trips; final post-GC heap growth about 1.55 MB on each Host
-- Catalog cancellation: 3.9 ms in the primary hosted Linux journey; 15 ms in the primary hosted Mac journey
-- Package, displayed, package-smoke, and soak artifacts: [exact-head workflow](https://github.com/bomkino/font-previewer/actions/runs/33043015559), eight retained exact-SHA archives
+- Install the locked Node/Electron dependencies on Ubuntu 24.04.
+- Run the complete verification suite and prove tracked source remains unchanged.
+- Run a retained 500-Face, 2,000-operation, 100-recovery-round-trip diagnostic.
+- Launch the displayed Electron Host under Xvfb and isolated D-Bus.
+- Reject malformed and path-bearing bridge messages; prove Node is unavailable in the renderer.
+- Exercise keyboard wrap, return focus, semantic labels, duplicate-ID checks, overflow checks, and Inspector/help separation.
+- Discover and page the installed Catalog; prove opaque preview URLs, actual font loading, bounded results, cancellation acknowledgement, obsolete-result rejection, and no implicit Study mutation.
+- Save/recover and perform transactional Handoff.
+- Force Electron renderer termination and prove automatic reload, decision preservation, and focus restoration.
+- Capture six non-empty displayed states and verify evidence checksums.
+- Launch the native Wayland/Ozone path under a headless compositor with `DISPLAY` absent and prove a rendered Studio state.
+- Build `.deb` and portable packages twice; require byte-identical checksum manifests.
+- Audit package inventory, local/private paths, credential markers, source maps, licences, notices, SBOM, and font binaries.
+- Extract and launch the portable package.
+- Install, launch, exercise, remove, and residue-check the Debian package.
+- Verify root-owned mode-4755 Chromium sandbox helper and package checksums.
+- Add `SOURCE_SHA` to the exact-SHA package artifact.
 
-Hosted-runner measurements are diagnostic, not universal performance claims. The package round trips use disposable hosted runners; they do not replace an independent clean-machine matrix.
+### macOS Host
+
+- Install locked Studio dependencies without downloading Electron.
+- Verify the shared Studio and prove tracked source remains unchanged.
+- Run the retained 500-Face long-session diagnostic.
+- Build the AppKit/WKWebView Host and embed the production Studio, licence, notices, SBOM, and installation guidance.
+- Enable hardened runtime, sign ad hoc, and verify the signature deeply and strictly.
+- Run the displayed Host, native menu/panel routes, installed Catalog, opaque font loading, cancellation, keyboard/focus/semantic checks, recovery, and transactional Handoff fault injection.
+- Label the termination-callback recovery exercise as a simulation; do not claim a real induced WebKit content-process crash.
+- Capture six non-empty displayed states.
+- Extract the packaged ZIP, reverify signature, run the package journey, and remove the extracted app.
+- Verify package ZIP checksum and add `SOURCE_SHA` to the exact-SHA artifact.
+
+## Automated evidence boundaries
+
+Hosted-runner measurements are diagnostic, not universal performance claims. Xvfb, headless Weston, and hosted macOS cannot prove independent hardware, every compositor/driver, native feel, or attended accessibility. Automated semantic labels cannot stand in for VoiceOver or Orca.
+
+The exact final verified commit, run links, job results, package names, and checksums are recorded in [`maintenance/REPOSITORY_STATE.md`](maintenance/REPOSITORY_STATE.md) and [`maintenance/REPOSITORY_CLEANUP_2026-08-27.md`](maintenance/REPOSITORY_CLEANUP_2026-08-27.md). Historical RC evidence remains under [`archive/2026-08-27/`](archive/2026-08-27/).
 
 ## Human stable-v1 matrix
 
-Automation cannot judge typography, screen-reader usability, native feel, or redistribution rights. Before a supported stable v1.0, use legally held fonts covering:
+Automation cannot judge typography, screen-reader usability, native feel, or redistribution rights. Before a supported stable `v1.0.0`, use legally held fonts covering:
 
 - static CFF OTF and TrueType;
 - one-axis and multi-axis variable families;
@@ -69,40 +83,41 @@ Automation cannot judge typography, screen-reader usability, native feel, or red
 Run the complete journey:
 
 - browse Catalog without changing the Study;
-- search and page a large Catalog, rebuild, and cancel/leave during work;
+- search, page, rebuild, cancel, and leave during Catalog work;
 - add one Source and one visible Family Group;
-- duplicate a variable Candidate and prove settings/decisions stay independent;
+- duplicate a variable Candidate and prove settings/decisions remain independent;
 - Review, Compare, assign Roles, Save, quit/recover, reopen on the other Host, relink, and export;
 - cancel every native panel and Handoff;
-- include Sources once without permission and once with explicit permission;
-- compare live Review/Compare/System with PNG/PDF outputs.
+- attempt Source copying without rights acknowledgement, then repeat with explicit acknowledgement and a legally redistributable font;
+- compare live Review/Compare/System with PNG/PDF outputs;
+- reconstruct the Handoff independently from its manifest and checksums.
 
 ## Accessibility gate
 
 - Traverse the packaged Mac app with VoiceOver and Linux app with Orca.
-- Confirm Family, style, decision, Role, grouping confidence, and source state are understandable.
+- Confirm Family, style, decision, Role, grouping confidence, and Source state are understandable.
 - Operate all decisions, comparison, Role assignment, Save, and Handoff without a pointer.
 - Confirm modal focus trap, Escape close, return focus, stage focus, and native-panel return focus.
-- Test increased contrast, reduced transparency, keyboard repeat, and minimum window size.
-- Record findings; semantic labels alone are not a screen-reader pass.
+- Test increased contrast, reduced transparency, forced colours, reduced motion, keyboard repeat, and minimum window size.
+- Record findings and exact package SHA. Semantic labels alone are not a screen-reader pass.
 
-## Performance and stability gate
+## Performance and containment gate
 
-The 10,000-entry search/cancellation and the semantic 500-Face long-session diagnostic pass on hosted CI. Synthetic hostile headers now exercise every supported extension through the bounded Linux inspector, and forced Electron renderer termination is an automated evidence gate. The following remain stable-v1 blockers until measured on reference hardware or with the required corpus:
+The synthetic 10,000-entry Catalog workload, cancellation contract, semantic 500-Face soak, malformed protocol/Study corpora, and synthetic hostile headers are automated. Stable `v1.0.0` still requires:
 
-- responsive 500-Face import and 100 visible review cards;
-- bounded memory over a displayed long Review/Compare session on reference hardware;
-- hostile-font failure containment with a genuine adversarial multi-format corpus beyond synthetic headers;
+- responsive 500-Face import and 100 visible review cards on reference hardware;
+- bounded memory over a displayed long Review/Compare session;
+- genuine adversarial multi-format font containment beyond synthetic headers;
 - induced WKWebView content-process termination and recovery;
 - no per-frame font-file reads or unbounded watcher/token growth.
 
 ## Distribution gate
 
-- Repeat install, launch, Save, recover, export, and uninstall on independent clean supported Linux images; the disposable Ubuntu 24.04 hosted-runner round trip is already green.
-- Repeat portable extraction and launch on an independent machine; the hosted-runner archive preserves the root-owned mode-4755 sandbox helper and completes the displayed journey.
-- Build Mac arm64 with hardened runtime. Developer ID signing, notarization, stapling, and Gatekeeper verification apply only if that future distribution model is adopted; v0.1 is explicitly ad-hoc and unnotarized.
-- Decide and test RPM if included in V1.
-- Verify notices/SBOM/checksums against the exact source SHA.
-- Owner authorization is recorded in [`programme/RELEASE_DECISION_PACKET.md`](programme/RELEASE_DECISION_PACKET.md); exact-head CI must still pass before every publication.
+- Repeat install, launch, Save, recover, export, and uninstall on independent clean supported Linux images.
+- Repeat portable extraction and launch on an independent machine while preserving sandbox ownership safely.
+- Repeat the packaged macOS journey on an independent compatible Mac.
+- Verify notices, SBOM, checksums, package contents, and `SOURCE_SHA` against the exact intended commit.
+- Adopt Developer ID signing, notarisation, stapling, and Gatekeeper verification only if that future distribution model is deliberately chosen and credentials are supplied.
+- Obtain explicit owner authorization before any public release.
 
-No source font, Study, recovery file, Handoff, absolute client path, signing secret, or notarization credential may enter Git or CI artifacts.
+No source font, Study, recovery file, Handoff, absolute client path, username, email address, signing secret, notarisation credential, or internal handover payload may enter Git or CI artifacts.

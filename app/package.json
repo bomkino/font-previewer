@@ -17,7 +17,8 @@
     "package:linux": "npm run build && node scripts/package-linux.mjs && npm run audit:package",
     "sbom": "node scripts/build-sbom.mjs",
     "test": "node scripts/run-tests.mjs",
-    "verify": "npm run build && npm run sbom && npm audit --audit-level=high"
+    "verify": "npm run version:check && npm run build && npm run sbom && npm audit --audit-level=high",
+    "version:check": "node scripts/check-version.mjs"
   },
   "dependencies": {
     "fontkit": "2.0.4",

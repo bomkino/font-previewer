@@ -1,27 +1,26 @@
-name: Font Previewer release candidate
+name: Verify Font Previewer
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-      - codex/v1-release-candidate
-      - codex/v1-release-candidate-hardening-*
-      - codex/v0.2-pre-mac
+    branches: [main]
     paths:
-      - ".github/workflows/release-candidate.yml"
+      - ".github/workflows/verify.yml"
       - "app/**"
   pull_request:
     paths:
-      - ".github/workflows/release-candidate.yml"
+      - ".github/workflows/verify.yml"
       - "app/**"
 
 permissions:
   contents: read
 
 concurrency:
-  group: font-previewer-rc-${{ github.ref }}
+  group: font-previewer-verify-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
+
+env:
+  VERIFIED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   linux:
@@ -34,6 +33,11 @@ jobs:
     steps:
       - name: Check out exact source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ env.VERIFIED_SHA }}
+
+      - name: Verify exact checkout
+        run: test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -42,6 +46,9 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
           package-manager-cache: false
+
+      - name: Verify version surfaces
+        run: npm run version:check
 
       - name: Install displayed-app dependencies
         run: |
@@ -65,6 +72,9 @@ jobs:
 
       - name: Verify types, tests, bundles, SBOM, and audit
         run: npm run verify
+
+      - name: Assert verification did not change tracked source
+        run: git diff --exit-code
 
       - name: Run 500-face long-session diagnostic
         env:
@@ -172,11 +182,13 @@ jobs:
           node scripts/package-linux.mjs
           cmp "$RUNNER_TEMP/first-package-checksums.sha256" release/checksums.sha256
           npm run audit:package
+          printf '%s\n' "$VERIFIED_SHA" > release/SOURCE_SHA
 
       - name: Inspect Linux packages
         run: |
           cd release
           sha256sum -c checksums.sha256
+          test "$(cat SOURCE_SHA)" = "$VERIFIED_SHA"
           dpkg-deb --info font-previewer_0.1.0_amd64.deb
           dpkg-deb --contents font-previewer_0.1.0_amd64.deb | grep -q -- '-rwsr-xr-x root/root.*chrome-sandbox'
           dpkg-deb --contents font-previewer_0.1.0_amd64.deb | grep -q 'usr/bin/font-previewer -> ../../opt/font-previewer/font-previewer'
@@ -248,7 +260,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: font-previewer-linux-package-smoke-${{ github.sha }}
+          name: font-previewer-linux-package-smoke-${{ env.VERIFIED_SHA }}
           path: ${{ runner.temp }}/font-previewer-linux-package-smoke
           if-no-files-found: warn
           retention-days: 14
@@ -257,7 +269,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: font-previewer-linux-evidence-${{ github.sha }}
+          name: font-previewer-linux-evidence-${{ env.VERIFIED_SHA }}
           path: ${{ runner.temp }}/font-previewer-linux-evidence
           if-no-files-found: error
           retention-days: 14
@@ -266,7 +278,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: font-previewer-linux-soak-${{ github.sha }}
+          name: font-previewer-linux-soak-${{ env.VERIFIED_SHA }}
           path: ${{ runner.temp }}/font-previewer-linux-soak
           if-no-files-found: error
           retention-days: 14
@@ -275,7 +287,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: font-previewer-wayland-evidence-${{ github.sha }}
+          name: font-previewer-wayland-evidence-${{ env.VERIFIED_SHA }}
           path: ${{ runner.temp }}/font-previewer-wayland-evidence
           if-no-files-found: warn
           retention-days: 14
@@ -284,11 +296,12 @@ jobs:
         if: success()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: font-previewer-linux-${{ github.sha }}
+          name: font-previewer-linux-${{ env.VERIFIED_SHA }}
           path: |
             app/release/Font-Previewer-0.1.0-linux-x64.tar.gz
             app/release/font-previewer_0.1.0_amd64.deb
             app/release/checksums.sha256
+            app/release/SOURCE_SHA
           if-no-files-found: error
           retention-days: 30
 
@@ -302,6 +315,11 @@ jobs:
     steps:
       - name: Check out exact source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ env.VERIFIED_SHA }}
+
+      - name: Verify exact checkout
+        run: test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -310,6 +328,9 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
           package-manager-cache: false
+
+      - name: Verify version surfaces
+        run: npm run version:check
 
       - name: Inspect Apple toolchain
         run: |
@@ -327,6 +348,9 @@ jobs:
 
       - name: Verify shared Studio
         run: npm run build
+
+      - name: Assert verification did not change tracked source
+        run: git diff --exit-code
 
       - name: Run 500-face long-session diagnostic
         env:
@@ -353,6 +377,7 @@ jobs:
             cd "$RUNNER_TEMP/font-previewer-macos-build"
             test "$(cut -c 67- 'Font Previewer.zip.sha256')" = "Font Previewer.zip"
             shasum -a 256 -c "Font Previewer.zip.sha256"
+            printf '%s\n' "$VERIFIED_SHA" > SOURCE_SHA
           )
 
       - name: Run displayed WKWebView release evidence
@@ -479,7 +504,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: font-previewer-macos-package-smoke-${{ github.sha }}
+          name: font-previewer-macos-package-smoke-${{ env.VERIFIED_SHA }}
           path: ${{ runner.temp }}/font-previewer-macos-package-smoke
           if-no-files-found: warn
           retention-days: 14
@@ -488,7 +513,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: font-previewer-macos-evidence-${{ github.sha }}
+          name: font-previewer-macos-evidence-${{ env.VERIFIED_SHA }}
           path: ${{ runner.temp }}/font-previewer-macos-evidence
           if-no-files-found: warn
           retention-days: 14
@@ -497,7 +522,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: font-previewer-macos-soak-${{ github.sha }}
+          name: font-previewer-macos-soak-${{ env.VERIFIED_SHA }}
           path: ${{ runner.temp }}/font-previewer-macos-soak
           if-no-files-found: error
           retention-days: 14
@@ -506,9 +531,10 @@ jobs:
         if: success()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: font-previewer-macos-${{ github.sha }}
+          name: font-previewer-macos-${{ env.VERIFIED_SHA }}
           path: |
             ${{ runner.temp }}/font-previewer-macos-build/Font Previewer.zip
             ${{ runner.temp }}/font-previewer-macos-build/Font Previewer.zip.sha256
+            ${{ runner.temp }}/font-previewer-macos-build/SOURCE_SHA
           if-no-files-found: error
           retention-days: 30
