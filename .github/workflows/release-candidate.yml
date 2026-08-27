@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - codex/v1-release-candidate
+      - codex/v1-release-candidate-hardening-*
     paths:
       - ".github/workflows/release-candidate.yml"
       - "app/**"
@@ -237,6 +238,10 @@ jobs:
             .installedCatalog.cancellation.acknowledged == true and
             .installedCatalog.cancellation.obsoleteResultCancelled == true and
             .installedCatalog.cancellation.durationMs <= 100 and
+            .transactionalHandoffFault.failureObserved == true and
+            .transactionalHandoffFault.priorExportByteIdentical == true and
+            .transactionalHandoffFault.stagingClean == true and
+            .transactionalHandoffFault.finalFolderCount == 1 and
             .security.attempts == .security.rejected and
             .security.nodeUnavailable == true and
             .keyboardAccessibility.forwardWrap == true and

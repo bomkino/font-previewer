@@ -729,7 +729,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         }
     }
 
-    fileprivate func exportHandoff(_ document: [String: Any], _ preferences: [String: Any], _ permission: Bool, _ target: URL) async throws -> (name: String, count: Int) {
+    fileprivate func exportHandoff(_ document: [String: Any], _ preferences: [String: Any], _ permission: Bool, _ target: URL, commit: ((URL, URL) throws -> Void)? = nil) async throws -> (name: String, count: Int) {
         let manager = FileManager.default; let base = "\(safeStem(document["title"] as? String ?? "Font Previewer")) Handoff"
         var final = target.appendingPathComponent(base, isDirectory: true); var suffix = 2
         while manager.fileExists(atPath: final.path) { final = target.appendingPathComponent("\(base) \(suffix)", isDirectory: true); suffix += 1 }
@@ -757,8 +757,35 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
             try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys]).write(to: staging.appendingPathComponent("manifest.json"), options: [.atomic])
             let checksums = entries.compactMap { entry -> String? in guard let hash = entry["sha256"] as? String, let path = entry["path"] as? String else { return nil }; return "\(hash)  \(path)" }.joined(separator: "\n") + "\n"
             try checksums.data(using: .utf8)!.write(to: staging.appendingPathComponent("checksums.sha256"), options: [.atomic])
-            try manager.moveItem(at: staging, to: final); return (final.lastPathComponent, entries.count + 2)
+            if let commit { try commit(staging, final) } else { try manager.moveItem(at: staging, to: final) }
+            return (final.lastPathComponent, entries.count + 2)
         } catch { try? manager.removeItem(at: staging); throw error }
+    }
+
+    fileprivate func verifyHandoffFaultInjection(in target: URL) async throws -> [String: Any] {
+        let manager = FileManager.default
+        guard let document = mirroredDocument else { throw HostError.exportFailed("No mirrored Study for Handoff fault injection") }
+        try manager.createDirectory(at: target, withIntermediateDirectories: true)
+        let preferences: [String: Any] = ["profile": "technical", "outputs": ["summary", "json", "csv"], "includeSources": false]
+        let committed = try await exportHandoff(document, preferences, false, target)
+        let manifest = target.appendingPathComponent(committed.name, isDirectory: true).appendingPathComponent("manifest.json")
+        let before = try Data(contentsOf: manifest)
+        var failureObserved = false
+        do {
+            _ = try await exportHandoff(document, preferences, false, target) { _, _ in throw HostError.exportFailed("Injected Handoff commit failure") }
+        } catch {
+            failureObserved = true
+        }
+        let after = try Data(contentsOf: manifest)
+        let names = try manager.contentsOfDirectory(atPath: target.path)
+        return [
+            "failureObserved": failureObserved,
+            "priorExportByteIdentical": before == after,
+            "stagingClean": !names.contains { $0.contains(".staging-") },
+            "committedFolder": committed.name,
+            "committedFileCount": committed.count,
+            "finalFolderCount": names.count,
+        ]
     }
 
     fileprivate func evaluate(_ script: String) async throws -> Any? { try await withCheckedThrowingContinuation { continuation in webView.evaluateJavaScript(script) { value, error in if let error { continuation.resume(throwing: error) } else { continuation.resume(returning: value) } } } }
@@ -850,15 +877,16 @@ private final class MacEvidenceRunner {
         for (stage, file) in [("Compare", "02-compare.png"), ("System", "03-system.png"), ("Handoff", "04-handoff.png")] { _ = try await host.evaluate("([...document.querySelectorAll('.stage-nav button')].find((item)=>item.textContent?.includes('\(stage)')))?.click();true"); try await Task.sleep(nanoseconds: 150_000_000); try await host.snapshot(to: output.appendingPathComponent(file)) }
         trace["security"] = try await host.evaluateAsync("(async()=>{const bad=[{type:'open-import',path:'/tmp/x'},{type:'probe',serial:-1},{type:'read-file',path:'/etc/passwd'},{type:'scan-installed'},{type:'scan-installed',query:'',cursor:0,limit:10000,refresh:false}];let rejected=0;for(const r of bad){try{await window.fontPreviewerHost.request(r)}catch{rejected++}}return {attempts:bad.length,rejected,nodeUnavailable:typeof window.require==='undefined'&&typeof window.process==='undefined',hostKeys:Object.keys(window.fontPreviewerHost).sort()}})()") ?? NSNull()
         trace["semantics"] = try await host.evaluate("(()=>{const controls=[...document.querySelectorAll('button,input,select,textarea')];const named=el=>el.getAttribute('aria-label')||el.getAttribute('aria-labelledby')||el.closest('label')?.textContent?.trim()||el.textContent?.trim();const roleLabel=[...document.querySelectorAll('.field-label')].find(label=>label.querySelector(':scope > span')?.textContent?.trim()==='Role');const roleSelect=roleLabel?.querySelector('select')?.getBoundingClientRect();const roleHelp=roleLabel?.querySelector(':scope > small')?.getBoundingClientRect();return {controls:controls.length,unnamed:controls.filter(el=>!named(el)).length,mains:document.querySelectorAll('main').length,asides:document.querySelectorAll('aside').length,duplicateIds:[...document.querySelectorAll('[id]')].map(el=>el.id).filter((id,i,a)=>a.indexOf(id)!==i).length,horizontalOverflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,roleHelpSeparated:Boolean(roleSelect&&roleHelp&&roleSelect.bottom<=roleHelp.top)}})()") ?? NSNull()
+        trace["transactionalHandoffFault"] = try await host.verifyHandoffFaultInjection(in: output.appendingPathComponent("handoff-fault-target", isDirectory: true))
         try await wait("Recovery") { try await self.bool("document.querySelector('.document-title > span:last-child')?.textContent?.includes('recovery ready')") }
         let before = try await inspect(); host.webView.reload(); try await wait("Reload") { try await self.bool("document.querySelector('#workspace-heading') && document.activeElement?.id==='workspace-heading' && document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label')==='Keep'") }; let after = try await inspect(); trace["reload"] = ["before": before, "after": after]
         try await host.snapshot(to: output.appendingPathComponent("05-recovered.png"))
         trace["nativePanel"] = ["opened": host.panelOpened, "cancelled": host.panelCancelled]
         trace["hostCounters"] = ["rejectedRequests": host.rejectedRequests, "menuCommands": host.menuCommands, "navigationRejections": host.navigationRejections, "popupRejections": host.popupRejections, "processTerminations": host.processTerminations]
         try JSONSerialization.data(withJSONObject: trace, options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("run.json"), options: [.atomic])
-        let security = trace["security"] as? [String: Any]; let semantics = trace["semantics"] as? [String: Any]; let keyboard = trace["keyboardAccessibility"] as? [String: Any]; let catalog = trace["installedCatalog"] as? [String: Any]
+        let security = trace["security"] as? [String: Any]; let semantics = trace["semantics"] as? [String: Any]; let keyboard = trace["keyboardAccessibility"] as? [String: Any]; let catalog = trace["installedCatalog"] as? [String: Any]; let handoffFault = trace["transactionalHandoffFault"] as? [String: Any]
         let cancellation = catalog?["cancellation"] as? [String: Any]
-        guard security?["attempts"] as? Int == security?["rejected"] as? Int, security?["nodeUnavailable"] as? Bool == true, semantics?["unnamed"] as? Int == 0, semantics?["duplicateIds"] as? Int == 0, semantics?["horizontalOverflow"] as? Bool == false, semantics?["roleHelpSeparated"] as? Bool == true, keyboard?["forwardWrap"] as? Bool == true, keyboard?["backwardWrap"] as? Bool == true, keyboard?["candidateUnchanged"] as? Bool == true, keyboard?["trayUnchanged"] as? Bool == true, keyboard?["returnFocus"] as? Bool == true, ((catalog?["count"] as? Int) ?? 0) > 0, ((catalog?["indexed"] as? Int) ?? 0) > 0, catalog?["pageBounded"] as? Bool == true, catalog?["studyUnchanged"] as? Bool == true, catalog?["pathLeak"] as? Bool == false, catalog?["opaquePreviewUrls"] as? Bool == true, catalog?["previewAvailable"] as? Bool == true, catalog?["fontLoaded"] as? Bool == true, cancellation?["acknowledged"] as? Bool == true, cancellation?["obsoleteResultCancelled"] as? Bool == true, ((cancellation?["durationMs"] as? Double) ?? .infinity) <= 100, host.panelOpened > 0, host.panelCancelled > 0 else { throw HostError.unavailable("Evidence assertions failed") }
+        guard security?["attempts"] as? Int == security?["rejected"] as? Int, security?["nodeUnavailable"] as? Bool == true, semantics?["unnamed"] as? Int == 0, semantics?["duplicateIds"] as? Int == 0, semantics?["horizontalOverflow"] as? Bool == false, semantics?["roleHelpSeparated"] as? Bool == true, keyboard?["forwardWrap"] as? Bool == true, keyboard?["backwardWrap"] as? Bool == true, keyboard?["candidateUnchanged"] as? Bool == true, keyboard?["trayUnchanged"] as? Bool == true, keyboard?["returnFocus"] as? Bool == true, ((catalog?["count"] as? Int) ?? 0) > 0, ((catalog?["indexed"] as? Int) ?? 0) > 0, catalog?["pageBounded"] as? Bool == true, catalog?["studyUnchanged"] as? Bool == true, catalog?["pathLeak"] as? Bool == false, catalog?["opaquePreviewUrls"] as? Bool == true, catalog?["previewAvailable"] as? Bool == true, catalog?["fontLoaded"] as? Bool == true, cancellation?["acknowledged"] as? Bool == true, cancellation?["obsoleteResultCancelled"] as? Bool == true, ((cancellation?["durationMs"] as? Double) ?? .infinity) <= 100, handoffFault?["failureObserved"] as? Bool == true, handoffFault?["priorExportByteIdentical"] as? Bool == true, handoffFault?["stagingClean"] as? Bool == true, handoffFault?["finalFolderCount"] as? Int == 1, host.panelOpened > 0, host.panelCancelled > 0 else { throw HostError.unavailable("Evidence assertions failed") }
     }
     private func performMenu(_ menuTitle: String, _ itemTitle: String) throws {
         guard let menu = NSApp.mainMenu?.item(withTitle: menuTitle)?.submenu, let item = menu.item(withTitle: itemTitle) else { throw HostError.unavailable("Missing native menu item \(menuTitle) → \(itemTitle)") }
