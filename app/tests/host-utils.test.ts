@@ -91,6 +91,22 @@ test("Fontconfig inspection rejects malformed, truncated, and duplicate-face met
   assert.throws(() => parseFontconfigQuery("0\u001fFamily\nInjected\u001fRegular\u001fName\u001fFalse\u001e"), /invalid family/);
 });
 
+test("Fontconfig collapses named-instance records only for one variable Face", () => {
+  const inspected = parseFontconfigQuery(
+    "0\u001fInter\u001fRegular\u001fInter-Regular\u001fTrue\u001e" +
+    "0\u001fInter\u001fBold\u001fInter-Bold\u001fTrue\u001e",
+  );
+  assert.equal(inspected.length, 1);
+  assert.equal(inspected[0].variable, true);
+  assert.throws(
+    () => parseFontconfigQuery(
+      "0\u001fInter\u001fRegular\u001fInter-Regular\u001fTrue\u001e" +
+      "0\u001fOther\u001fBold\u001fOther-Bold\u001fTrue\u001e",
+    ),
+    /duplicate/,
+  );
+});
+
 test("Linux font inspection rejects a malformed font file before import", {
   skip: process.platform !== "linux" || !existsSync("/usr/bin/fc-query"),
 }, async () => {

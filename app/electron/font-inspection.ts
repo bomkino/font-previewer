@@ -115,24 +115,32 @@ export function parseFontconfigQuery(output: string): readonly InspectedFaceMeta
   if (records.length === 0 || records.length > MAXIMUM_FACES_PER_SOURCE) {
     throw new Error("Font metadata has an invalid face count.");
   }
-  const seenIndexes = new Set<number>();
-  return records.map((record) => {
+  const faces: InspectedFaceMetadata[] = [];
+  const facesByIndex = new Map<number, InspectedFaceMetadata>();
+  for (const record of records) {
     const fields = record.split(FIELD_SEPARATOR);
     if (fields.length !== 5 || !/^\d{1,6}$/u.test(fields[0]) || !["True", "False"].includes(fields[4])) throw new Error("Font metadata record is malformed.");
     const faceIndex = Number(fields[0]);
-    if (!Number.isSafeInteger(faceIndex) || seenIndexes.has(faceIndex)) throw new Error("Font metadata has a duplicate or invalid face index.");
-    seenIndexes.add(faceIndex);
+    if (!Number.isSafeInteger(faceIndex)) throw new Error("Font metadata has an invalid face index.");
     const family = parseMetadataName(fields[1], "family");
     const style = parseMetadataName(fields[2], "style");
     const postScriptName = parseMetadataName(fields[3], "PostScript name", true);
-    return {
+    const face: InspectedFaceMetadata = {
       faceIndex,
       family: family!,
       style: style!,
       ...(postScriptName ? { postScriptName } : {}),
       variable: fields[4] === "True",
     };
-  });
+    const existing = facesByIndex.get(faceIndex);
+    if (existing) {
+      if (existing.variable && face.variable && existing.family === face.family) continue;
+      throw new Error("Font metadata has a duplicate or invalid face index.");
+    }
+    facesByIndex.set(faceIndex, face);
+    faces.push(face);
+  }
+  return faces;
 }
 
 export async function inspectFontFile(canonicalPath: string): Promise<readonly InspectedFaceMetadata[]> {
