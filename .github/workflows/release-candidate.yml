@@ -121,6 +121,74 @@ jobs:
           dpkg-deb --contents font-previewer_0.1.0_amd64.deb | grep -q 'opt/font-previewer/resources/app/LICENSE.txt'
           dpkg-deb --contents font-previewer_0.1.0_amd64.deb | grep -q 'opt/font-previewer/resources/app/THIRD_PARTY_NOTICES.md'
 
+      - name: Round-trip Linux portable and installed packages
+        run: |
+          run_package_journey() {
+            journey_binary="$1"
+            journey_evidence="$2"
+            journey_config="$3"
+            mkdir -p "$journey_evidence" "$journey_config"
+            FONT_PREVIEWER_EVIDENCE_DIR="$journey_evidence" \
+              XDG_CONFIG_HOME="$journey_config" \
+              timeout --signal=TERM --kill-after=10s 4m \
+              xvfb-run --auto-servernum --server-args="-screen 0 1500x980x24" \
+              dbus-run-session -- "$journey_binary" --disable-dev-shm-usage
+            jq -e '
+              .installedCatalog.count > 0 and
+              .installedCatalog.cancellation.acknowledged == true and
+              .installedCatalog.cancellation.obsoleteResultCancelled == true and
+              .installedCatalog.cancellation.durationMs <= 100 and
+              .reloadRecovery.after.activeElement == "workspace-heading" and
+              .reloadRecovery.after.reviewState == "Keep" and
+              .transactionalHandoff.fileCount >= 2
+            ' "$journey_evidence/trace.json" >/dev/null
+            (cd "$journey_evidence" && sha256sum -c checksums.sha256)
+          }
+
+          portable_root="$RUNNER_TEMP/font-previewer-portable-roundtrip"
+          mkdir -p "$portable_root"
+          sudo tar -xzf release/Font-Previewer-0.1.0-linux-x64.tar.gz -C "$portable_root"
+          portable_binary="$portable_root/linux-unpacked/font-previewer"
+          test -x "$portable_binary"
+          test "$(stat --format='%U:%G %a' "$portable_root/linux-unpacked/chrome-sandbox")" = "root:root 4755"
+          run_package_journey \
+            "$portable_binary" \
+            "$RUNNER_TEMP/font-previewer-linux-package-smoke/portable" \
+            "$RUNNER_TEMP/font-previewer-linux-package-config/portable"
+
+          package_installed=0
+          cleanup_installed_package() {
+            if test "$package_installed" -eq 1; then sudo dpkg --remove font-previewer || true; fi
+          }
+          trap cleanup_installed_package EXIT
+          sudo apt-get install --yes "$PWD/release/font-previewer_0.1.0_amd64.deb"
+          package_installed=1
+          test "$(dpkg-query -W -f='${Version}' font-previewer)" = "0.1.0"
+          test "$(readlink -f /usr/bin/font-previewer)" = "/opt/font-previewer/font-previewer"
+          test "$(stat --format='%U:%G %a' /opt/font-previewer/chrome-sandbox)" = "root:root 4755"
+          test "$(sha256sum /opt/font-previewer/font-previewer | cut -d' ' -f1)" = "$(sha256sum release/deb-root/opt/font-previewer/font-previewer | cut -d' ' -f1)"
+          run_package_journey \
+            /usr/bin/font-previewer \
+            "$RUNNER_TEMP/font-previewer-linux-package-smoke/installed" \
+            "$RUNNER_TEMP/font-previewer-linux-package-config/installed"
+          sudo dpkg --remove font-previewer
+          package_installed=0
+          trap - EXIT
+          test ! -e /usr/bin/font-previewer
+          test ! -e /opt/font-previewer
+          test ! -e /usr/share/applications/font-previewer.desktop
+          test ! -e /usr/share/icons/hicolor/scalable/apps/font-previewer.svg
+          if dpkg-query -W -f='${db:Status-Status}\n' font-previewer 2>/dev/null | grep -qx installed; then exit 1; fi
+
+      - name: Upload Linux package round-trip evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: font-previewer-linux-package-smoke-${{ github.sha }}
+          path: ${{ runner.temp }}/font-previewer-linux-package-smoke
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload Linux evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
@@ -260,6 +328,60 @@ jobs:
             test -s "$EVIDENCE/$image.png"
             file "$EVIDENCE/$image.png" | grep -q 'PNG image data'
           done
+
+      - name: Round-trip packaged Mac archive
+        env:
+          FONT_PREVIEWER_MAC_EVIDENCE_DIR: ${{ runner.temp }}/font-previewer-macos-package-smoke
+          CFFIXED_USER_HOME: ${{ runner.temp }}/font-previewer-macos-package-home
+        run: |
+          roundtrip_root="$RUNNER_TEMP/font-previewer-macos-package-roundtrip"
+          mkdir -p "$roundtrip_root" "$FONT_PREVIEWER_MAC_EVIDENCE_DIR" "$CFFIXED_USER_HOME"
+          ditto -x -k "$RUNNER_TEMP/font-previewer-macos-build/Font Previewer.zip" "$roundtrip_root"
+          roundtrip_app="$roundtrip_root/Font Previewer.app"
+          roundtrip_binary="$roundtrip_app/Contents/MacOS/FontPreviewer"
+          test -x "$roundtrip_binary"
+          codesign --verify --deep --strict --verbose=2 "$roundtrip_app"
+          "$roundtrip_binary" >"$FONT_PREVIEWER_MAC_EVIDENCE_DIR/host.stdout.log" 2>"$FONT_PREVIEWER_MAC_EVIDENCE_DIR/host.stderr.log" &
+          roundtrip_pid=$!
+          for _ in $(seq 1 240); do
+            if ! kill -0 "$roundtrip_pid" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          if kill -0 "$roundtrip_pid" 2>/dev/null; then
+            kill "$roundtrip_pid"
+            wait "$roundtrip_pid" || true
+            exit 124
+          fi
+          roundtrip_status=0
+          wait "$roundtrip_pid" || roundtrip_status=$?
+          if test "$roundtrip_status" -ne 0; then
+            test ! -f "$FONT_PREVIEWER_MAC_EVIDENCE_DIR/host.stderr.log" || cat "$FONT_PREVIEWER_MAC_EVIDENCE_DIR/host.stderr.log"
+            test ! -f "$FONT_PREVIEWER_MAC_EVIDENCE_DIR/failure.txt" || cat "$FONT_PREVIEWER_MAC_EVIDENCE_DIR/failure.txt"
+            exit "$roundtrip_status"
+          fi
+          jq -e '
+            .installedCatalog.count > 0 and
+            .installedCatalog.cancellation.acknowledged == true and
+            .installedCatalog.cancellation.obsoleteResultCancelled == true and
+            .installedCatalog.cancellation.durationMs <= 100 and
+            .transactionalHandoffFault.failureObserved == true and
+            .transactionalHandoffFault.priorExportByteIdentical == true and
+            .transactionalHandoffFault.stagingClean == true and
+            .reload.after.activeElement == "workspace-heading" and
+            .reload.after.reviewState == "Keep"
+          ' "$FONT_PREVIEWER_MAC_EVIDENCE_DIR/run.json" >/dev/null
+          test "$roundtrip_app" = "$RUNNER_TEMP/font-previewer-macos-package-roundtrip/Font Previewer.app"
+          rm -rf -- "$roundtrip_app"
+          test ! -e "$roundtrip_app"
+
+      - name: Upload Mac package round-trip evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: font-previewer-macos-package-smoke-${{ github.sha }}
+          path: ${{ runner.temp }}/font-previewer-macos-package-smoke
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload Mac evidence
         if: always()

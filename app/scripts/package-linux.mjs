@@ -47,7 +47,7 @@ await writeFile(join(packagedApplication, "package.json"), `${JSON.stringify({ n
 const portableName = `Font-Previewer-${version}-linux-${process.arch}.tar.gz`;
 const portablePath = join(releaseRoot, portableName);
 await rm(portablePath, { force: true });
-await run("tar", ["-C", releaseRoot, "-czf", portablePath, "linux-unpacked"]);
+await run("tar", ["--owner=0", "--group=0", "--numeric-owner", "-C", releaseRoot, "-czf", portablePath, "linux-unpacked"]);
 
 const installRoot = join(debRoot, "opt", "font-previewer");
 await mkdir(installRoot, { recursive: true });
