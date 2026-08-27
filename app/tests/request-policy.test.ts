@@ -5,6 +5,10 @@ import { rendererRequestAllowed } from "../electron/request-policy.js";
 
 test("renderer request policy permits only bundled Studio, opaque fonts, and explicit local development", () => {
   const root = join("/opt", "font-previewer", "resources", "app", "dist", "renderer");
+  assert.equal(rendererRequestAllowed("about:blank", root), true);
+  assert.equal(rendererRequestAllowed("about:srcdoc", root), false);
+  assert.equal(rendererRequestAllowed("chrome-error://chromewebdata/", root), true);
+  assert.equal(rendererRequestAllowed("chrome-error://other/", root), false);
   assert.equal(rendererRequestAllowed(`file://${root}/index.html`, root), true);
   assert.equal(rendererRequestAllowed(`file://${root}/assets/app.js`, root), true);
   assert.equal(rendererRequestAllowed("file:///etc/passwd", root), false);
