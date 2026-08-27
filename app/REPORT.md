@@ -36,7 +36,7 @@ Permanent application verification is defined by [`.github/workflows/verify.yml`
 - macOS app assembly, hardened runtime, ad-hoc signature verification, archive round trip, and checksums;
 - package inventory, private-path, credential-marker, source-map, licence, notice, SBOM, and font-binary checks.
 
-Exact final-head workflow evidence is recorded in [`../docs/maintenance/REPOSITORY_STATE.md`](../docs/maintenance/REPOSITORY_STATE.md) and the cleanup receipt after CI completes.
+Current workflow evidence is recorded in [`../docs/maintenance/REPOSITORY_STATE.md`](../docs/maintenance/REPOSITORY_STATE.md) and the cleanup receipt. Full application and reference verification passed at product-integration commit `671e9feeebcf39c7333d5abf7296d24b9641e74b`; the audited `main` was a documentation-only descendant with identical `app/` and workflow subtrees, not a separate exact-head application run.
 
 ## Release machinery
 

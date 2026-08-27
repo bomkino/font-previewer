@@ -1,6 +1,6 @@
 # Font Previewer repository state
 
-Last reviewed: 2026-08-27
+Last reviewed: 2026-08-28
 
 ## Purpose
 
@@ -10,6 +10,9 @@ Font Previewer is a local typography decision tool. The active product is the sh
 
 - Canonical branch: `main`
 - Default branch: `main`
+- Remote `main` observed during this review: `806b419f00f6f0662783bef9b00c9bcfd526edb0`
+- Observed tree: `116639a2679b37edf48005b0782b1b337371bf0c`
+- Product-integration commit: `671e9feeebcf39c7333d5abf7296d24b9641e74b`
 - Source version: `0.1.0`
 - Verified product base before repository-only canonicalisation: `f1a6df73246eab2d52b0ac582af8e9f737fcafd0`
 - Current source posture: unreleased `v0.1.0-rc.2` candidate
@@ -17,7 +20,22 @@ Font Previewer is a local typography decision tool. The active product is the sh
 - Published tag commit: `6ae51f5618387e1e4e39f4816f797da35aaee57b`
 - Stable release: none
 
-The exact final `main` SHA and exact-head workflow runs are recorded in [`REPOSITORY_CLEANUP_2026-08-27.md`](REPOSITORY_CLEANUP_2026-08-27.md) after canonicalisation. The RC, hardening, and pre-Mac product work entered `main` through PRs #1, #2, and #3.
+At the 2026-08-28 readback, remote `main` was a documentation-only child of the product-integration commit. Their `app/` subtree (`3fe70d8a3e66433cf14fcc24b7d2e202764cc301`) and workflow subtree (`f2f61bea38e243a52a08ed0353bd01cafa682766`) were identical; the only intervening file change was the cleanup receipt. The RC, hardening, and pre-Mac product work entered `main` through PRs #1, #2, and #3; repository canonicalisation entered through PR #4.
+
+## Current workflow evidence
+
+- [`Repository truth` run 33120587354](https://github.com/bomkino/font-previewer/actions/runs/33120587354) passed at exact readback `main` commit `806b419f00f6f0662783bef9b00c9bcfd526edb0`.
+- [`Verify Font Previewer` run 33119845596](https://github.com/bomkino/font-previewer/actions/runs/33119845596) passed both macOS and Linux jobs at product-integration commit `671e9feeebcf39c7333d5abf7296d24b9641e74b` and published nine exact-SHA evidence/package artifacts.
+- [`macOS reference` run 33119845491](https://github.com/bomkino/font-previewer/actions/runs/33119845491) passed at that same product-integration commit and published two exact-SHA artifacts.
+
+The application and reference workflows did not run at `806b419f00f6f0662783bef9b00c9bcfd526edb0`: their path filters excluded the cleanup-receipt-only change. Their successful evidence therefore belongs to `671e9feeebcf39c7333d5abf7296d24b9641e74b`, whose application and workflow subtrees matched the readback `main`; it was not an exact-readback-head run.
+
+## Current GitHub maintenance state
+
+- Open pull requests: none; PRs #1 through #4 are merged.
+- Open stable-v1 gates: issues [#5](https://github.com/bomkino/font-previewer/issues/5), [#6](https://github.com/bomkino/font-previewer/issues/6), and [#7](https://github.com/bomkino/font-previewer/issues/7).
+- Eight reviewed non-`main` branches remain. Their recorded deletion dispositions are unchanged; no branch deletion was performed during this readback.
+- `main` has no branch protection or repository ruleset, and automatic merged-branch deletion is disabled. These are repository-maintenance gaps, not product verification failures.
 
 ## Platform posture
 
