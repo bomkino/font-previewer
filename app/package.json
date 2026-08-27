@@ -13,7 +13,7 @@
     "electron:install": "install-electron",
     "package:linux": "npm run build && node scripts/package-linux.mjs",
     "sbom": "node scripts/build-sbom.mjs",
-    "test": "tsc -p tsconfig.test.json && node --test .test-dist/tests/*.test.js",
+    "test": "node scripts/run-tests.mjs",
     "verify": "npm run build && npm run sbom && npm audit --audit-level=high"
   },
   "dependencies": {
