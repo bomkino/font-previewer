@@ -625,6 +625,8 @@ async function handleHostRequest(event: IpcMainInvokeEvent, rawRequest: unknown)
     case "native-undo":
       mainWindow?.webContents.undo();
       return { type: "ack", action: "native-undo" };
+    case "finish-terminate":
+      return { type: "ack", action: "finish-terminate" };
     case "reload-studio":
       setTimeout(() => mainWindow?.webContents.reload(), 25);
       return { type: "ack", action: "reload-studio" };
