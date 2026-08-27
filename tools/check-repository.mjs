@@ -36,8 +36,14 @@ const rootMarkdown = [
   "AGENTS.md",
   "CONTRIBUTING.md",
   "SECURITY.md",
-].map(fromRoot);
-const appMarkdown = ["app/README.md", "app/INSTALL.md", "app/REPORT.md", "app/DEPENDENCIES.md", "app/THIRD_PARTY_NOTICES.md"].map(fromRoot);
+].map((path) => fromRoot(path));
+const appMarkdown = [
+  "app/README.md",
+  "app/INSTALL.md",
+  "app/REPORT.md",
+  "app/DEPENDENCIES.md",
+  "app/THIRD_PARTY_NOTICES.md",
+].map((path) => fromRoot(path));
 const docsMarkdown = await walk(fromRoot("docs"), (repoPath, isDirectory) => {
   if (repoPath === "docs/archive" || repoPath.startsWith("docs/archive/")) return false;
   if (repoPath === "docs/programme/handover" || repoPath.startsWith("docs/programme/handover/")) return false;
