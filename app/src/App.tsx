@@ -316,6 +316,16 @@ export default function App() {
     });
   }, [dispatch, host, mirror, runTask]);
 
+  const saveAfterFocusedEdit = useCallback((saveAs: boolean) => {
+    const activeElement = document.activeElement;
+    if (editableTarget(activeElement) && activeElement instanceof HTMLElement) {
+      activeElement.blur();
+      requestAnimationFrame(() => saveStudy(saveAs));
+      return;
+    }
+    saveStudy(saveAs);
+  }, [saveStudy]);
+
   const exportHandoff = useCallback((sourcePermissionAcknowledged: boolean) => {
     void runTask("Exporting Handoff", async () => {
       const current = sessionRef.current;
@@ -392,8 +402,8 @@ export default function App() {
       case "open-study": openStudy(); break;
       case "open-import": importSources(); break;
       case "scan-installed": scanInstalled(); break;
-      case "save-study": saveStudy(false); break;
-      case "save-study-as": saveStudy(true); break;
+      case "save-study": saveAfterFocusedEdit(false); break;
+      case "save-study-as": saveAfterFocusedEdit(true); break;
       case "export-handoff": {
         exportHandoff(sessionRef.current.document.handoff.includeSources);
         break;
@@ -409,7 +419,7 @@ export default function App() {
       case "set-stage": dispatch({ type: "set-stage", stage: command.stage }); break;
       case "reload-studio": void host.request({ type: "reload-studio" }); break;
     }
-  }, [dispatch, exportHandoff, host, importSources, newStudy, openStudy, saveStudy, scanInstalled]);
+  }, [dispatch, exportHandoff, host, importSources, newStudy, openStudy, saveAfterFocusedEdit, scanInstalled]);
 
   useEffect(() => {
     let active = true;
@@ -511,10 +521,11 @@ export default function App() {
       const primary = event.metaKey || event.ctrlKey;
       if (primary && event.key.toLocaleLowerCase() === "s") {
         event.preventDefault();
-        saveStudy(event.shiftKey);
+        saveAfterFocusedEdit(event.shiftKey);
         return;
       }
       if (primary && event.key.toLocaleLowerCase() === "z") {
+        if (editableTarget(event.target)) return;
         event.preventDefault();
         historyDispatch({ type: event.shiftKey ? "redo" : "undo" });
         return;
@@ -547,7 +558,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [dispatch, saveStudy]);
+  }, [dispatch, saveAfterFocusedEdit]);
 
   const setStage = (stage: Stage) => {
     pendingWorkspaceFocusRef.current = true;
@@ -561,7 +572,7 @@ export default function App() {
 
   return (
     <div className={`app-shell ${showWelcome ? "is-welcome" : ""}`}>
-      <a className="skip-link" href="#workspace">Skip to workspace</a>
+      <a className="skip-link" href={showWelcome ? "#welcome-heading" : "#workspace-heading"}>Skip to main content</a>
       <header className="titlebar">
         <div className="brand-lockup"><span className="brand-mark">Fp</span><div><strong>Font Previewer</strong><span>Decision Studio</span></div></div>
         <label className="document-title"><span className={`save-dot ${session.revision === session.intentionallySavedRevision ? "" : "is-unsaved"}`} aria-hidden="true">●</span><span className="sr-only">Study title</span><input value={titleDraft} onChange={(event) => setTitleDraft(event.target.value)} onBlur={() => dispatch({ type: "rename-study", title: titleDraft })} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} aria-label="Study title" /><span>{statusLabel(session, recoveryAvailable)}</span></label>

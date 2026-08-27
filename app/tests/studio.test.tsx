@@ -44,9 +44,22 @@ test("shared Studio renders the complete Review-to-Handoff product seam", () => 
   assert.match(html, /Family Group/);
   assert.match(html, /aria-live="polite"/);
   assert.match(html, /aria-current="step"/);
+  assert.match(html, /class="skip-link" href="#workspace-heading">Skip to main content/);
   assert.equal((html.match(/<main/g) ?? []).length, 1);
   assert.equal((html.match(/<aside/g) ?? []).length, 2);
   assert.equal((html.match(/<nav/g) ?? []).length, 1);
   assert.equal((html.match(/<footer/g) ?? []).length, 1);
   assert.doesNotMatch(html, /(?:file:\/\/|\/Users\/|\/home\/)/);
+});
+
+test("welcome skip link has a focusable destination", () => {
+  globalThis.location.search = "";
+  let html = "";
+  try {
+    html = renderToStaticMarkup(<App />);
+  } finally {
+    globalThis.location.search = "?fixture=1";
+  }
+  assert.match(html, /class="skip-link" href="#welcome-heading">Skip to main content/);
+  assert.match(html, /<h1 id="welcome-heading" tabindex="-1">/);
 });
