@@ -28,6 +28,7 @@ for (const required of [
   join(applicationRoot, "DEPENDENCIES.md"),
   join(applicationRoot, "INSTALL.md"),
   join(applicationRoot, "sbom.cdx.json"),
+  join(applicationRoot, "assets", "icon", "font-previewer-icon-512.png"),
   join(applicationRoot, "..", "LICENSE"),
 ]) {
   if (!(await lstat(required)).isFile()) throw new Error(`Missing build input: ${relative(applicationRoot, required)}`);
@@ -41,6 +42,7 @@ await chmod(join(unpacked, "font-previewer"), 0o755);
 await chmod(join(unpacked, "chrome-sandbox"), 0o4755);
 const packagedApplication = join(unpacked, "resources", "app");
 await mkdir(packagedApplication, { recursive: true });
+await mkdir(join(packagedApplication, "assets", "icon"), { recursive: true });
 await Promise.all([
   cp(join(applicationRoot, "dist"), join(packagedApplication, "dist"), { recursive: true }),
   cp(join(applicationRoot, "dist-electron"), join(packagedApplication, "dist-electron"), { recursive: true }),
@@ -48,6 +50,7 @@ await Promise.all([
   cp(join(applicationRoot, "DEPENDENCIES.md"), join(packagedApplication, "DEPENDENCIES.md")),
   cp(join(applicationRoot, "INSTALL.md"), join(packagedApplication, "INSTALL.md")),
   cp(join(applicationRoot, "sbom.cdx.json"), join(packagedApplication, "sbom.cdx.json")),
+  cp(join(applicationRoot, "assets", "icon", "font-previewer-icon-512.png"), join(packagedApplication, "assets", "icon", "font-previewer-icon-512.png")),
   cp(join(applicationRoot, "..", "LICENSE"), join(packagedApplication, "LICENSE.txt")),
 ]);
 const lock = JSON.parse(await readFile(join(applicationRoot, "package-lock.json"), "utf8"));
@@ -91,9 +94,9 @@ await cp(unpacked, installRoot, { recursive: true, preserveTimestamps: true });
 await mkdir(join(debRoot, "DEBIAN"), { recursive: true });
 await mkdir(join(debRoot, "usr", "bin"), { recursive: true });
 await mkdir(join(debRoot, "usr", "share", "applications"), { recursive: true });
-await mkdir(join(debRoot, "usr", "share", "icons", "hicolor", "scalable", "apps"), { recursive: true });
+await mkdir(join(debRoot, "usr", "share", "icons", "hicolor", "512x512", "apps"), { recursive: true });
 await symlink("../../opt/font-previewer/font-previewer", join(debRoot, "usr", "bin", "font-previewer"));
-await cp(join(applicationRoot, "assets", "font-previewer.svg"), join(debRoot, "usr", "share", "icons", "hicolor", "scalable", "apps", "font-previewer.svg"));
+await cp(join(applicationRoot, "assets", "icon", "font-previewer-icon-512.png"), join(debRoot, "usr", "share", "icons", "hicolor", "512x512", "apps", "font-previewer.png"));
 await writeFile(join(debRoot, "DEBIAN", "control"), `Package: font-previewer\nVersion: ${version}\nSection: graphics\nPriority: optional\nArchitecture: ${architecture}\nMaintainer: pitch.dog contributors\nDepends: libgtk-3-0, libnss3, libasound2, libgbm1\nDescription: Local typography decision Studio\n Review local font Sources, compare Candidates, build a typography System, and export a decision Handoff.\n`);
 await writeFile(join(debRoot, "usr", "share", "applications", "font-previewer.desktop"), `[Desktop Entry]\nName=Font Previewer\nComment=Local typography decision Studio\nExec=/opt/font-previewer/font-previewer %U\nIcon=font-previewer\nTerminal=false\nType=Application\nCategories=Graphics;Office;\nStartupWMClass=Font Previewer\nMimeType=application/x-font-previewer-study;\n`);
 await chmod(join(debRoot, "opt", "font-previewer", "chrome-sandbox"), 0o4755);

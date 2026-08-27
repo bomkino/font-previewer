@@ -9,6 +9,7 @@ This directory contains the active shared Studio and the two desktop Hosts. The 
 - `macos/FontPreviewerHost.swift` — AppKit/WKWebView Host with CoreText discovery, native menus/panels, persistence, export, and displayed evidence runner.
 - `tests/` — public-seam domain, protocol, Catalog, grouping, migration, recovery, Handoff, accessibility, and Host tests.
 - `scripts/` — deterministic test/build cleanup, version checks, SBOM generation, package audits, Linux packaging, and macOS assembly.
+- `assets/icon/` and `public/` — the source icon pair and mechanically derived native/browser icon family.
 
 Source version is `0.1.0`. The current public prerelease is `v0.1.0-rc.2`.
 

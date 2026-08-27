@@ -44,6 +44,7 @@ test("shared Studio renders the complete Review-to-Handoff product seam", () => 
   assert.match(html, /Comparison tray/);
   assert.match(html, /Family Group/);
   assert.match(html, /aria-live="polite"/);
+  assert.match(html, /font-previewer-icon-64\.png/);
   assert.match(html, /aria-current="step"/);
   assert.match(html, /class="skip-link" href="#workspace-heading">Skip to main content/);
   assert.equal((html.match(/<main/g) ?? []).length, 1);

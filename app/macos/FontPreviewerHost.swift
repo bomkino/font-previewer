@@ -329,7 +329,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = false
         webView.allowsMagnification = true
-        webView.underPageBackgroundColor = NSColor(calibratedWhite: 0.96, alpha: 1)
+        webView.underPageBackgroundColor = NSColor(calibratedRed: 0.082, green: 0.082, blue: 0.071, alpha: 1)
         webView.setAccessibilityLabel("Font Previewer Studio")
         webView.setAccessibilityHelp("Review fonts, compare Candidates, build a typography System, and export a Handoff.")
         webView.translatesAutoresizingMaskIntoConstraints = false

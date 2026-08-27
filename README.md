@@ -4,6 +4,8 @@ Font Previewer is a local typography decision tool for pitch-deck work. One shar
 
 **Review → Compare → System → Handoff**
 
+Its dark-first Studio and coral-loupe mark share one idea: attention reveals character; the tool does not choose a winner for you.
+
 It imports and inspects fonts, maintains portable `.pitchfontstudy` documents, compares Candidates, assembles typography systems, and creates transactional Handoff packages. It does not install, transform, anonymise, slant, interpolate, or repackage fonts. Those are FontBlind concerns; the products share no implementation.
 
 ## Repository status

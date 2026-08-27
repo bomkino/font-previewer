@@ -594,7 +594,7 @@ export default function App() {
     <div className={`app-shell ${showWelcome ? "is-welcome" : ""}`}>
       <a className="skip-link" href={showWelcome ? "#welcome-heading" : "#workspace-heading"}>Skip to main content</a>
       <header className="titlebar">
-        <div className="brand-lockup"><span className="brand-mark">Fp</span><div><strong>Font Previewer</strong><span>Decision Studio</span></div></div>
+        <div className="brand-lockup"><img className="brand-mark" src="/font-previewer-icon-64.png" alt="" aria-hidden="true" /><div><strong>Font Previewer</strong><span>Decision Studio</span></div></div>
         <label className="document-title"><span className={`save-dot ${session.revision === session.intentionallySavedRevision ? "" : "is-unsaved"}`} aria-hidden="true">●</span><span className="sr-only">Study title</span><input value={titleDraft} onChange={(event) => setTitleDraft(event.target.value)} onBlur={() => dispatch({ type: "rename-study", title: titleDraft })} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} aria-label="Study title" /><span>{statusLabel(session, recoveryAvailable)}</span></label>
         <div className="host-actions"><span className="host-probe">{hostName}</span><button type="button" className="quiet-button" onClick={openStudy}>Open</button><button id="import-fonts-button" type="button" className="quiet-button" onClick={importSources}>Import</button><button type="button" className="primary-button" onClick={() => saveStudy(false)}>Save</button></div>
       </header>

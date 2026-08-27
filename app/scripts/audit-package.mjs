@@ -9,6 +9,7 @@ const required = [
   "INSTALL.md",
   "LICENSE.txt",
   "THIRD_PARTY_NOTICES.md",
+  "assets",
   "dist",
   "dist-electron",
   "node_modules",

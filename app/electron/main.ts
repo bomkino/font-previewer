@@ -643,7 +643,8 @@ async function createWindow(): Promise<BrowserWindow> {
     minWidth: 960,
     minHeight: 640,
     show: false,
-    backgroundColor: "#f5f2eb",
+    backgroundColor: "#151512",
+    icon: join(applicationRoot, "assets", "icon", "font-previewer-icon-512.png"),
     title: "Font Previewer",
     webPreferences: {
       preload: preloadPath,

@@ -10,6 +10,8 @@
 - Added a version-consistency gate covering npm metadata, lockfile, macOS bundle metadata, Linux package names, SBOM metadata, documentation, and CI.
 - Added a manual, exact-SHA, exact-run, non-overwriting release-preparation workflow. Its default path produces a validated dry-run bundle; publication requires an explicit second confirmation.
 - Clarified that current source is ahead of the published `v0.1.0-rc.1` prerelease.
+- Added an original pitch.dog app-icon family across the macOS bundle, Linux package, Studio chrome, favicons, and web manifest: a coral loupe reveals one letter's typographic character.
+- Made the Studio's dark field the default presentation instead of conditioning it on the operating-system theme.
 
 ### Hardened
 

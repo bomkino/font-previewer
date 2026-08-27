@@ -81,6 +81,7 @@ verify_app() {
   test -s "$candidate/Contents/Resources/DEPENDENCIES.md"
   test -s "$candidate/Contents/Resources/INSTALL.md"
   test -s "$candidate/Contents/Resources/sbom.cdx.json"
+  test -s "$candidate/Contents/Resources/FontPreviewer.icns"
   plutil -lint "$candidate/Contents/Info.plist" >/dev/null
   test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$candidate/Contents/Info.plist")" = "dog.pitch.fontpreviewer"
   test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$candidate/Contents/Info.plist")" = "0.1.0"
