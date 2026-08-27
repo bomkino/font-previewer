@@ -1,0 +1,89 @@
+name: Repository truth
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - "tools/check-repository.mjs"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "ROADMAP.md"
+      - "AGENTS.md"
+      - "CONTRIBUTING.md"
+      - "SECURITY.md"
+      - "docs/**"
+      - "app/README.md"
+      - "app/INSTALL.md"
+      - "app/REPORT.md"
+      - "app/DEPENDENCIES.md"
+      - "app/THIRD_PARTY_NOTICES.md"
+      - "app/package.json"
+      - "app/package-lock.json"
+      - "app/macos/Info.plist"
+      - "app/scripts/check-version.mjs"
+      - "app/scripts/package-linux.mjs"
+      - "app/sbom.cdx.json"
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "tools/check-repository.mjs"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "ROADMAP.md"
+      - "AGENTS.md"
+      - "CONTRIBUTING.md"
+      - "SECURITY.md"
+      - "docs/**"
+      - "app/README.md"
+      - "app/INSTALL.md"
+      - "app/REPORT.md"
+      - "app/DEPENDENCIES.md"
+      - "app/THIRD_PARTY_NOTICES.md"
+      - "app/package.json"
+      - "app/package-lock.json"
+      - "app/macos/Info.plist"
+      - "app/scripts/check-version.mjs"
+      - "app/scripts/package-linux.mjs"
+      - "app/sbom.cdx.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: font-previewer-repository-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERIFIED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  repository:
+    name: Versions · links · workflows · current truth
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ env.VERIFIED_SHA }}
+
+      - name: Verify exact checkout
+        run: test "$(git rev-parse HEAD)" = "$VERIFIED_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.19.0
+          package-manager-cache: false
+
+      - name: Verify version surfaces
+        working-directory: app
+        run: node scripts/check-version.mjs
+
+      - name: Verify repository truth
+        run: node tools/check-repository.mjs
+
+      - name: Assert tracked source stayed clean
+        run: test -z "$(git status --short --untracked-files=no)"
