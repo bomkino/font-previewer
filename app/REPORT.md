@@ -1,17 +1,27 @@
-# v0.1 release-candidate report
+# v0.1 release-candidate hardening report
 
 ## Result
 
-The autonomous implementation slice is complete and cross-Host automated evidence is green.
+The isolated autonomous hardening slice is complete and exact-head cross-Host evidence is green.
 
-- Branch: `codex/v1-release-candidate`
-- Draft PR: [#1](https://github.com/bomkino/font-previewer/pull/1)
-- Verified remote code commit: [`704be6e`](https://github.com/bomkino/font-previewer/commit/704be6e94939b867323f735609d692c1e5c6ad67)
-- Verified tree: `98ae42c9a5da2f61ba6df304d66cb0c400cbb97a`
-- Automated run: [33023567900](https://github.com/bomkino/font-previewer/actions/runs/33023567900)
-- Local equivalent commit: `2b9b719` (same tree; local and connector histories have different commit objects)
+- Release-candidate base: `codex/v1-release-candidate` at `a31777e2b2bd30bc76c49a540c19715068d8e6b7`
+- Isolated branch: `codex/v1-release-candidate-hardening-02`
+- Draft PR: [#2](https://github.com/bomkino/font-previewer/pull/2)
+- Verified product/evidence commit: [`a5dd924`](https://github.com/bomkino/font-previewer/commit/a5dd924265d85ec37d8022732b923ccc89cedad4)
+- Verified tree: `73f865a661f6b05d6f5fad67d9af6a823c532f37`
+- Exact-head automated run: [33040027604](https://github.com/bomkino/font-previewer/actions/runs/33040027604)
 
-No merge, public release, deployment, notarization, or architecture ADR acceptance occurred.
+No merge, public release, deployment, production signing, notarization, attended accessibility claim, or architecture ADR acceptance occurred.
+
+## Hardening delivered
+
+- The test command removes all compiled test output, proves a planted stale failure cannot survive, and invokes only explicitly discovered fresh test files.
+- Catalog indexing/search is independently bounded to 10,000 normalized entries. A 10,050-entry corpus verifies truncation and 100 warm searches record diagnostic p95 latency.
+- Both Hosts support explicit Catalog cancellation, invalidate obsolete generations, and reject stale results. Linux also terminates an active `fc-list` child process.
+- Protocol progress rejects impossible values. One thousand deterministic malformed messages and 250 seeded corrupt Study documents are rejected without state corruption.
+- Atomic Study writes clean their temporary sidecar on every failure. Injected commit failures preserve the previous intentional save byte-for-byte.
+- Transactional Handoff commit failures preserve the prior export, remove staging, and leave no failed final directory; Mac displayed evidence exercises this path.
+- The extracted Mac ZIP, extracted Linux archive, and installed Linux `.deb` each run the displayed critical journey. The Linux test then removes the package and asserts its symlink, application tree, desktop entry, and icon are absent.
 
 ## User journey delivered
 
@@ -35,38 +45,41 @@ Catalog discovery no longer mutates a Study. Only an explicit Add dispatches `in
 | Gate | Result |
 |---|---|
 | Strict renderer types | Pass |
-| Public-seam tests | 19/19 pass |
-| Renderer production bundle | 287.8 kB raw / 85.9 kB gzip in CI |
+| Public-seam tests | 25/25 pass; stale compiled output rejected |
+| Renderer production bundle | 288.6 kB raw / 86.1 kB gzip |
 | Electron main and sandboxed CJS preload | Pass |
 | Mac Host compiler | Pass with zero warnings |
 | CycloneDX SBOM | 81 components |
 | npm audit | 0 known vulnerabilities |
-| Linux displayed app | Native menu, semantic undo/redo, 6 screenshots, AX tree, layout, security, actual installed-font load, Catalog/Study separation, transactional Handoff, reload/focus pass |
-| macOS displayed app | AppKit menu, real panel open/cancel, 6 snapshots, layout, security, CoreText Catalog, actual installed-font load, Catalog/Study separation, reload/focus pass |
-| Linux packages | `.deb` and portable archive, SHA-256, root-owned mode-4755 sandbox helper, desktop entry, symlink, licence/notices pass |
-| Mac package | App build, ad-hoc signature, strict verification, ZIP, checksum, licence/notices pass |
+| Synthetic Catalog | 10,000-entry bound; 100 warm searches; p95 0.477 ms Linux / 0.906 ms Mac on hosted runners |
+| Linux displayed app | Native menu, semantic undo/redo, 6 screenshots, AX tree, layout, security, actual installed-font load, Catalog/Study separation, 3.9 ms cancellation, transactional Handoff, reload/focus pass |
+| macOS displayed app | AppKit menu, real panel open/cancel, 6 snapshots, layout, security, CoreText Catalog, actual installed-font load, Catalog/Study separation, 15 ms cancellation, Handoff fault recovery, reload/focus pass |
+| Linux packages | `.deb` and portable archive, SHA-256, root-owned mode-4755 sandbox helper, displayed journeys, install/removal/residue assertions, desktop entry, symlink, licence/notices pass |
+| Mac package | App build, ad-hoc signature integrity, strict verification, ZIP/checksum, extracted displayed journey, removal, licence/notices pass |
 
-The CI gates use real fonts already installed on each runner but never commit or upload font binaries. Bridge responses are checked for `file://`, home-directory, user-directory, and drive-path leakage; preview URLs must use opaque `pitch-font://asset/` tokens and load through `FontFace`.
+The CI gates use real fonts already installed on each runner but never commit or upload font binaries. Bridge responses are checked for `file://`, home-directory, user-directory, and drive-path leakage; preview URLs must use opaque `pitch-font://asset/` tokens and load through `FontFace`. Hosted timings and disposable-runner package journeys are diagnostic evidence, not reference-hardware or independent clean-machine claims.
 
 ## Security and durability
 
 - Electron uses sandboxing, context isolation, no Node integration, bundled local content, denied navigation/popups/permissions, and a narrow preload.
 - WKWebView uses a nonpersistent store, bounded read-only Studio/font schemes, a named content world, denied external navigation/popups, and exact request parsing.
 - Protocol v2 accepts a closed request/response vocabulary, exact keys, bounded strings, safe integers, and Catalog pages no larger than 200.
+- Protocol and Study corruption corpora are deterministic, bounded, and exercise 1,250 invalid documents/messages without preserving rejected state.
 - Portable Studies contain no path or Binding. Host-local bindings persist separately; Mac accepts an installed-font path fallback only when the path is rediscovered through CoreText.
-- Recovery and intentional Save remain distinct. Both Hosts reject stale mirror revisions and require the exact mirrored revision before Save or Handoff.
-- Handoff is staged and verified before the final directory move. Source copying is off by default and requires an explicit redistribution acknowledgement.
+- Recovery and intentional Save remain distinct. Both Hosts reject stale mirror revisions and require the exact mirrored revision before Save or Handoff. Injected write-commit failure leaves the prior intentional save byte-identical and cleans the temporary sidecar.
+- Handoff is staged and verified before the final directory move. Injected commit failure leaves the prior export byte-identical and removes staging. Source copying is off by default and requires an explicit redistribution acknowledgement.
 
 ## Remaining release gates
 
-These remain outside the proven slice and require attended testing, reference hardware/corpora, owner decisions, or signing credentials:
+These remain outside the proven slice and require attended testing, independent reference hardware/machines or corpora, owner decisions, or signing credentials:
 
 1. Traverse the packaged Mac app with VoiceOver and the packaged Linux app with Orca.
 2. Review full native window/menu quality and typography with 20–50 legally held production fonts, including variable, collection, missing-glyph, and complex-script cases.
 3. Induce WKWebView content-process termination and inspect recovery; automated reload is already proven.
-4. Run long-session, malformed-font containment, 10,000-entry synthetic performance, and clean-machine install/uninstall matrices.
-5. Decide the production renderer/format tiers and accept or reject the leading workspace/durability ADRs.
-6. Supply Developer ID credentials for hardened signing, notarization, and stapling; decide whether RPM is a V1 release requirement.
-7. Owner reviews the draft PR and separately authorizes merge and public release.
+4. Run 500-Face/100-card, long-session memory, hostile-font containment, and reference-hardware budgets. The bounded 10,000-entry hosted diagnostic and basic corrupt-input corpora already pass.
+5. Repeat Mac and Linux install/launch/uninstall on independent clean supported machines. Disposable hosted-runner ZIP/archive/`.deb` round trips already pass.
+6. Decide the production renderer/format tiers and accept or reject the leading workspace/durability ADRs.
+7. Supply Developer ID credentials for hardened signing, notarization, and stapling; decide whether RPM and additional Mac architectures are V1 requirements.
+8. Owner reviews the draft PR and separately authorizes merge and public release.
 
 Until those gates close, the artifacts are release candidates and evidence—not a supported public release.

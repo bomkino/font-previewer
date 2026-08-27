@@ -11,6 +11,8 @@
 5. CycloneDX SBOM generation;
 6. high-severity npm audit.
 
+The test runner removes the compiled test directory before every run, plants a deliberately failing stale artifact, and proves that no stale output survives before it discovers the freshly emitted tests explicitly.
+
 The cross-Host workflow additionally requires:
 
 - a real displayed Electron run under Xvfb and isolated D-Bus;
@@ -19,22 +21,31 @@ The cross-Host workflow additionally requires:
 - semantic undo/redo and keyboard-collision checks;
 - named interactive controls, no duplicate IDs, no page overflow, and no Inspector-help collision;
 - malformed/path-bearing bridge-request rejection;
+- deterministic malformed-input corpora: 1,000 bridge messages and 250 corrupt Study documents;
 - actual installed Catalog discovery and font loading through an opaque URL;
 - no Study mutation from Catalog browsing;
+- explicit Catalog cancellation with acknowledgement within 100 ms and obsolete-result rejection;
+- a bounded 10,000-entry synthetic Catalog workload with a provisional 75 ms search budget;
 - transactional Handoff and durable recovery;
+- injected atomic-save and Handoff-commit failures that preserve prior data and remove staging residue;
 - reload with review decision and workspace focus restored;
 - six non-empty screenshots/snapshots per Host, including the installed Catalog, and a Chromium AX tree;
-- packaged licence/notices, checksums, signature/package structure, and Linux sandbox ownership.
+- packaged licence/notices, checksums, ad-hoc Mac signature integrity, package structure, and Linux sandbox ownership;
+- a displayed journey from the extracted Mac ZIP, extracted Linux archive, and installed Linux `.deb`, followed by package/file removal assertions.
 
 ## Current automated result
 
-- Remote code commit: `704be6e94939b867323f735609d692c1e5c6ad67`
-- Workflow: [33023567900](https://github.com/bomkino/font-previewer/actions/runs/33023567900)
-- Tests: 19/19
+- Remote product/evidence commit: `a5dd924265d85ec37d8022732b923ccc89cedad4`
+- Exact tree: `73f865a661f6b05d6f5fad67d9af6a823c532f37`
+- Exact-head workflow: [33040027604](https://github.com/bomkino/font-previewer/actions/runs/33040027604)
+- Tests: 25/25
 - Audit: zero known vulnerabilities
 - Mac and Linux displayed/package jobs: pass
+- 10,000-entry warm-search p95: 0.477 ms on hosted Linux; 0.906 ms on hosted Mac
+- Catalog cancellation: 3.9 ms in the primary hosted Linux journey; 15 ms in the primary hosted Mac journey
+- Package smoke artifacts: [Linux](https://github.com/bomkino/font-previewer/actions/runs/33040027604) and [Mac](https://github.com/bomkino/font-previewer/actions/runs/33040027604), retained with exact-SHA names
 
-Hosted-runner measurements are diagnostic, not universal performance claims.
+Hosted-runner measurements are diagnostic, not universal performance claims. The package round trips use disposable hosted runners; they do not replace an independent clean-machine matrix.
 
 ## Human release matrix
 
@@ -71,20 +82,18 @@ Run the complete journey:
 
 ## Performance and stability gate
 
-The following remain release blockers until measured on reference hardware:
+The 10,000-entry search and cancellation budgets pass on hosted CI. The following remain release blockers until measured on reference hardware or with the required corpus:
 
-- 10,000-entry Catalog query at the provisional ≤75 ms search budget after indexing;
 - responsive 500-Face import and 100 visible review cards;
 - bounded memory over a long Review/Compare session;
-- cancellation and rebuild without stale results;
 - malformed-font failure containment;
 - induced WKWebView content-process termination and recovery;
 - no per-frame font-file reads or unbounded watcher/token growth.
 
 ## Distribution gate
 
-- Install, launch, Save, recover, export, and uninstall the `.deb` on a clean supported Linux image.
-- Extract and launch the portable archive without changing its sandbox-helper guarantees.
+- Repeat install, launch, Save, recover, export, and uninstall on independent clean supported Linux images; the disposable Ubuntu 24.04 hosted-runner round trip is already green.
+- Repeat portable extraction and launch on an independent machine; the hosted-runner archive preserves the root-owned mode-4755 sandbox helper and completes the displayed journey.
 - Build Mac arm64 and any promised x86_64/universal artifact; sign with Developer ID, enable hardened runtime, notarize, staple, and verify with Gatekeeper.
 - Decide and test RPM if included in V1.
 - Verify notices/SBOM/checksums against the exact source SHA.

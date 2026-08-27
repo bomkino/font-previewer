@@ -4,9 +4,9 @@
 
 - Run attended VoiceOver and Orca journeys on the packaged apps.
 - Review native window/menu quality and typography with 20–50 legally held production fonts.
-- Measure 10,000-entry Catalog search, 500-Face import, scrolling, long-session memory, and cancellation on reference hardware.
+- Repeat the already-green 10,000-entry Catalog and cancellation diagnostics on reference hardware; measure 500-Face import, 100-card scrolling, and long-session memory.
 - Exercise malformed-font containment and induced WKWebView content-process termination.
-- Run clean-machine `.deb`, portable archive, and Mac install/launch/uninstall matrices.
+- Repeat the already-green disposable-runner package journeys on independent clean Mac/Linux machines, including Wayland/X11 and installed-data residue review.
 - Decide production renderer/format tiers and record the workspace/durability ADR verdicts.
 - Decide whether RPM and x86_64/universal Mac artifacts are V1 commitments.
 - Apply Developer ID/hardened signing, notarization, and stapling when credentials are deliberately supplied.

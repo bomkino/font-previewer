@@ -6,22 +6,24 @@
 - Preserved reference: `bomkino/pitch-deck-tools`, branch `codex/native-macos-font-lab`, SHA `be77221cb7cb809fdf119945f3fee3d2e1e72ed6`
 - Release-candidate branch: `codex/v1-release-candidate`
 - Draft PR: [#1](https://github.com/bomkino/font-previewer/pull/1)
-- Latest verified remote code SHA: `704be6e94939b867323f735609d692c1e5c6ad67`
-- Exact verified tree: `98ae42c9a5da2f61ba6df304d66cb0c400cbb97a`
-- Cross-Host workflow: [33023567900](https://github.com/bomkino/font-previewer/actions/runs/33023567900)
+- Isolated hardening branch: `codex/v1-release-candidate-hardening-02`
+- Hardening draft PR: [#2](https://github.com/bomkino/font-previewer/pull/2)
+- Latest verified product/evidence SHA: `a5dd924265d85ec37d8022732b923ccc89cedad4`
+- Exact verified tree: `73f865a661f6b05d6f5fad67d9af6a823c532f37`
+- Exact-head Cross-Host workflow: [33040027604](https://github.com/bomkino/font-previewer/actions/runs/33040027604)
 
 ## Current milestone
 
 R3 — release-candidate hardening.
 
-The autonomous, credential-free implementation and automated evidence slice is complete. The milestone itself is not complete because human accessibility/typography, clean-machine distribution, production signing, performance, and owner release gates remain open.
+The autonomous, credential-free hardening and hosted-runner evidence slice is complete. The milestone itself is not complete because attended accessibility/typography, independent reference-machine distribution/performance, production signing, decision, and owner release gates remain open.
 
 ## Current frontier
 
 - T10 Family Groups: implementation and public-seam tests pass; attended design review remains.
-- T15 installed Catalog: Host-local separation, server search, 10,000-entry bound, 80-entry paging, 400-entry cache, explicit Add, rebuild, opaque font load, and Study-nonmutation evidence pass. Synthetic 10,000-entry latency/cancellation evidence remains.
-- T17 hardening: automated keyboard, semantics, path-redaction, bridge rejection, reload/focus, sandbox, and package evidence pass. VoiceOver, Orca, malformed-font containment, long-session, and reference-hardware budgets remain.
-- T18 packaging: Mac ad-hoc `.app` ZIP and Linux `.deb`/portable archive pass integrity and notice checks. Developer ID/notarization/stapling, clean-machine install/uninstall, and an owner decision on RPM remain.
+- T15 installed Catalog: Host-local separation, bounded index/search/paging/cache, explicit Add, rebuild, opaque font load, Study non-mutation, and cancellation pass. The 10,000-entry synthetic search p95 is 0.477 ms on hosted Linux and 0.906 ms on hosted Mac; reference-hardware, 500-Face, and long-session memory evidence remain.
+- T17 hardening: automated keyboard, semantics, path redaction, 1,000 malformed bridge messages, 250 corrupt Study documents, stale-test-output rejection, reload/focus, cancellation, sandbox, and transactional failure recovery pass. VoiceOver, Orca, hostile-font containment, long-session, and attended native review remain.
+- T18 packaging: Mac ad-hoc `.app` ZIP and Linux `.deb`/portable archive pass integrity, notices, extraction/install, real displayed journey, removal, and residue checks on disposable hosted runners. Developer ID/notarization/stapling, independent clean reference machines, and owner decisions on RPM and Mac architecture remain.
 
 ## Implemented product
 
@@ -50,12 +52,13 @@ Still owner/decision-gated:
 
 ## Evidence
 
-- 19/19 domain, grouping, protocol, Host-utility, and surface tests pass.
+- 25/25 domain, grouping, protocol, Host-utility, durability, Catalog, and surface tests pass. The runner deletes compiled test output first and proves a planted stale test cannot execute.
 - Strict Studio, Electron main, and sandboxed preload builds pass.
-- Renderer bundle is approximately 85.9 kB gzip; preload is approximately 6.5 kB gzip.
+- Renderer bundle is approximately 86.1 kB gzip; preload is approximately 6.5 kB gzip.
 - CycloneDX 1.6 SBOM contains 81 resolved components; npm audit reports zero known vulnerabilities.
-- macOS displayed evidence passes warning-free Host compilation, AppKit menu dispatch, real panel open/cancel/focus, actual CoreText Catalog font load, Catalog/Study separation, semantics, layout, security, reload recovery, six snapshots, app assembly, ad-hoc signature verification, notices, ZIP, and checksum.
-- Linux displayed evidence passes native menu semantics, actual Fontconfig Catalog font load, Catalog/Study separation, Chromium AX tree, layout, security, transactional Handoff, reload recovery, six screenshots, `.deb`/portable assembly, SUID sandbox ownership, notices, and checksums.
+- macOS displayed evidence passes warning-free Host compilation, AppKit menu dispatch, real panel open/cancel/focus, actual CoreText Catalog font load, Catalog/Study separation, 15 ms cancellation, transactional Handoff commit-failure recovery, semantics, layout, security, reload recovery, and six snapshots.
+- Linux displayed evidence passes native menu semantics, actual Fontconfig Catalog font load, Catalog/Study separation, 3.9 ms cancellation, Chromium AX tree, layout, security, transactional Handoff, reload recovery, and six screenshots.
+- Packaged-app round trips pass from the extracted Mac ZIP, extracted Linux archive, and installed Linux `.deb`; checksums, ad-hoc Mac integrity, SUID sandbox ownership, application journey, uninstall, and installed-file removal are asserted. These are disposable hosted-runner checks, not independent clean-machine or notarization evidence.
 - Exact details: [`app/REPORT.md`](../../app/REPORT.md).
 
 ## Owner gates
@@ -67,6 +70,6 @@ Still owner/decision-gated:
 
 ## Latest update
 
-- Date: 2026-08-26
+- Date: 2026-08-27
 - Author: primary agent
-- Summary: release-candidate code now runs on both desktop Hosts with a separate paginated installed Catalog, explicit Add-to-Study, Family Groups, real installed-font loading, secure recovery/Handoff, verified packages, notices, and cross-Host evidence. Remaining work is explicitly human-, credential-, performance-, or owner-gated.
+- Summary: isolated hardening now adds deterministic fresh-test discovery, bounded 10,000-entry Catalog diagnostics, explicit cross-Host cancellation, malformed protocol/Study corpora, injected save/Handoff commit failures, and packaged-app round trips. Exact-head Mac and Linux CI is green; no merge, release, production signing, notarization, or attended accessibility claim occurred.

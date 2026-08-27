@@ -40,4 +40,3 @@ async function testFilesWithin(directory) {
 const testFiles = (await testFilesWithin(join(outputRoot, "tests"))).sort();
 if (testFiles.length === 0) throw new Error("The test compiler emitted no test files.");
 run(process.execPath, ["--test", ...testFiles]);
-
