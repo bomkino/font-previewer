@@ -36,6 +36,7 @@ Run IDs, conclusions, artifacts, and the source SHA remain available in GitHub A
 - Merged working branches delete automatically. `main` rejects force-push and deletion, including for administrators.
 - Required checks are not attached to branch protection because the workflows are deliberately path-filtered; missing checks would deadlock unrelated maintenance changes.
 - The unused repository wiki and classic-project surfaces are disabled. Issues remain enabled.
+- Private vulnerability reporting, vulnerability alerts, Dependabot security updates, secret scanning, and secret-scanning push protection are enabled.
 
 ## Platform posture
 

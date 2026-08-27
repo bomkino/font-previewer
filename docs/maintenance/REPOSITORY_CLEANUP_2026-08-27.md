@@ -82,6 +82,7 @@ After this receipt was corrected, [Repository truth run `33120587354`](https://g
 - All eight reviewed non-`main` branches were deleted. `main` is the sole remote branch and merged branches now auto-delete.
 - `main` is protected against force-push and deletion, including for administrators. Required checks were not attached because every existing workflow is path-filtered and a missing check would deadlock unrelated maintenance changes.
 - The unused repository wiki and classic-project surfaces are disabled. Issues remain enabled for the three stable-v1 gates.
+- Private vulnerability reporting, vulnerability alerts, Dependabot security updates, secret scanning, and secret-scanning push protection are enabled.
 
 ## Remaining human and physical gates
 
