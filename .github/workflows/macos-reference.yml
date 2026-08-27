@@ -5,12 +5,14 @@ on:
   push:
     paths:
       - ".github/workflows/macos-reference.yml"
-      - "build-font-previewer-app.command"
+      - "build-reference-app.command"
+      - "run-reference-app.command"
       - "macos/**"
   pull_request:
     paths:
       - ".github/workflows/macos-reference.yml"
-      - "build-font-previewer-app.command"
+      - "build-reference-app.command"
+      - "run-reference-app.command"
       - "macos/**"
 
 permissions:
@@ -57,12 +59,14 @@ jobs:
             --output "$RUNNER_TEMP/font-previewer-smoke"
 
       - name: Build, sign, package, re-extract, and verify
-        run: ./build-font-previewer-app.command --no-install --skip-tests
+        run: ./build-reference-app.command --skip-tests
 
       - name: Inspect packaged app
         run: |
           set -euo pipefail
-          ZIP="output/macos/Font Previewer.zip"
+          ARTIFACT_DIR="$(find output -maxdepth 1 -type d -name 'macos-reference-*' -print | LC_ALL=C sort | tail -n 1)"
+          test -n "$ARTIFACT_DIR"
+          ZIP="$ARTIFACT_DIR/Font Previewer Reference.zip"
           CHECKSUM="$ZIP.sha256"
           test -s "$ZIP"
           test -s "$CHECKSUM"
@@ -70,21 +74,21 @@ jobs:
           VERIFY="$RUNNER_TEMP/font-previewer-verify"
           mkdir -p "$VERIFY"
           ditto -x -k "$ZIP" "$VERIFY"
-          APP="$VERIFY/Font Previewer.app"
+          APP="$VERIFY/Font Previewer Reference.app"
           test -x "$APP/Contents/MacOS/FontPreviewer"
           plutil -lint "$APP/Contents/Info.plist"
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" = "dog.pitch.fontpreviewer"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" = "dog.pitch.fontpreviewer.reference"
           codesign --verify --deep --strict --verbose=2 "$APP"
-          printf '%s\n' "$VERIFIED_SHA" > output/macos/SOURCE_SHA
+          printf '%s\n' "$VERIFIED_SHA" > "$ARTIFACT_DIR/SOURCE_SHA"
 
       - name: Upload verified reference app
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: Font-Previewer-reference-macOS-${{ env.VERIFIED_SHA }}
           path: |
-            output/macos/Font Previewer.zip
-            output/macos/Font Previewer.zip.sha256
-            output/macos/SOURCE_SHA
+            output/macos-reference-*/Font Previewer Reference.zip
+            output/macos-reference-*/Font Previewer Reference.zip.sha256
+            output/macos-reference-*/SOURCE_SHA
           if-no-files-found: error
           retention-days: 30
 
