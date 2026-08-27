@@ -70,7 +70,7 @@ jobs:
           CHECKSUM="$ZIP.sha256"
           test -s "$ZIP"
           test -s "$CHECKSUM"
-          shasum -a 256 -c "$CHECKSUM"
+          (cd "$ARTIFACT_DIR" && shasum -a 256 -c "Font Previewer Reference.zip.sha256")
           VERIFY="$RUNNER_TEMP/font-previewer-verify"
           mkdir -p "$VERIFY"
           ditto -x -k "$ZIP" "$VERIFY"
