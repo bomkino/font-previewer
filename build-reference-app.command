@@ -19,12 +19,17 @@ while (( $# )); do
   shift
 done
 
-for tool in swift xcrun codesign ditto plutil iconutil shasum file; do
+for tool in swift xcrun xcode-select codesign ditto plutil iconutil shasum file; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     print -u2 "Missing required macOS build tool: $tool"
     exit 69
   fi
 done
+
+if [[ "$(xcode-select -p)" == "/Library/Developer/CommandLineTools" ]]; then
+  print -u2 "Preserved SwiftUI reference requires full Xcode. Active AppKit/WKWebView product builds with Command Line Tools."
+  exit 69
+fi
 
 ARCHITECTURE="$(uname -m)"
 case "$ARCHITECTURE" in
