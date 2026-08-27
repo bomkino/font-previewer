@@ -193,6 +193,7 @@ private enum HostRequest {
     case getLaunchState
     case openImport
     case scanInstalled(String, Int, Int, Bool)
+    case cancelCatalog
     case openStudy
     case mirrorStudy([String: Any], [String: Any], Int)
     case saveStudy([String: Any], Int, Bool)
@@ -249,6 +250,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     private var catalogCacheOrder: [String] = []
     private var installedCatalogIndex: [InstalledCatalogEntry] = []
     private var installedCatalogTruncated = false
+    private var catalogGeneration = 0
     private var scopedURLs: [URL] = []
     private var mirroredDocument: [String: Any]?
     private var mirroredWorkspace: [String: Any]?
@@ -410,6 +412,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         case "scan-installed":
             guard exact(object, ["type", "query", "cursor", "limit", "refresh"]), let query = object["query"] as? String, query.count <= 200, let cursor = integer(object["cursor"]), let limit = integer(object["limit"]), (1...200).contains(limit), let refresh = object["refresh"] as? Bool else { return nil }
             return .scanInstalled(query, cursor, limit, refresh)
+        case "cancel-catalog": return exact(object, ["type"]) ? .cancelCatalog : nil
         case "open-study": return exact(object, ["type"]) ? .openStudy : nil
         case "mirror-study":
             guard exact(object, ["type", "document", "workspace", "revision"]), let document = object["document"] as? [String: Any], let workspace = object["workspace"] as? [String: Any], let revision = integer(object["revision"]), validJSON(document, maximum: maximumStudyBytes), validJSON(workspace, maximum: 200_000) else { return nil }
@@ -437,7 +440,16 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
             switch request {
             case .getLaunchState: replyHandler(launchState(), nil)
             case .openImport: presentImport(replyHandler)
-            case .scanInstalled(let query, let cursor, let limit, let refresh): replyHandler(catalogResult(query: query, cursor: cursor, limit: limit, refresh: refresh), nil)
+            case .scanInstalled(let query, let cursor, let limit, let refresh):
+                catalogGeneration += 1
+                let generation = catalogGeneration
+                Task { @MainActor [weak self] in
+                    guard let self else { replyHandler(nil, "Host closed during Catalog scan."); return }
+                    replyHandler(await self.catalogResult(query: query, cursor: cursor, limit: limit, refresh: refresh, generation: generation), nil)
+                }
+            case .cancelCatalog:
+                catalogGeneration += 1
+                replyHandler(["type": "ack", "action": "cancel-catalog"], nil)
             case .openStudy: presentOpenStudy(replyHandler)
             case .mirrorStudy(let document, let workspace, let revision):
                 guard mirroredDocument?["id"] as? String != document["id"] as? String || revision >= mirroredRevision else { replyHandler(nil, "Rejected stale recovery revision."); return }
@@ -515,17 +527,27 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         return ["type": "import-result", "imports": imports, "rejected": rejected, "truncated": urls.count > 2_048]
     }
 
-    private func rebuildInstalledCatalog() {
-        installedCatalogIndex = []
-        installedCatalogTruncated = false
-        catalogImportCache = [:]
-        catalogCacheOrder = []
+    private func catalogOperationIsCurrent(_ generation: Int) -> Bool {
+        generation == catalogGeneration && !Task.isCancelled
+    }
+
+    private func cancelledCatalogResult() -> [String: Any] {
+        ["type": "catalog-result", "imports": [], "indexed": installedCatalogIndex.count, "total": 0, "rejected": 0, "truncated": installedCatalogTruncated, "cancelled": true]
+    }
+
+    private func rebuildInstalledCatalog(generation: Int) async -> Bool {
+        var rebuilt: [InstalledCatalogEntry] = []
+        var truncated = false
         var seen = Set<String>()
-        for selected in (CTFontManagerCopyAvailableFontURLs() as? [URL] ?? []) {
+        for (index, selected) in (CTFontManagerCopyAvailableFontURLs() as? [URL] ?? []).enumerated() {
+            if index % 8 == 0 {
+                await Task.yield()
+                guard catalogOperationIsCurrent(generation) else { return false }
+            }
             let url = selected.resolvingSymlinksInPath().standardizedFileURL
             guard allowedExtensions.contains(url.pathExtension.lowercased()) else { continue }
             guard seen.insert(url.path).inserted else { continue }
-            if installedCatalogIndex.count >= maximumCatalogEntries { installedCatalogTruncated = true; break }
+            if rebuilt.count >= maximumCatalogEntries { truncated = true; break }
             let descriptors = (CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor]) ?? []
             let names = descriptors.prefix(32).flatMap { descriptor -> [String] in
                 let family = CTFontDescriptorCopyAttribute(descriptor, kCTFontFamilyNameAttribute) as? String
@@ -533,21 +555,34 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
                 return [family, style].compactMap { $0 }
             }
             let text = ([url.deletingPathExtension().lastPathComponent] + names).joined(separator: " ").folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current).lowercased()
-            installedCatalogIndex.append(InstalledCatalogEntry(url: url, searchText: text))
+            rebuilt.append(InstalledCatalogEntry(url: url, searchText: text))
         }
-        installedCatalogIndex.sort { $0.searchText.localizedStandardCompare($1.searchText) == .orderedAscending }
+        guard catalogOperationIsCurrent(generation) else { return false }
+        rebuilt.sort { $0.searchText.localizedStandardCompare($1.searchText) == .orderedAscending }
+        guard catalogOperationIsCurrent(generation) else { return false }
+        installedCatalogIndex = rebuilt
+        installedCatalogTruncated = truncated
+        catalogImportCache = [:]
+        catalogCacheOrder = []
+        return true
     }
 
-    private func catalogResult(query: String, cursor: Int, limit: Int, refresh: Bool) -> [String: Any] {
-        if refresh || installedCatalogIndex.isEmpty { rebuildInstalledCatalog() }
+    private func catalogResult(query: String, cursor: Int, limit: Int, refresh: Bool, generation: Int) async -> [String: Any] {
+        if refresh || installedCatalogIndex.isEmpty {
+            guard await rebuildInstalledCatalog(generation: generation) else { return cancelledCatalogResult() }
+        }
+        guard catalogOperationIsCurrent(generation) else { return cancelledCatalogResult() }
         let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines).folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current).lowercased()
         let matches = normalized.isEmpty ? installedCatalogIndex : installedCatalogIndex.filter { $0.searchText.contains(normalized) }
+        guard catalogOperationIsCurrent(generation) else { return cancelledCatalogResult() }
         let start = min(cursor, matches.count)
         let end = min(start + limit, matches.count)
         let page = Array(matches[start..<end])
         var imports: [[String: Any]] = []
         var rejected = 0
         for (index, entry) in page.enumerated() {
+            await Task.yield()
+            guard catalogOperationIsCurrent(generation) else { return cancelledCatalogResult() }
             do {
                 let imported: [String: Any]
                 if let cached = catalogImportCache[entry.url.path] { imported = cached }
@@ -564,7 +599,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
             } catch { rejected += 1 }
             if index % 25 == 0 || index + 1 == page.count { sendEvent(["type": "task-progress", "task": "catalog", "completed": start + index + 1, "total": matches.count]) }
         }
-        var response: [String: Any] = ["type": "catalog-result", "imports": imports, "indexed": installedCatalogIndex.count, "total": matches.count, "rejected": rejected, "truncated": installedCatalogTruncated]
+        var response: [String: Any] = ["type": "catalog-result", "imports": imports, "indexed": installedCatalogIndex.count, "total": matches.count, "rejected": rejected, "truncated": installedCatalogTruncated, "cancelled": false]
         if end < matches.count { response["nextCursor"] = end }
         return response
     }
@@ -694,7 +729,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         }
     }
 
-    fileprivate func exportHandoff(_ document: [String: Any], _ preferences: [String: Any], _ permission: Bool, _ target: URL) async throws -> (name: String, count: Int) {
+    fileprivate func exportHandoff(_ document: [String: Any], _ preferences: [String: Any], _ permission: Bool, _ target: URL, commit: ((URL, URL) throws -> Void)? = nil) async throws -> (name: String, count: Int) {
         let manager = FileManager.default; let base = "\(safeStem(document["title"] as? String ?? "Font Previewer")) Handoff"
         var final = target.appendingPathComponent(base, isDirectory: true); var suffix = 2
         while manager.fileExists(atPath: final.path) { final = target.appendingPathComponent("\(base) \(suffix)", isDirectory: true); suffix += 1 }
@@ -722,8 +757,35 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
             try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys]).write(to: staging.appendingPathComponent("manifest.json"), options: [.atomic])
             let checksums = entries.compactMap { entry -> String? in guard let hash = entry["sha256"] as? String, let path = entry["path"] as? String else { return nil }; return "\(hash)  \(path)" }.joined(separator: "\n") + "\n"
             try checksums.data(using: .utf8)!.write(to: staging.appendingPathComponent("checksums.sha256"), options: [.atomic])
-            try manager.moveItem(at: staging, to: final); return (final.lastPathComponent, entries.count + 2)
+            if let commit { try commit(staging, final) } else { try manager.moveItem(at: staging, to: final) }
+            return (final.lastPathComponent, entries.count + 2)
         } catch { try? manager.removeItem(at: staging); throw error }
+    }
+
+    fileprivate func verifyHandoffFaultInjection(in target: URL) async throws -> [String: Any] {
+        let manager = FileManager.default
+        guard let document = mirroredDocument else { throw HostError.exportFailed("No mirrored Study for Handoff fault injection") }
+        try manager.createDirectory(at: target, withIntermediateDirectories: true)
+        let preferences: [String: Any] = ["profile": "technical", "outputs": ["summary", "json", "csv"], "includeSources": false]
+        let committed = try await exportHandoff(document, preferences, false, target)
+        let manifest = target.appendingPathComponent(committed.name, isDirectory: true).appendingPathComponent("manifest.json")
+        let before = try Data(contentsOf: manifest)
+        var failureObserved = false
+        do {
+            _ = try await exportHandoff(document, preferences, false, target) { _, _ in throw HostError.exportFailed("Injected Handoff commit failure") }
+        } catch {
+            failureObserved = true
+        }
+        let after = try Data(contentsOf: manifest)
+        let names = try manager.contentsOfDirectory(atPath: target.path)
+        return [
+            "failureObserved": failureObserved,
+            "priorExportByteIdentical": before == after,
+            "stagingClean": !names.contains { $0.contains(".staging-") },
+            "committedFolder": committed.name,
+            "committedFileCount": committed.count,
+            "finalFolderCount": names.count,
+        ]
     }
 
     fileprivate func evaluate(_ script: String) async throws -> Any? { try await withCheckedThrowingContinuation { continuation in webView.evaluateJavaScript(script) { value, error in if let error { continuation.resume(throwing: error) } else { continuation.resume(returning: value) } } } }
@@ -740,7 +802,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     private func relativePath(_ url: URL, _ root: URL) -> String { String(url.path.dropFirst(root.path.count + 1)) }
     private func sha256(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
 
-    private func emptyDocument() -> [String: Any] { let now = ISO8601DateFormatter().string(from: Date()); return ["schemaVersion": 4, "id": "study:\(UUID().uuidString.lowercased())", "title": "Untitled font study", "createdAt": now, "updatedAt": now, "sources": [], "faces": [], "candidates": [], "recipes": [["id": "recipe:blank", "pack": "blank", "name": "Custom specimen", "copy": "Type carries the argument before a word is read.", "language": "en", "direction": "auto", "casing": "exact", "sizePolicy": "fit", "size": 72, "lineHeight": 1.04, "tracking": -0.02, "alignment": "leading", "background": "split"]], "comparisonSets": [], "typographySystems": [["id": "system:primary", "name": "Primary system", "rationale": "", "fontUses": []]], "activeSystemId": "system:primary", "handoff": ["profile": "designer", "outputs": ["pdf", "summary", "json", "csv"], "includeSources": false]] }
+    private func emptyDocument() -> [String: Any] { let now = ISO8601DateFormatter().string(from: Date()); return ["schemaVersion": 4, "id": "study:\(UUID().uuidString.lowercased())", "title": "Untitled font study", "createdAt": now, "updatedAt": now, "sources": [], "faces": [], "candidates": [], "recipes": [["id": "recipe:blank", "pack": "blank", "name": "Custom specimen", "copy": "Type carries the argument before a word is read.", "language": "en", "direction": "auto", "casing": "exact", "sizePolicy": "fit", "size": 72, "lineHeight": 1.04, "tracking": -0.02, "alignment": "leading", "background": "split"]], "comparisonSets": [], "typographySystems": [["id": "system:primary", "name": "Primary system", "rationale": "", "fontUses": []]], "activeSystemId": "system:primary", "handoff": ["profile": "designer", "outputs": ["pdf", "summary", "json", "csv"], "includeSources": true]] }
 
     private func persistRecovery() throws { guard let document = mirroredDocument, let workspace = mirroredWorkspace else { return }; let value: [String: Any] = ["version": 1, "document": document, "workspace": workspace, "revision": mirroredRevision, "intentionallySavedRevision": intentionallySavedRevision]; try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]).write(to: recoveryURL, options: [.atomic]) }
     private func loadRecovery() { guard let data = try? Data(contentsOf: recoveryURL), data.count <= maximumStudyBytes * 2, let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any], value["version"] as? Int == 1, let document = value["document"] as? [String: Any], document["schemaVersion"] as? Int == 4, let workspace = value["workspace"] as? [String: Any], let revision = value["revision"] as? Int else { return }; mirroredDocument = document; mirroredWorkspace = workspace; mirroredRevision = max(0, revision); intentionallySavedRevision = min(max(0, value["intentionallySavedRevision"] as? Int ?? 0), mirroredRevision) }
@@ -809,18 +871,22 @@ private final class MacEvidenceRunner {
         trace["afterMenuUndoRedo"] = try await inspect()
         trace["bridge"] = try await host.evaluateAsync("(async()=>{const v=[];for(let i=0;i<40;i++){const s=performance.now();const r=await window.fontPreviewerHost.request({type:'probe',serial:i});if(r.serial!==i)throw new Error('probe');v.push(performance.now()-s)}return {samples:v.length,max:Math.max(...v),mean:v.reduce((a,b)=>a+b,0)/v.length}})()") ?? NSNull()
         trace["installedCatalog"] = try await host.evaluateAsync("(async()=>{const studyCount=()=>Number([...document.querySelectorAll('.catalog-switcher button')].find(item=>item.textContent?.trim().startsWith('Study'))?.querySelector('span')?.textContent??-1);const beforeStudy=studyCount();[...document.querySelectorAll('.catalog-switcher button')].find(item=>item.textContent?.trim().startsWith('Catalog'))?.click();const deadline=performance.now()+30000;while(!document.querySelector('.catalog-results .catalog-source')&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,50));const afterStudy=studyCount();const r=await window.fontPreviewerHost.request({type:'scan-installed',query:'',cursor:0,limit:40,refresh:false});if(r.type!=='catalog-result')throw new Error('catalog');const raw=JSON.stringify(r);const preview=r.imports.find(item=>item.binding.previewUrl)?.binding.previewUrl;let fontLoaded=false;if(preview){const face=new FontFace('Font Previewer Evidence','url(\"'+preview+'\")');await face.load();fontLoaded=face.status==='loaded'}return {count:r.imports.length,indexed:r.indexed,total:r.total,rejected:r.rejected,truncated:r.truncated,pageBounded:r.imports.length<=40,studyUnchanged:beforeStudy>=0&&beforeStudy===afterStudy,rendered:document.querySelectorAll('.catalog-results .catalog-source').length,pathLeak:/(?:file:\\/\\/|\\/home\\/|\\/Users\\/|[A-Za-z]:\\\\)/.test(raw),opaquePreviewUrls:r.imports.every(item=>!item.binding.previewUrl||item.binding.previewUrl.startsWith('pitch-font://asset/')),previewAvailable:Boolean(preview),fontLoaded}})()") ?? NSNull()
+        let catalogCancellation = try await host.evaluateAsync("(async()=>{const obsolete=window.fontPreviewerHost.request({type:'scan-installed',query:'',cursor:0,limit:200,refresh:true});await new Promise(resolve=>setTimeout(resolve,0));const started=performance.now();const ack=await window.fontPreviewerHost.request({type:'cancel-catalog'});const durationMs=performance.now()-started;const result=await obsolete;return {acknowledged:ack.type==='ack'&&ack.action==='cancel-catalog',durationMs,obsoleteResultCancelled:result.type==='catalog-result'&&result.cancelled===true}})()") ?? NSNull()
+        if var installedCatalog = trace["installedCatalog"] as? [String: Any] { installedCatalog["cancellation"] = catalogCancellation; trace["installedCatalog"] = installedCatalog }
         try await host.snapshot(to: output.appendingPathComponent("06-catalog.png"))
         for (stage, file) in [("Compare", "02-compare.png"), ("System", "03-system.png"), ("Handoff", "04-handoff.png")] { _ = try await host.evaluate("([...document.querySelectorAll('.stage-nav button')].find((item)=>item.textContent?.includes('\(stage)')))?.click();true"); try await Task.sleep(nanoseconds: 150_000_000); try await host.snapshot(to: output.appendingPathComponent(file)) }
         trace["security"] = try await host.evaluateAsync("(async()=>{const bad=[{type:'open-import',path:'/tmp/x'},{type:'probe',serial:-1},{type:'read-file',path:'/etc/passwd'},{type:'scan-installed'},{type:'scan-installed',query:'',cursor:0,limit:10000,refresh:false}];let rejected=0;for(const r of bad){try{await window.fontPreviewerHost.request(r)}catch{rejected++}}return {attempts:bad.length,rejected,nodeUnavailable:typeof window.require==='undefined'&&typeof window.process==='undefined',hostKeys:Object.keys(window.fontPreviewerHost).sort()}})()") ?? NSNull()
         trace["semantics"] = try await host.evaluate("(()=>{const controls=[...document.querySelectorAll('button,input,select,textarea')];const named=el=>el.getAttribute('aria-label')||el.getAttribute('aria-labelledby')||el.closest('label')?.textContent?.trim()||el.textContent?.trim();const roleLabel=[...document.querySelectorAll('.field-label')].find(label=>label.querySelector(':scope > span')?.textContent?.trim()==='Role');const roleSelect=roleLabel?.querySelector('select')?.getBoundingClientRect();const roleHelp=roleLabel?.querySelector(':scope > small')?.getBoundingClientRect();return {controls:controls.length,unnamed:controls.filter(el=>!named(el)).length,mains:document.querySelectorAll('main').length,asides:document.querySelectorAll('aside').length,duplicateIds:[...document.querySelectorAll('[id]')].map(el=>el.id).filter((id,i,a)=>a.indexOf(id)!==i).length,horizontalOverflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,roleHelpSeparated:Boolean(roleSelect&&roleHelp&&roleSelect.bottom<=roleHelp.top)}})()") ?? NSNull()
+        trace["transactionalHandoffFault"] = try await host.verifyHandoffFaultInjection(in: output.appendingPathComponent("handoff-fault-target", isDirectory: true))
         try await wait("Recovery") { try await self.bool("document.querySelector('.document-title > span:last-child')?.textContent?.includes('recovery ready')") }
         let before = try await inspect(); host.webView.reload(); try await wait("Reload") { try await self.bool("document.querySelector('#workspace-heading') && document.activeElement?.id==='workspace-heading' && document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label')==='Keep'") }; let after = try await inspect(); trace["reload"] = ["before": before, "after": after]
         try await host.snapshot(to: output.appendingPathComponent("05-recovered.png"))
         trace["nativePanel"] = ["opened": host.panelOpened, "cancelled": host.panelCancelled]
         trace["hostCounters"] = ["rejectedRequests": host.rejectedRequests, "menuCommands": host.menuCommands, "navigationRejections": host.navigationRejections, "popupRejections": host.popupRejections, "processTerminations": host.processTerminations]
         try JSONSerialization.data(withJSONObject: trace, options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("run.json"), options: [.atomic])
-        let security = trace["security"] as? [String: Any]; let semantics = trace["semantics"] as? [String: Any]; let keyboard = trace["keyboardAccessibility"] as? [String: Any]; let catalog = trace["installedCatalog"] as? [String: Any]
-        guard security?["attempts"] as? Int == security?["rejected"] as? Int, security?["nodeUnavailable"] as? Bool == true, semantics?["unnamed"] as? Int == 0, semantics?["duplicateIds"] as? Int == 0, semantics?["horizontalOverflow"] as? Bool == false, semantics?["roleHelpSeparated"] as? Bool == true, keyboard?["forwardWrap"] as? Bool == true, keyboard?["backwardWrap"] as? Bool == true, keyboard?["candidateUnchanged"] as? Bool == true, keyboard?["trayUnchanged"] as? Bool == true, keyboard?["returnFocus"] as? Bool == true, ((catalog?["count"] as? Int) ?? 0) > 0, ((catalog?["indexed"] as? Int) ?? 0) > 0, catalog?["pageBounded"] as? Bool == true, catalog?["studyUnchanged"] as? Bool == true, catalog?["pathLeak"] as? Bool == false, catalog?["opaquePreviewUrls"] as? Bool == true, catalog?["previewAvailable"] as? Bool == true, catalog?["fontLoaded"] as? Bool == true, host.panelOpened > 0, host.panelCancelled > 0 else { throw HostError.unavailable("Evidence assertions failed") }
+        let security = trace["security"] as? [String: Any]; let semantics = trace["semantics"] as? [String: Any]; let keyboard = trace["keyboardAccessibility"] as? [String: Any]; let catalog = trace["installedCatalog"] as? [String: Any]; let handoffFault = trace["transactionalHandoffFault"] as? [String: Any]
+        let cancellation = catalog?["cancellation"] as? [String: Any]
+        guard security?["attempts"] as? Int == security?["rejected"] as? Int, security?["nodeUnavailable"] as? Bool == true, semantics?["unnamed"] as? Int == 0, semantics?["duplicateIds"] as? Int == 0, semantics?["horizontalOverflow"] as? Bool == false, semantics?["roleHelpSeparated"] as? Bool == true, keyboard?["forwardWrap"] as? Bool == true, keyboard?["backwardWrap"] as? Bool == true, keyboard?["candidateUnchanged"] as? Bool == true, keyboard?["trayUnchanged"] as? Bool == true, keyboard?["returnFocus"] as? Bool == true, ((catalog?["count"] as? Int) ?? 0) > 0, ((catalog?["indexed"] as? Int) ?? 0) > 0, catalog?["pageBounded"] as? Bool == true, catalog?["studyUnchanged"] as? Bool == true, catalog?["pathLeak"] as? Bool == false, catalog?["opaquePreviewUrls"] as? Bool == true, catalog?["previewAvailable"] as? Bool == true, catalog?["fontLoaded"] as? Bool == true, cancellation?["acknowledged"] as? Bool == true, cancellation?["obsoleteResultCancelled"] as? Bool == true, ((cancellation?["durationMs"] as? Double) ?? .infinity) <= 100, handoffFault?["failureObserved"] as? Bool == true, handoffFault?["priorExportByteIdentical"] as? Bool == true, handoffFault?["stagingClean"] as? Bool == true, handoffFault?["finalFolderCount"] as? Int == 1, host.panelOpened > 0, host.panelCancelled > 0 else { throw HostError.unavailable("Evidence assertions failed") }
     }
     private func performMenu(_ menuTitle: String, _ itemTitle: String) throws {
         guard let menu = NSApp.mainMenu?.item(withTitle: menuTitle)?.submenu, let item = menu.item(withTitle: itemTitle) else { throw HostError.unavailable("Missing native menu item \(menuTitle) → \(itemTitle)") }

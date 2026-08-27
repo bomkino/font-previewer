@@ -66,11 +66,14 @@ ditto "$STUDIO" "$APP/Contents/Resources/Studio"
 ditto "$REPO_DIR/LICENSE" "$APP/Contents/Resources/LICENSE.txt"
 ditto "$APP_DIR/THIRD_PARTY_NOTICES.md" "$APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
-codesign --force --sign - --identifier dog.pitch.fontpreviewer "$APP"
+codesign --force --sign - --options runtime --identifier dog.pitch.fontpreviewer "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 
 ARCHIVE="$OUTPUT_DIR/Font Previewer.zip"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ARCHIVE"
-shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"
+(
+  cd "$OUTPUT_DIR"
+  shasum -a 256 "Font Previewer.zip" > "Font Previewer.zip.sha256"
+)
 
 echo "$APP"

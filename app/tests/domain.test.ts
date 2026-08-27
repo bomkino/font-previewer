@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createNewStudy } from "../src/fixture.js";
 import {
   DomainError,
   activeTypographySystem,
@@ -158,19 +159,22 @@ test("recovery round-trips document/workspace/revisions but never Host-local bin
   assert.throws(() => parseRecoverySnapshot("x".repeat(16_000_001)), DomainError);
 });
 
-test("legacy migration preserves Maybe evidence and strips source paths", () => {
-  const migrated = migrateLegacyStudy({
-    schemaVersion: 2,
-    id: "legacy",
-    title: "Legacy Study",
-    records: [{ id: "one", fileName: "Family-Regular.otf", path: "/Users/person/Fonts/Family-Regular.otf", familyName: "Family", styleName: "Regular", status: "maybe", role: "display" }],
-  });
-  assert.equal(migrated.document.schemaVersion, 4);
-  assert.equal(migrated.document.candidates[0].reviewState, "maybe");
-  assert.deepEqual(migrated.document.candidates[0].provenance, { kind: "legacy", legacyReviewState: "maybe" });
-  assert.equal(activeTypographySystem(migrated.document).fontUses[0].role, "display");
-  assert.doesNotMatch(serializeStudyDocument(migrated.document), /\/Users\/person/);
-  assert.ok(migrated.warnings.some((warning) => warning.includes("paths")));
+test("every supported legacy schema preserves Maybe evidence and strips source paths", () => {
+  for (const schemaVersion of [1, 2, 3]) {
+    const migrated = migrateLegacyStudy({
+      schemaVersion,
+      id: `legacy-${schemaVersion}`,
+      title: `Legacy Study ${schemaVersion}`,
+      records: [{ id: "one", fileName: "Family-Regular.otf", path: "/Users/person/Fonts/Family-Regular.otf", familyName: "Family", styleName: "Regular", status: "maybe", role: "display" }],
+    });
+    assert.equal(migrated.fromVersion, schemaVersion);
+    assert.equal(migrated.document.schemaVersion, 4);
+    assert.equal(migrated.document.candidates[0].reviewState, "maybe");
+    assert.deepEqual(migrated.document.candidates[0].provenance, { kind: "legacy", legacyReviewState: "maybe" });
+    assert.equal(activeTypographySystem(migrated.document).fontUses[0].role, "display");
+    assert.doesNotMatch(serializeStudyDocument(migrated.document), /\/Users\/person/);
+    assert.ok(migrated.warnings.some((warning) => warning.includes("paths")));
+  }
 });
 
 test("validation rejects corrupt references, oversized input, and future schemas", () => {
@@ -196,4 +200,30 @@ test("createSession repairs invalid workspace references instead of reviving sta
   assert.equal(repaired.workspace.selectedCandidateId, fixture.document.candidates[0].id);
   assert.equal(repaired.workspace.activeRecipeId, fixture.document.recipes[0].id);
   assert.deepEqual(repaired.workspace.trayIds, [fixture.document.candidates[2].id]);
+});
+
+test("Study parser contains seeded corruption at the portable document seam", () => {
+  const serialized = serializeStudyDocument(createFixtureSession().document);
+  const corruptions: Array<(document: Record<string, any>) => void> = [
+    (document) => { document.schemaVersion = 99; },
+    (document) => { document.sources[1].id = document.sources[0].id; },
+    (document) => { document.sources[0].hint.fileSize = Number.MAX_SAFE_INTEGER + 1; },
+    (document) => { document.faces[0].coverage.supportedCodePointCount = -1; },
+    (document) => { document.candidates[0].faceId = "face:absent"; },
+    (document) => { document.candidates[0].reviewState = "approved"; },
+    (document) => { document.recipes[0].copy = "x".repeat(20_001); },
+    (document) => { document.comparisonSets[0].candidateIds[0] = "candidate:absent"; },
+    (document) => { document.typographySystems[0].fontUses[0].role = "not-a-role"; },
+    (document) => { document.activeSystemId = "system:absent"; },
+  ];
+  let state = 0x1a2b3c4d;
+  for (let index = 0; index < 250; index += 1) {
+    state = (Math.imul(state ^ state >>> 16, 0x45d9f3b) + index) | 0;
+    const document = JSON.parse(serialized) as Record<string, any>;
+    corruptions[(state >>> 0) % corruptions.length](document);
+    assert.throws(() => parseStudyDocument(JSON.stringify(document)), DomainError);
+  }
+});
+test("new internal studies include bound Sources in Handoff by default", () => {
+  assert.equal(createNewStudy().document.handoff.includeSources, true);
 });

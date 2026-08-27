@@ -10,5 +10,5 @@
     "sourceMap": true,
     "types": ["node"]
   },
-  "include": ["electron/main.ts", "electron/evidence.ts"]
+  "include": ["electron/main.ts", "electron/evidence.ts", "electron/font-variation-worker.ts"]
 }

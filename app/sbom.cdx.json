@@ -564,6 +564,64 @@
     },
     {
       "type": "library",
+      "name": "@swc/helpers",
+      "version": "0.5.23",
+      "purl": "pkg:npm/%40swc/helpers@0.5.23",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "e654ac30e4d751178f8250dfbee01052a9067a4f47836924b0e61acb69b4f9747ef9bd8d5982ffe2c5b2baf54122cf282a725ac64762f7085a2ffb2a375dda7f"
+        }
+      ],
+      "properties": [
+        {
+          "name": "font-previewer:development",
+          "value": "false"
+        },
+        {
+          "name": "font-previewer:optional",
+          "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "@types/fontkit",
+      "version": "2.0.9",
+      "purl": "pkg:npm/%40types/fontkit@2.0.9",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "a8d61eac5932de6b829993eaf91f81ddc503440e4e38dc3fa21e9a186171c762ce073eb2bbc79a98abacae19079c2eab7367e6efaf86f73f50a16481d926906b"
+        }
+      ],
+      "properties": [
+        {
+          "name": "font-previewer:development",
+          "value": "true"
+        },
+        {
+          "name": "font-previewer:optional",
+          "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "@types/node",
       "version": "24.13.3",
       "purl": "pkg:npm/%40types/node@24.13.3",
@@ -1260,6 +1318,93 @@
     },
     {
       "type": "library",
+      "name": "base64-js",
+      "version": "1.5.1",
+      "purl": "pkg:npm/base64-js@1.5.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "00aa5a6251e7f2de1255b3870b2f9be7e28a82f478bebb03f2f6efadb890269b3b7ca0d3923903af2ea38b4ad42630b49336cd78f2f0cf1abc8b2a68e35a9e58"
+        }
+      ],
+      "properties": [
+        {
+          "name": "font-previewer:development",
+          "value": "false"
+        },
+        {
+          "name": "font-previewer:optional",
+          "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "brotli",
+      "version": "1.3.3",
+      "purl": "pkg:npm/brotli@1.3.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "a132a325d4a1983b865bde12cb26a842f0237f7d1d65a1e78c9f2e005faedbfbc626425b24f2404f580388e24fe6fd596fa7fd284c96ff51e9b9a5885ed1873e"
+        }
+      ],
+      "properties": [
+        {
+          "name": "font-previewer:development",
+          "value": "false"
+        },
+        {
+          "name": "font-previewer:optional",
+          "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "clone",
+      "version": "2.1.2",
+      "purl": "pkg:npm/clone@2.1.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "dcf7bf085d4d9fde21ca1218a63b622e1742a04a33d03a90fbdf3c13d826784750665a23c6739bef8c1cb45caec16407ceac9ff57ec2ecc1bc8ee529a81253f3"
+        }
+      ],
+      "properties": [
+        {
+          "name": "font-previewer:development",
+          "value": "false"
+        },
+        {
+          "name": "font-previewer:optional",
+          "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "csstype",
       "version": "3.2.3",
       "purl": "pkg:npm/csstype@3.2.3",
@@ -1347,6 +1492,35 @@
     },
     {
       "type": "library",
+      "name": "dfa",
+      "version": "1.2.0",
+      "purl": "pkg:npm/dfa@1.2.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "103de33fcb1a6b07854e37865fc1d03e3782d5863266cf7c8c6359c7a22206fc56ec91b9bf8f7691a980401de6db0a29d3b0af53f4509b370aafa6e0702e43fd"
+        }
+      ],
+      "properties": [
+        {
+          "name": "font-previewer:development",
+          "value": "false"
+        },
+        {
+          "name": "font-previewer:optional",
+          "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "electron",
       "version": "44.0.0",
       "purl": "pkg:npm/electron@44.0.0",
@@ -1405,6 +1579,35 @@
     },
     {
       "type": "library",
+      "name": "fast-deep-equal",
+      "version": "3.1.3",
+      "purl": "pkg:npm/fast-deep-equal@3.1.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "7f7a90f68432f63d808417bf1fd542f75c0b98a042094fe00ce9ca340606e61b303bb04b2a3d3d1dce4760dcfd70623efb19690c22200da8ad56cd3701347ce1"
+        }
+      ],
+      "properties": [
+        {
+          "name": "font-previewer:development",
+          "value": "false"
+        },
+        {
+          "name": "font-previewer:optional",
+          "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "fdir",
       "version": "6.5.0",
       "purl": "pkg:npm/fdir@6.5.0",
@@ -1425,6 +1628,35 @@
         {
           "name": "font-previewer:development",
           "value": "true"
+        },
+        {
+          "name": "font-previewer:optional",
+          "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "fontkit",
+      "version": "2.0.4",
+      "purl": "pkg:npm/fontkit@2.0.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "b327ad41a75a5040cd77176e8206bd0a911855a408c4ec24ec6970656599d7dfffa96e331396e49ce29e3010d80004b09e96921ca2484d12cc17d9b57e9decea"
+        }
+      ],
+      "properties": [
+        {
+          "name": "font-previewer:development",
+          "value": "false"
         },
         {
           "name": "font-previewer:optional",
@@ -1898,6 +2130,35 @@
     },
     {
       "type": "library",
+      "name": "pako",
+      "version": "0.2.9",
+      "purl": "pkg:npm/pako@0.2.9",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "35473068ac54c56ad92e90c6fb3ff165a0a04084e403f0efe15fd3e9bc3b54e37a9755f3fd59eb06aad88d9435d936a6287cc84d37ce1086148f8f32d8a5c898"
+        }
+      ],
+      "properties": [
+        {
+          "name": "font-previewer:development",
+          "value": "false"
+        },
+        {
+          "name": "font-previewer:optional",
+          "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "picocolors",
       "version": "1.1.1",
       "purl": "pkg:npm/picocolors@1.1.1",
@@ -2072,6 +2333,35 @@
     },
     {
       "type": "library",
+      "name": "restructure",
+      "version": "3.0.2",
+      "purl": "pkg:npm/restructure@3.0.2",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "8127e888e100d153c4e93ba492bafb234441744d2cec7d5e1420c1934e65d4a2104f550828d739259cba8ddc96e9e607dda4778396f73ee2fbeebab486fc2d03"
+        }
+      ],
+      "properties": [
+        {
+          "name": "font-previewer:development",
+          "value": "false"
+        },
+        {
+          "name": "font-previewer:optional",
+          "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "rolldown",
       "version": "1.2.6",
       "purl": "pkg:npm/rolldown@1.2.6",
@@ -2217,6 +2507,35 @@
     },
     {
       "type": "library",
+      "name": "tiny-inflate",
+      "version": "1.0.3",
+      "purl": "pkg:npm/tiny-inflate@1.0.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "a646357e3d5c2876f6b1e583cb4075e87796c9cce5240f7f596deeddce33fcd8960ec3b70ce5390fb9e14cb13d085d325effd064563bb042668f6e1d2be46bab"
+        }
+      ],
+      "properties": [
+        {
+          "name": "font-previewer:development",
+          "value": "false"
+        },
+        {
+          "name": "font-previewer:optional",
+          "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "tinyglobby",
       "version": "0.2.17",
       "purl": "pkg:npm/tinyglobby@0.2.17",
@@ -2237,6 +2556,35 @@
         {
           "name": "font-previewer:development",
           "value": "true"
+        },
+        {
+          "name": "font-previewer:optional",
+          "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "tslib",
+      "version": "2.8.1",
+      "purl": "pkg:npm/tslib@2.8.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "a0916ef781d06fe29576e49440bef09e99aa9df98bb0e03f9c087a6fa107d30084a0ad3f98f79753a737c0a0d5f373243ae1cf447b525ca294f7d2016b34bfdb"
+        }
+      ],
+      "properties": [
+        {
+          "name": "font-previewer:development",
+          "value": "false"
         },
         {
           "name": "font-previewer:optional",
@@ -2324,6 +2672,64 @@
         {
           "name": "font-previewer:development",
           "value": "true"
+        },
+        {
+          "name": "font-previewer:optional",
+          "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "unicode-properties",
+      "version": "1.4.1",
+      "purl": "pkg:npm/unicode-properties@1.4.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "08b8c208b43a52e3315a76c8ca5922b1b463df5ab11cf02eaef7a76bfd22c1255b4361b5558e7f1e357421169b3846c31e5cd9951742ac3e0d841d09b54e343e"
+        }
+      ],
+      "properties": [
+        {
+          "name": "font-previewer:development",
+          "value": "false"
+        },
+        {
+          "name": "font-previewer:optional",
+          "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "unicode-trie",
+      "version": "2.0.0",
+      "purl": "pkg:npm/unicode-trie@2.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "c7b6dcefac746e6e29adfd552e0efdba10332b0f0355ba0295237957126e43e2ca0ce5445bd09d1fe558ed23febd7ef109842acf3810a45ab3d79cde2ef02d65"
+        }
+      ],
+      "properties": [
+        {
+          "name": "font-previewer:development",
+          "value": "false"
         },
         {
           "name": "font-previewer:optional",

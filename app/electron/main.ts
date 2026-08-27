@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { execFile as BunlessExecFile, type ChildProcess } from "node:child_process";
 import { constants as fsConstants, watch, type FSWatcher } from "node:fs";
 import { access, lstat, mkdir, readdir, realpath, stat } from "node:fs/promises";
 import { basename, extname, isAbsolute, join } from "node:path";
@@ -36,7 +37,18 @@ import {
   type RecoveryEnvelope,
 } from "../src/protocol.js";
 import { runEvidenceFlow } from "./evidence.js";
-import { FONT_EXTENSIONS, buildImportedSource, rendererSupportForPath } from "./font-inspection.js";
+import {
+  MAXIMUM_CATALOG_ENTRIES,
+  buildFontconfigCatalog,
+  catalogPage,
+  type CatalogIndexEntry,
+} from "./catalog-index.js";
+import {
+  FONT_EXTENSIONS,
+  buildImportedSource,
+  inspectFontFile,
+  rendererSupportForPath,
+} from "./font-inspection.js";
 import { exportTransactionalHandoff } from "./handoff.js";
 import { atomicWrite, readBoundedText, safeFileStem } from "./host-storage.js";
 
@@ -54,7 +66,6 @@ const maximumStudyBytes = 8_000_000;
 const maximumSourceBytes = 512 * 1024 * 1024;
 const maximumImportBytes = 2 * 1024 * 1024 * 1024;
 const maximumImportFiles = 2_048;
-const maximumCatalogEntries = 10_000;
 const maximumCatalogCache = 400;
 const maximumImportDepth = 12;
 const maximumImportMilliseconds = 15_000;
@@ -92,8 +103,10 @@ const sourceWatchers = new Map<string, FSWatcher>();
 const catalogSourceIdsByCanonicalPath = new Map<string, string>();
 const catalogPathsBySourceId = new Map<string, string>();
 const catalogImportCache = new Map<string, ImportedSource>();
-let installedCatalogIndex: Array<{ readonly path: string; readonly searchText: string }> = [];
+let installedCatalogIndex: readonly CatalogIndexEntry[] = [];
 let installedCatalogTruncated = false;
+let catalogGeneration = 0;
+let activeCatalogProcess: ChildProcess | undefined;
 
 if (evidenceDirectory) app.disableHardwareAcceleration();
 
@@ -238,6 +251,7 @@ async function inspectFontPath(selectedPath: string, forcedSourceId?: string, ca
   const metadata = await stat(canonicalPath);
   if (!metadata.isFile() || metadata.size <= 0 || metadata.size > maximumSourceBytes) throw new Error("Source is empty or exceeds 512 MB.");
   await access(canonicalPath, fsConstants.R_OK);
+  const faces = await inspectFontFile(canonicalPath);
   const sourceId = forcedSourceId ?? sourceIdsByCanonicalPath.get(canonicalPath) ?? catalogSourceIdsByCanonicalPath.get(canonicalPath) ?? `source:${randomUUID()}`;
   if (forcedSourceId) {
     const priorPath = sourceBindings.get(forcedSourceId);
@@ -259,6 +273,7 @@ async function inspectFontPath(selectedPath: string, forcedSourceId?: string, ca
     sourceId,
     byteLength: metadata.size,
     modifiedAt: metadata.mtime.toISOString(),
+    faces,
     ...(support === "full" ? { previewUrl: previewUrlForSource(sourceId, canonicalPath) } : {}),
   });
 }
@@ -323,48 +338,78 @@ async function importPaths(roots: readonly string[], task: "import" | "catalog")
   return { type: "import-result", imports, rejected, truncated: collected.truncated };
 }
 
-async function rebuildInstalledCatalog(): Promise<void> {
-  installedCatalogIndex = [];
-  installedCatalogTruncated = false;
-  catalogImportCache.clear();
-  if (process.platform !== "linux") return;
-  const records = await new Promise<string>((resolve) => {
-    const child = BunlessExecFile("/usr/bin/fc-list", ["-f", "%{file}\u001f%{family}\u001f%{style}\\n"], { maxBuffer: 16 * 1024 * 1024 }, (error, stdout) => {
-      resolve(error ? "" : stdout);
-    });
-    const timer = setTimeout(() => { child.kill(); resolve(""); }, maximumImportMilliseconds);
-    child.once("exit", () => clearTimeout(timer));
-  });
-  const byPath = new Map<string, string>();
-  for (const line of records.split("\n")) {
-    const [pathValue, family = "", style = ""] = line.split("\u001f");
-    const path = pathValue?.trim();
-    if (!path || !FONT_EXTENSIONS.has(extname(path).toLocaleLowerCase())) continue;
-    const search = `${basename(path, extname(path))} ${family} ${style}`.normalize("NFKD").toLocaleLowerCase();
-    byPath.set(path, `${byPath.get(path) ?? ""} ${search}`.trim());
-    if (byPath.size > maximumCatalogEntries) {
-      installedCatalogTruncated = true;
-      break;
-    }
-  }
-  installedCatalogIndex = [...byPath]
-    .slice(0, maximumCatalogEntries)
-    .map(([path, searchText]) => ({ path, searchText }))
-    .sort((left, right) => left.searchText.localeCompare(right.searchText));
+function cancelCatalogOperation(): number {
+  catalogGeneration += 1;
+  activeCatalogProcess?.kill();
+  activeCatalogProcess = undefined;
+  return catalogGeneration;
 }
 
-async function installedCatalogPage(request: Extract<HostRequest, { type: "scan-installed" }>): Promise<Extract<HostResponse, { type: "catalog-result" }>> {
-  if (request.refresh || installedCatalogIndex.length === 0) await rebuildInstalledCatalog();
-  const query = request.query.trim().normalize("NFKD").toLocaleLowerCase();
-  const matches = query ? installedCatalogIndex.filter((entry) => entry.searchText.includes(query)) : installedCatalogIndex;
-  const page = matches.slice(request.cursor, request.cursor + request.limit);
+function catalogOperationIsCurrent(generation: number): boolean {
+  return generation === catalogGeneration;
+}
+
+function cancelledCatalogResult(): Extract<HostResponse, { type: "catalog-result" }> {
+  return {
+    type: "catalog-result",
+    imports: [],
+    indexed: installedCatalogIndex.length,
+    total: 0,
+    rejected: 0,
+    truncated: installedCatalogTruncated,
+    cancelled: true,
+  };
+}
+
+async function rebuildInstalledCatalog(generation: number): Promise<boolean> {
+  if (process.platform !== "linux") {
+    if (!catalogOperationIsCurrent(generation)) return false;
+    installedCatalogIndex = [];
+    installedCatalogTruncated = false;
+    catalogImportCache.clear();
+    return true;
+  }
+  const records = await new Promise<string>((resolve) => {
+    let child: ChildProcess;
+    let settled = false;
+    let timer: NodeJS.Timeout | undefined;
+    const finish = (value: string) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      if (activeCatalogProcess === child) activeCatalogProcess = undefined;
+      resolve(value);
+    };
+    child = BunlessExecFile("/usr/bin/fc-list", ["-f", "%{file}\u001f%{family}\u001f%{style}\\n"], { maxBuffer: 16 * 1024 * 1024 }, (error, stdout) => {
+      finish(error ? "" : stdout);
+    });
+    activeCatalogProcess = child;
+    timer = setTimeout(() => { child.kill(); finish(""); }, maximumImportMilliseconds);
+  });
+  if (!catalogOperationIsCurrent(generation)) return false;
+  const rebuilt = buildFontconfigCatalog(records, FONT_EXTENSIONS, MAXIMUM_CATALOG_ENTRIES);
+  if (!catalogOperationIsCurrent(generation)) return false;
+  installedCatalogIndex = rebuilt.entries;
+  installedCatalogTruncated = rebuilt.truncated;
+  catalogImportCache.clear();
+  return true;
+}
+
+async function installedCatalogPage(request: Extract<HostRequest, { type: "scan-installed" }>, generation: number): Promise<Extract<HostResponse, { type: "catalog-result" }>> {
+  if (request.refresh || installedCatalogIndex.length === 0) {
+    if (!await rebuildInstalledCatalog(generation)) return cancelledCatalogResult();
+  }
+  if (!catalogOperationIsCurrent(generation)) return cancelledCatalogResult();
+  const result = catalogPage(installedCatalogIndex, request.query, request.cursor, request.limit);
   const imports: ImportedSource[] = [];
   let rejected = 0;
-  for (const [index, entry] of page.entries()) {
+  for (const [index, entry] of result.entries.entries()) {
+    if (!catalogOperationIsCurrent(generation)) return cancelledCatalogResult();
     try {
       let imported = catalogImportCache.get(entry.path);
       if (!imported) {
         imported = await inspectFontPath(entry.path, undefined, true);
+        if (!catalogOperationIsCurrent(generation)) return cancelledCatalogResult();
         catalogImportCache.set(entry.path, imported);
         if (catalogImportCache.size > maximumCatalogCache) catalogImportCache.delete(catalogImportCache.keys().next().value!);
       }
@@ -372,19 +417,19 @@ async function installedCatalogPage(request: Extract<HostRequest, { type: "scan-
     } catch {
       rejected += 1;
     }
-    if (index % 25 === 0 || index + 1 === page.length) {
-      sendHostEvent({ type: "task-progress", task: "catalog", completed: request.cursor + index + 1, total: matches.length });
+    if (index % 25 === 0 || index + 1 === result.entries.length) {
+      sendHostEvent({ type: "task-progress", task: "catalog", completed: request.cursor + index + 1, total: result.total });
     }
   }
-  const consumed = request.cursor + page.length;
   return {
     type: "catalog-result",
     imports,
     indexed: installedCatalogIndex.length,
-    total: matches.length,
+    total: result.total,
     rejected,
     truncated: installedCatalogTruncated,
-    ...(consumed < matches.length ? { nextCursor: consumed } : {}),
+    cancelled: false,
+    ...(result.nextCursor === undefined ? {} : { nextCursor: result.nextCursor }),
   };
 }
 
@@ -403,9 +448,6 @@ function promoteCatalogBindings(document: StudyDocument): boolean {
   }
   return changed;
 }
-
-// Kept behind a tiny wrapper so no shell is ever involved.
-import { execFile as BunlessExecFile } from "node:child_process";
 
 async function bindingForSource(sourceId: string): Promise<SourceBindingSummary> {
   const path = sourceBindings.get(sourceId);
@@ -503,8 +545,13 @@ async function handleHostRequest(event: IpcMainInvokeEvent, rawRequest: unknown)
       });
       return result.canceled ? { type: "import-result", imports: [], rejected: 0, truncated: false } : importPaths(result.filePaths, "import");
     }
-    case "scan-installed":
-      return installedCatalogPage(request);
+    case "scan-installed": {
+      const generation = cancelCatalogOperation();
+      return installedCatalogPage(request, generation);
+    }
+    case "cancel-catalog":
+      cancelCatalogOperation();
+      return { type: "ack", action: "cancel-catalog" };
     case "open-study": {
       if (!mainWindow) throw new Error("No active window.");
       const result = await dialog.showOpenDialog(mainWindow, { title: "Open Font Previewer Study", properties: ["openFile"], filters: [{ name: "Font Previewer Study", extensions: ["pitchfontstudy", "json"] }] });

@@ -1335,7 +1335,7 @@ export function migrateLegacyStudy(value: Record<string, unknown>): MigrationRes
         : [],
     typographySystems: [{ id: "system:primary", name: "Primary system", rationale: "", fontUses }],
     activeSystemId: "system:primary",
-    handoff: { profile: "designer", outputs: ["pdf", "summary", "json", "csv"], includeSources: false },
+    handoff: { profile: "designer", outputs: ["pdf", "summary", "json", "csv"], includeSources: true },
     extensions: { migratedFromSchema: version },
   });
   return { document, fromVersion: version, warnings };

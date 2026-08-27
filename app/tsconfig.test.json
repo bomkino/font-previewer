@@ -17,6 +17,10 @@
     "src/fixture.ts",
     "src/host-bridge.ts",
     "src/protocol.ts",
+    "electron/catalog-index.ts",
+    "electron/handoff.ts",
+    "electron/host-storage.ts",
+    "electron/font-variation-worker.ts",
     "tests/**/*.ts",
     "tests/**/*.tsx"
   ]

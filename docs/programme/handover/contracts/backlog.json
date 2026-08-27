@@ -773,7 +773,7 @@
         "source health.",
         "coverage/fallback.",
         "Figma reference JSON/CSV.",
-        "permission-gated Source copies.",
+        "visible default-on internal Source copies with opt-out and licence warning.",
         "independent reconstruction."
       ],
       "seam": "Handoff Builder / reconstruction",

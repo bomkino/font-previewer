@@ -1,18 +1,25 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, open, readFile, rename, stat } from "node:fs/promises";
+import { mkdir, open, readFile, rename, rm, stat, type FileHandle } from "node:fs/promises";
 import { dirname } from "node:path";
 
-export async function atomicWrite(path: string, content: string | Uint8Array, mode = 0o600): Promise<void> {
+export type AtomicCommit = (temporaryPath: string, targetPath: string) => Promise<void>;
+
+export async function atomicWrite(path: string, content: string | Uint8Array, mode = 0o600, commit: AtomicCommit = rename): Promise<void> {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
   const temporaryPath = `${path}.tmp-${process.pid}-${randomUUID()}`;
-  const handle = await open(temporaryPath, "wx", mode);
+  let handle: FileHandle | undefined;
   try {
+    handle = await open(temporaryPath, "wx", mode);
     await handle.writeFile(content);
     await handle.sync();
-  } finally {
     await handle.close();
+    handle = undefined;
+    await commit(temporaryPath, path);
+  } catch (error) {
+    if (handle) await handle.close().catch(() => undefined);
+    await rm(temporaryPath, { force: true }).catch(() => undefined);
+    throw error;
   }
-  await rename(temporaryPath, path);
 }
 
 export async function readBoundedText(path: string, maximumBytes: number): Promise<string> {

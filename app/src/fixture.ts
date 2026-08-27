@@ -76,7 +76,7 @@ export function createNewStudy(pack: RecipePack = "film-tv", title = "Untitled f
     comparisonSets: [],
     typographySystems: [{ id: "system:primary", name: "Primary system", rationale: "", fontUses: [] }],
     activeSystemId: "system:primary",
-    handoff: { profile: "designer", outputs: ["pdf", "summary", "json", "csv"], includeSources: false },
+    handoff: { profile: "designer", outputs: ["pdf", "summary", "json", "csv"], includeSources: true },
   };
   return createSession(document);
 }

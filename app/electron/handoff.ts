@@ -20,6 +20,8 @@ interface ManifestEntry {
   readonly sha256: string;
 }
 
+export type HandoffCommit = (stagingPath: string, finalPath: string) => Promise<void>;
+
 async function exists(path: string): Promise<boolean> {
   try {
     await stat(path);
@@ -86,7 +88,7 @@ async function uniqueFinalPath(targetDirectory: string, requestedStem: string): 
   throw new Error("Could not choose a unique Handoff folder name.");
 }
 
-export async function exportTransactionalHandoff(options: HandoffOptions): Promise<{ readonly displayName: string; readonly fileCount: number }> {
+export async function exportTransactionalHandoff(options: HandoffOptions, commit: HandoffCommit = rename): Promise<{ readonly displayName: string; readonly fileCount: number }> {
   if (options.includeSources && !options.sourcePermissionAcknowledged) {
     throw new Error("Source-copy permission was not acknowledged.");
   }
@@ -158,7 +160,7 @@ export async function exportTransactionalHandoff(options: HandoffOptions): Promi
     for (const entry of entries) {
       if (await sha256(join(stagingPath, entry.path)) !== entry.sha256) throw new Error(`Handoff verification failed: ${entry.path}`);
     }
-    await rename(stagingPath, finalPath);
+    await commit(stagingPath, finalPath);
     return { displayName: basename(finalPath), fileCount: entries.length + 2 };
   } catch (error) {
     await rm(stagingPath, { recursive: true, force: true });

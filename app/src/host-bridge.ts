@@ -121,7 +121,9 @@ const browserPort: HostPort = {
         return { type: "import-result", imports: files.slice(0, 64).map((file) => importedBrowserFile(file)), rejected: 0, truncated: files.length > 64 };
       }
       case "scan-installed":
-        return { type: "catalog-result", imports: [], indexed: 0, total: 0, rejected: 0, truncated: false };
+        return { type: "catalog-result", imports: [], indexed: 0, total: 0, rejected: 0, truncated: false, cancelled: false };
+      case "cancel-catalog":
+        return { type: "ack", action: "cancel-catalog" };
       case "open-study": {
         const [file] = await chooseFiles(".pitchfontstudy,application/json", false);
         if (!file) {

@@ -248,6 +248,12 @@ async function installedCatalogAudit(window: BrowserWindow): Promise<Record<stri
       await face.load();
       fontLoaded = face.status === 'loaded';
     }
+    const obsolete = window.fontPreviewerHost.request({ type: 'scan-installed', query: '', cursor: 0, limit: 200, refresh: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const cancelStarted = performance.now();
+    const cancelAck = await window.fontPreviewerHost.request({ type: 'cancel-catalog' });
+    const cancelDurationMs = performance.now() - cancelStarted;
+    const obsoleteResult = await obsolete;
     return {
       count: response.imports.length,
       indexed: response.indexed,
@@ -261,6 +267,11 @@ async function installedCatalogAudit(window: BrowserWindow): Promise<Record<stri
       opaquePreviewUrls: response.imports.every((item) => !item.binding.previewUrl || item.binding.previewUrl.startsWith('pitch-font://asset/')),
       previewAvailable: Boolean(preview),
       fontLoaded,
+      cancellation: {
+        acknowledged: cancelAck.type === 'ack' && cancelAck.action === 'cancel-catalog',
+        durationMs: cancelDurationMs,
+        obsoleteResultCancelled: obsoleteResult.type === 'catalog-result' && obsoleteResult.cancelled === true,
+      },
     };
   })()`, true), 60_000);
 }
@@ -369,10 +380,10 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   const audit = trace.semanticAudit as { unnamed?: unknown[]; duplicateIds?: unknown[]; horizontalOverflow?: boolean; roleHelpSeparated?: boolean };
   const security = trace.securityAudit as { invalidRequests?: number; rejected?: number; nodeUnavailable?: boolean };
   const keyboard = trace.keyboardAccessibility as Record<string, boolean>;
-  const catalog = trace.installedCatalog as { count?: number; indexed?: number; pathLeak?: boolean; opaquePreviewUrls?: boolean; previewAvailable?: boolean; fontLoaded?: boolean; pageBounded?: boolean; studyUnchanged?: boolean };
+  const catalog = trace.installedCatalog as { count?: number; indexed?: number; pathLeak?: boolean; opaquePreviewUrls?: boolean; previewAvailable?: boolean; fontLoaded?: boolean; pageBounded?: boolean; studyUnchanged?: boolean; cancellation?: { acknowledged?: boolean; durationMs?: number; obsoleteResultCancelled?: boolean } };
   if (audit.unnamed?.length || audit.duplicateIds?.length || audit.horizontalOverflow || !audit.roleHelpSeparated) throw new Error("Semantic accessibility or layout audit failed.");
   if (security.invalidRequests !== security.rejected || !security.nodeUnavailable) throw new Error("Host security audit failed.");
-  if (!catalog.count || !catalog.indexed || catalog.pathLeak || !catalog.opaquePreviewUrls || !catalog.previewAvailable || !catalog.fontLoaded || !catalog.pageBounded || !catalog.studyUnchanged) throw new Error("Installed font catalog audit failed.");
+  if (!catalog.count || !catalog.indexed || catalog.pathLeak || !catalog.opaquePreviewUrls || !catalog.previewAvailable || !catalog.fontLoaded || !catalog.pageBounded || !catalog.studyUnchanged || !catalog.cancellation?.acknowledged || !catalog.cancellation.obsoleteResultCancelled || catalog.cancellation.durationMs === undefined || catalog.cancellation.durationMs > 100) throw new Error("Installed font catalog audit failed.");
   if (!keyboard.forwardWrap || !keyboard.backwardWrap || !keyboard.candidateUnchanged || !keyboard.trayUnchanged || !keyboard.returnFocus) throw new Error("Keyboard accessibility audit failed.");
   if (afterReload.activeElement !== "workspace-heading" || afterReload.reviewState !== "Keep") throw new Error("Reload recovery or focus restoration failed.");
   await checksumEvidence(output);

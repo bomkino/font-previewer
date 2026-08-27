@@ -67,6 +67,7 @@ export type HostRequest =
       readonly limit: number;
       readonly refresh: boolean;
     }
+  | { readonly type: "cancel-catalog" }
   | { readonly type: "open-study" }
   | {
       readonly type: "mirror-study";
@@ -108,6 +109,7 @@ export type HostResponse =
       readonly total: number;
       readonly rejected: number;
       readonly truncated: boolean;
+      readonly cancelled: boolean;
       readonly nextCursor?: number;
     }
   | {
@@ -121,7 +123,7 @@ export type HostResponse =
   | { readonly type: "save-result"; readonly revision: number; readonly displayName: string; readonly saved: boolean }
   | { readonly type: "export-result"; readonly displayName: string; readonly exported: boolean; readonly fileCount: number }
   | { readonly type: "relink-result"; readonly import?: ImportedSource; readonly relinked: boolean }
-  | { readonly type: "ack"; readonly action: "native-undo" | "reload-studio" | "reveal-source" }
+  | { readonly type: "ack"; readonly action: "native-undo" | "reload-studio" | "reveal-source" | "cancel-catalog" }
   | {
       readonly type: "probe-result";
       readonly serial: number;
@@ -284,7 +286,7 @@ function validDocument(value: unknown): value is StudyDocument {
 
 export function isHostRequest(value: unknown): value is HostRequest {
   if (!isRecord(value) || typeof value.type !== "string") return false;
-  if (["get-launch-state", "open-import", "open-study", "native-undo", "reload-studio"].includes(value.type)) {
+  if (["get-launch-state", "open-import", "open-study", "native-undo", "reload-studio", "cancel-catalog"].includes(value.type)) {
     return exactKeys(value, ["type"]);
   }
   if (value.type === "scan-installed") {
@@ -370,7 +372,7 @@ export function isHostEvent(value: unknown): value is HostEvent {
     allowedKeys(value, ["type", "task", "completed"], ["total"]) &&
     ["import", "export", "catalog"].includes(String(value.task)) &&
     isInteger(value.completed) &&
-    (value.total === undefined || isInteger(value.total))
+    (value.total === undefined || (isInteger(value.total) && value.completed <= value.total))
   );
 }
 
@@ -380,7 +382,7 @@ export function isHostResponse(value: unknown): value is HostResponse {
     return exactKeys(value, ["type", "serial", "host"]) && isInteger(value.serial) && ["browser", "electron", "wkwebview"].includes(String(value.host));
   }
   if (value.type === "ack") {
-    return exactKeys(value, ["type", "action"]) && ["native-undo", "reload-studio", "reveal-source"].includes(String(value.action));
+    return exactKeys(value, ["type", "action"]) && ["native-undo", "reload-studio", "reveal-source", "cancel-catalog"].includes(String(value.action));
   }
   if (value.type === "mirror-ack") return exactKeys(value, ["type", "revision", "recoveryPersisted"]) && isInteger(value.revision) && typeof value.recoveryPersisted === "boolean";
   if (value.type === "save-result") {
@@ -401,7 +403,7 @@ export function isHostResponse(value: unknown): value is HostResponse {
   }
   if (value.type === "catalog-result") {
     if (
-      !allowedKeys(value, ["type", "imports", "indexed", "total", "rejected", "truncated"], ["nextCursor"]) ||
+      !allowedKeys(value, ["type", "imports", "indexed", "total", "rejected", "truncated", "cancelled"], ["nextCursor"]) ||
       !Array.isArray(value.imports) ||
       value.imports.length > MAX_CATALOG_PAGE_SIZE ||
       !value.imports.every(validImportedSource) ||
@@ -410,6 +412,7 @@ export function isHostResponse(value: unknown): value is HostResponse {
       value.total > value.indexed ||
       !isInteger(value.rejected) ||
       typeof value.truncated !== "boolean" ||
+      typeof value.cancelled !== "boolean" ||
       (value.nextCursor !== undefined && (!isInteger(value.nextCursor, 1) || value.nextCursor > value.total))
     ) return false;
     return true;
