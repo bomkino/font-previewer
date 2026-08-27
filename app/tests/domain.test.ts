@@ -158,19 +158,22 @@ test("recovery round-trips document/workspace/revisions but never Host-local bin
   assert.throws(() => parseRecoverySnapshot("x".repeat(16_000_001)), DomainError);
 });
 
-test("legacy migration preserves Maybe evidence and strips source paths", () => {
-  const migrated = migrateLegacyStudy({
-    schemaVersion: 2,
-    id: "legacy",
-    title: "Legacy Study",
-    records: [{ id: "one", fileName: "Family-Regular.otf", path: "/Users/person/Fonts/Family-Regular.otf", familyName: "Family", styleName: "Regular", status: "maybe", role: "display" }],
-  });
-  assert.equal(migrated.document.schemaVersion, 4);
-  assert.equal(migrated.document.candidates[0].reviewState, "maybe");
-  assert.deepEqual(migrated.document.candidates[0].provenance, { kind: "legacy", legacyReviewState: "maybe" });
-  assert.equal(activeTypographySystem(migrated.document).fontUses[0].role, "display");
-  assert.doesNotMatch(serializeStudyDocument(migrated.document), /\/Users\/person/);
-  assert.ok(migrated.warnings.some((warning) => warning.includes("paths")));
+test("every supported legacy schema preserves Maybe evidence and strips source paths", () => {
+  for (const schemaVersion of [1, 2, 3]) {
+    const migrated = migrateLegacyStudy({
+      schemaVersion,
+      id: `legacy-${schemaVersion}`,
+      title: `Legacy Study ${schemaVersion}`,
+      records: [{ id: "one", fileName: "Family-Regular.otf", path: "/Users/person/Fonts/Family-Regular.otf", familyName: "Family", styleName: "Regular", status: "maybe", role: "display" }],
+    });
+    assert.equal(migrated.fromVersion, schemaVersion);
+    assert.equal(migrated.document.schemaVersion, 4);
+    assert.equal(migrated.document.candidates[0].reviewState, "maybe");
+    assert.deepEqual(migrated.document.candidates[0].provenance, { kind: "legacy", legacyReviewState: "maybe" });
+    assert.equal(activeTypographySystem(migrated.document).fontUses[0].role, "display");
+    assert.doesNotMatch(serializeStudyDocument(migrated.document), /\/Users\/person/);
+    assert.ok(migrated.warnings.some((warning) => warning.includes("paths")));
+  }
 });
 
 test("validation rejects corrupt references, oversized input, and future schemas", () => {

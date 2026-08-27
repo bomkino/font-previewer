@@ -11,6 +11,7 @@
     "dev": "vite --host 127.0.0.1",
     "electron": "electron .",
     "electron:install": "install-electron",
+    "evidence:soak": "npm test && node --expose-gc scripts/run-soak.mjs",
     "package:linux": "npm run build && node scripts/package-linux.mjs",
     "sbom": "node scripts/build-sbom.mjs",
     "test": "node scripts/run-tests.mjs",

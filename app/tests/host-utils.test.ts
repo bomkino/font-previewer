@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
-import { buildImportedSource, inferFontNames, rendererSupportForPath } from "../electron/font-inspection.js";
+import {
+  buildImportedSource,
+  inferFontNames,
+  inspectFontFile,
+  parseFontconfigQuery,
+  rendererSupportForPath,
+} from "../electron/font-inspection.js";
 import { csvCell, safeFileStem } from "../electron/host-storage.js";
 
 test("font inspection derives portable metadata and opaque preview capability", () => {
@@ -12,12 +22,56 @@ test("font inspection derives portable metadata and opaque preview capability", 
     byteLength: 42_000,
     modifiedAt: "2026-08-27T00:00:00.000Z",
     previewUrl: "pitch-font://asset/token",
+    faces: [{ faceIndex: 0, family: "Quiet Sans", style: "Semibold", postScriptName: "QuietSans-Semibold" }],
   });
   assert.equal(imported.source.id, imported.binding.sourceId);
   assert.equal(imported.faces[0].sourceId, imported.source.id);
   assert.equal(imported.faces[0].family, "Quiet Sans");
   assert.equal(imported.binding.previewUrl, "pitch-font://asset/token");
   assert.doesNotMatch(JSON.stringify(imported.source), /\/private\/fonts/);
+});
+
+test("Fontconfig inspection preserves exact collection face identity", () => {
+  const inspected = parseFontconfigQuery(
+    "0\u001fExample Sans\u001fRegular\u001fExampleSans-Regular\u001e" +
+    "1\u001fExample Sans\u001fBold\u001fExampleSans-Bold\u001e",
+  );
+  const imported = buildImportedSource({
+    canonicalPath: "/private/fonts/Example.ttc",
+    sourceId: "source:collection",
+    byteLength: 84_000,
+    modifiedAt: "2026-08-27T00:00:00.000Z",
+    faces: inspected,
+  });
+  assert.equal(imported.source.hint.faceCount, 2);
+  assert.deepEqual(imported.faces.map((face) => [face.faceIndex, face.id, face.style]), [
+    [0, "face:source:collection:0", "Regular"],
+    [1, "face:source:collection:1", "Bold"],
+  ]);
+  assert.equal(imported.binding.rendererSupport, "metadata-only");
+});
+
+test("Fontconfig inspection rejects malformed, truncated, and duplicate-face metadata", () => {
+  assert.throws(() => parseFontconfigQuery(""), /empty/);
+  assert.throws(() => parseFontconfigQuery("0\u001fFamily\u001fRegular\u001fName"), /truncated/);
+  assert.throws(
+    () => parseFontconfigQuery("0\u001fFamily\u001fRegular\u001fOne\u001e0\u001fFamily\u001fBold\u001fTwo\u001e"),
+    /duplicate/,
+  );
+  assert.throws(() => parseFontconfigQuery("0\u001fFamily\nInjected\u001fRegular\u001fName\u001e"), /invalid family/);
+});
+
+test("Linux font inspection rejects a malformed font file before import", {
+  skip: process.platform !== "linux" || !existsSync("/usr/bin/fc-query"),
+}, async () => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "font-previewer-malformed-"));
+  const malformedPath = join(temporaryRoot, "truncated.ttf");
+  try {
+    await writeFile(malformedPath, Buffer.from([0x00, 0x01, 0x00, 0x00, 0xff]));
+    await assert.rejects(inspectFontFile(malformedPath), /inspection failed|metadata is empty/);
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
 });
 
 test("Handoff filenames and CSV cells neutralize platform and spreadsheet hazards", () => {

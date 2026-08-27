@@ -43,7 +43,12 @@ import {
   catalogPage,
   type CatalogIndexEntry,
 } from "./catalog-index.js";
-import { FONT_EXTENSIONS, buildImportedSource, rendererSupportForPath } from "./font-inspection.js";
+import {
+  FONT_EXTENSIONS,
+  buildImportedSource,
+  inspectFontFile,
+  rendererSupportForPath,
+} from "./font-inspection.js";
 import { exportTransactionalHandoff } from "./handoff.js";
 import { atomicWrite, readBoundedText, safeFileStem } from "./host-storage.js";
 
@@ -246,6 +251,7 @@ async function inspectFontPath(selectedPath: string, forcedSourceId?: string, ca
   const metadata = await stat(canonicalPath);
   if (!metadata.isFile() || metadata.size <= 0 || metadata.size > maximumSourceBytes) throw new Error("Source is empty or exceeds 512 MB.");
   await access(canonicalPath, fsConstants.R_OK);
+  const faces = await inspectFontFile(canonicalPath);
   const sourceId = forcedSourceId ?? sourceIdsByCanonicalPath.get(canonicalPath) ?? catalogSourceIdsByCanonicalPath.get(canonicalPath) ?? `source:${randomUUID()}`;
   if (forcedSourceId) {
     const priorPath = sourceBindings.get(forcedSourceId);
@@ -267,6 +273,7 @@ async function inspectFontPath(selectedPath: string, forcedSourceId?: string, ca
     sourceId,
     byteLength: metadata.size,
     modifiedAt: metadata.mtime.toISOString(),
+    faces,
     ...(support === "full" ? { previewUrl: previewUrlForSource(sourceId, canonicalPath) } : {}),
   });
 }

@@ -61,6 +61,11 @@ jobs:
       - name: Verify types, tests, bundles, SBOM, and audit
         run: npm run verify
 
+      - name: Run 500-face long-session diagnostic
+        env:
+          FONT_PREVIEWER_SOAK_OUTPUT: ${{ runner.temp }}/font-previewer-linux-soak/soak.json
+        run: npm run evidence:soak
+
       - name: Run displayed Electron release evidence
         env:
           FONT_PREVIEWER_EVIDENCE_DIR: ${{ runner.temp }}/font-previewer-linux-evidence
@@ -198,6 +203,15 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Upload Linux soak evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: font-previewer-linux-soak-${{ github.sha }}
+          path: ${{ runner.temp }}/font-previewer-linux-soak
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload Linux packages
         if: success()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
@@ -242,6 +256,11 @@ jobs:
 
       - name: Verify shared Studio
         run: npm run build
+
+      - name: Run 500-face long-session diagnostic
+        env:
+          FONT_PREVIEWER_SOAK_OUTPUT: ${{ runner.temp }}/font-previewer-macos-soak/soak.json
+        run: npm run evidence:soak
 
       - name: Build, ad-hoc sign, and verify Mac app
         env:
@@ -390,6 +409,15 @@ jobs:
           name: font-previewer-macos-evidence-${{ github.sha }}
           path: ${{ runner.temp }}/font-previewer-macos-evidence
           if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload Mac soak evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: font-previewer-macos-soak-${{ github.sha }}
+          path: ${{ runner.temp }}/font-previewer-macos-soak
+          if-no-files-found: error
           retention-days: 14
 
       - name: Upload Mac app
