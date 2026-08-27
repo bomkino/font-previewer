@@ -135,7 +135,13 @@ export function parseFontconfigQuery(output: string): readonly InspectedFaceMeta
     };
     const existing = facesByIndex.get(faceIndex);
     if (existing) {
-      if (existing.variable && face.variable && existing.family === face.family) continue;
+      if (existing.variable || face.variable) {
+        if (!existing.variable && face.variable) {
+          faces[faces.findIndex((item) => item.faceIndex === faceIndex)] = face;
+          facesByIndex.set(faceIndex, face);
+        }
+        continue;
+      }
       throw new Error("Font metadata has a duplicate or invalid face index.");
     }
     facesByIndex.set(faceIndex, face);
