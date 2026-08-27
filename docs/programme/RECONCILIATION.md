@@ -4,6 +4,8 @@
 **Date:** 2026-08-26  
 **Public seam:** repository evidence
 
+> **Post-reconciliation update — 2026-08-26:** the standalone public repository now exists at `bomkino/font-previewer`. Cross-Host Actions run `33023567900` verifies the v0.1 release-candidate code through AppKit/WKWebView on macOS and sandboxed Electron on Linux, including real installed-font discovery and loading, Catalog/Study separation, native commands, recovery/focus, security/layout assertions, screenshots, packages, notices, and checksums. The capability table below records the historical D00 environment at reconciliation time; current truth lives in `STATUS.md` and [`app/REPORT.md`](../../app/REPORT.md).
+
 ## 1. Baseline
 
 ```text
@@ -18,7 +20,7 @@ The standalone repository was created by filtering `tools/font-previewer` histor
 
 The extraction preserves 27 Font Previewer commits, including the browser experiments and the native rewrite. It is materially better than a snapshot copy because decisions and hot spots remain inspectable.
 
-## 2. Capability check
+## 2. Capability check at reconciliation
 
 | Capability | Result | Evidence / limit |
 |---|---|---|
@@ -26,7 +28,7 @@ The extraction preserves 27 Font Previewer commits, including the browser experi
 | Create local branches, commits, and artifacts | Yes | standalone repository on `codex/d00-reconciliation` |
 | Read GitHub CI, jobs, and logs | Yes | run `32954024459`, job `98131604888` |
 | Write existing connected repositories | Technically exposed | not used; source repository must remain untouched during spin-out |
-| Create a new GitHub repository through connector | No exposed operation | standalone Git history prepared locally; visibility and publication remain owner gates |
+| Create a new GitHub repository through connector | No exposed operation at D00 | standalone Git history was prepared locally; the owner later created and authorized the public destination |
 | Run macOS builds/tests | No | workspace is Linux x86_64; no macOS runtime or Swift toolchain |
 | Run current portable Swift tests locally | No | `swift: command not found` |
 | Run Linux/Studio JavaScript work | Yes | Node.js 24.19.0, npm 11.9.0, pnpm 11.19.0 |

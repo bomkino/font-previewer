@@ -4,8 +4,10 @@
 
 Build one local typography-decision product delivered as:
 
-- an Apple-silicon Mac reference App using SwiftUI/AppKit and WKWebView;
-- a first-class Linux Electron App using the same Study semantics and Studio.
+- a Mac AppKit/WKWebView Host using the shared Studio;
+- a first-class Linux Electron Host using the same Study semantics and Studio.
+
+The root SwiftUI/CoreText Mac application is a preserved reference, not the active product.
 
 ## Before any task
 
@@ -66,14 +68,19 @@ Accepted:
 - explicit Render Profile;
 - expand–contract migration.
 
-Open R0 decisions:
+Open programme/release decisions:
 
 - full shared Studio;
 - interactive renderer path;
 - Study authority/durability;
 - Linux backend;
 - Mac sandbox/document/XPC;
-- visible stage labels.
+- final renderer and format tiers;
+- Mac sandbox/signing/document/process-isolation policy;
+- Linux package matrix;
+- production merge and release.
+
+The `codex/v1-release-candidate` implementation is evidence for leading hypotheses. It does not silently accept them.
 
 Do not treat a leading hypothesis as accepted.
 

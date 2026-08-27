@@ -2,82 +2,51 @@
 
 ## Actual goal
 
-Build one trustworthy local typography-decision product—not a larger specimen viewer—through two desktop Hosts that preserve the same Study meaning.
-
-Success means a designer can move from local Sources through Review, Compare, System, and Handoff on Mac or Linux, reopen the Study on the other platform, and understand declared renderer differences without losing decisions or leaking font files.
+Deliver one trustworthy local typography-decision product on Mac and Linux. A designer must be able to move from local Sources through Review, Compare, System, and Handoff, reopen the portable Study on the other platform, preserve decisions, understand renderer differences, and avoid leaking or silently copying font files.
 
 ## Current reality
 
-The reference branch proves useful Mac implementation techniques but not the destination architecture.
+The v0.1 release-candidate branch now implements the end-to-end journey in one shared Studio with narrow AppKit/WKWebView and Electron Hosts. Automated displayed-app and packaging evidence is green on both platforms.
 
-- It is a native SwiftUI/AppKit application with no shared Studio or Linux Host.
-- Its schema is v3 and collapses Source, Face, Candidate, and Font Use into `FontFaceRecord`.
-- It defaults new records to Maybe rather than Unreviewed.
-- It stores source paths inside the portable Study.
-- It autosaves into the intentional Study file and has no separate recovery mirror.
-- It renders and exports through one in-process CoreText renderer.
-- Its current reference SHA fails macOS CI before tests or packaging run.
+The root `macos/` application remains a preserved CoreText oracle. It is not the active product because its historical model stores paths in the Study and collapses concepts that Study v4 keeps distinct.
 
-## Route
+## Evidence-backed route
 
-1. Preserve the current Mac implementation as an oracle and engine seed.
-2. Close D00 with evidence, not optimism.
-3. Test the most consequential product seam first: workspace ownership.
-4. Run rendering, durability, domain, and UX prototypes as isolated decisions.
-5. Freeze only the tracer contracts needed for one cross-platform journey.
-6. Build the tracer vertically across Mac and Linux.
-7. Expand through Alpha, Beta, and release hardening without deleting reference behavior early.
+1. D00 preserved and reconciled the reference.
+2. P1 proved one shared Studio can run inside both Hosts with native menus/dialogs, a narrow bridge, recovery, and stable focus.
+3. The release-candidate vertical slice replaced prototype recovery/import/Handoff seams with Host-owned durable implementations.
+4. The installed Catalog is now Host-local, bounded, searchable, paginated, and explicit-add; Family Groups preserve Candidate identity.
+5. CI now builds, launches, exercises, packages, and retains evidence for both Hosts.
+6. The owner accepted the V1 workspace, durability, renderer, format, distribution, and internal Source-copy decisions. Human/reference gates remain before a supported stable v1.0.
 
-## Current decision
+## Accepted V1 direction
 
-### D00 — repository reconciliation
+Full shared-Studio ownership is the accepted V1 direction. It survived automated cross-Host vetoes for:
 
-Status: complete on the D00 working branch.
+- focus and native-panel return focus;
+- native semantic command routing;
+- bridge locality and malformed-request rejection;
+- renderer reload and Host recovery;
+- Catalog/Study separation and actual installed-font loading;
+- displayed composition and web accessibility semantics;
+- Mac and Linux packaging.
 
-Decision outcome:
+Interactive VoiceOver/Orca, attended native-quality review, real production-font review, and induced WebKit termination remain unverified and block a stable v1.0 quality claim, not the disclosed v0.1 prerelease.
 
-- standalone repository boundary is correct;
-- history-preserving subtree extraction is preferable to copying a snapshot;
-- reference source stays intact and explicitly mapped;
-- production implementation remains blocked;
-- reference CI repair is a prerequisite for treating Mac output as an oracle, but it must not mutate the old domain into the new one by stealth.
+## Next stable-v1 evidence packet
 
-## Next question
+Prepare one consolidated packet after:
 
-### D01 / P1 — can the full shared Studio own the workspace?
+- attended Mac/VoiceOver and Linux/Orca journeys;
+- reference-hardware Catalog/import/scroll/long-session measurements;
+- renderer and format-tier comparison with redistributable fonts;
+- independent clean-machine packages; production Mac signing evidence only if the owner later adopts paid Developer ID distribution.
 
-Leading hypothesis:
+At that point, decide whether the evidence supports a stable `v1.0.0` release.
 
-Use one React/TypeScript Studio for Sources/Study navigation, central stage, Inspector, stage navigation, and tray inside WKWebView and Electron. Keep documents, windows, menus, dialogs, permissions, recovery, and privileged operations in native Hosts.
+## Discipline
 
-Prototype must prove:
-
-- review geometry and keyboard decisions remain immediate;
-- native menu commands reach one semantic command path;
-- native dialogs restore focus;
-- web-process reload rehydrates without duplicated mutable state;
-- semantic specimen equivalents are navigable;
-- Mac does not feel like a browser page;
-- Linux does not imitate Mac chrome.
-
-Veto full-Studio ownership when:
-
-- focus is unreliable;
-- VoiceOver or Orca paths are materially broken;
-- bridge code mirrors most UI state;
-- platform forks spread through the Studio;
-- Mac interaction quality cannot reach the reference bar.
-
-Environment limits:
-
-- Linux x86_64 workspace is available.
-- Node.js 24.19.0, npm 11.9.0, and pnpm 11.19.0 are available.
-- Swift, Rust, CMake, Ninja, Electron, and a local macOS runtime are unavailable.
-- Mac build, WKWebView, VoiceOver, signing, and visual claims require external macOS evidence.
-
-## Decision discipline
-
-- Facts are gathered before owner questions.
-- Reversible prototype details do not require owner interruption.
-- Product taste trade-offs, scope changes, licence changes, merge, and publication remain owner-visible.
-- A prototype working does not accept its ADR. Evidence and veto reasoning do.
+- A working implementation does not silently accept an ADR.
+- A green workflow names its exact SHA and gates.
+- A package candidate is not a public release.
+- Missing human or credential evidence is reported as an open gate, never fabricated.

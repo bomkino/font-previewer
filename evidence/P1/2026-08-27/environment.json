@@ -1,0 +1,61 @@
+{
+  "schema_version": 2,
+  "captured_at": "2026-08-27",
+  "workspace": {
+    "platform": "linux",
+    "architecture": "x86_64",
+    "display": null,
+    "xvfb": null,
+    "orca": null,
+    "swift": null,
+    "node": "24.19.0",
+    "npm": "11.9.0",
+    "electron_package": "44.0.0"
+  },
+  "successful_gates": [
+    "renderer TypeScript strict check",
+    "Electron main/preload TypeScript strict check",
+    "ten Node public-seam/domain/protocol tests",
+    "Vite production build",
+    "Electron Linux x86_64 binary resolution and dynamic-link check",
+    "CycloneDX 1.6 SBOM generation",
+    "npm audit with zero known vulnerabilities"
+  ],
+  "blocked_gates": [
+    {
+      "gate": "displayed Linux Electron run",
+      "evidence": "No DISPLAY or display server is present. Electron main starts but app.whenReady does not complete in headless/offscreen attempts."
+    },
+    {
+      "gate": "Linux native D-Bus session",
+      "evidence": "dbus-run-session fails because socket creation is denied by the managed environment."
+    },
+    {
+      "gate": "Orca exploration",
+      "evidence": "Orca is not installed and no accessible desktop session exists."
+    },
+    {
+      "gate": "Mac WKWebView and VoiceOver",
+      "evidence": "The workspace is Linux and has no Swift or macOS runtime."
+    },
+    {
+      "gate": "renderer-only visual fallback",
+      "evidence": "No local browser exists. An isolated Playwright Chromium download returned a truncated zero-size archive through the restricted network and the temporary dependency was removed."
+    }
+  ],
+  "hosted_runner_evidence": [
+    {
+      "platform": "Ubuntu 24.04 x64",
+      "workflow_run_id": 33010127784,
+      "status": "pass",
+      "coverage": "Displayed Electron task flow under Xvfb and isolated D-Bus, native menu routes, undo, latency, reload/focus recovery, screenshots, and Chromium accessibility tree."
+    },
+    {
+      "platform": "macOS 14.8.7 arm64",
+      "workflow_run_id": 33013245969,
+      "status": "pass-with-limits",
+      "coverage": "AppKit/WKWebView task flow, native menu dispatch, real panel-open/cancel and focus restoration, undo, latency, reload/focus recovery, screenshots, web semantics, basic native accessibility hosting, and bridge-security rejection."
+    }
+  ],
+  "decision_effect": "D01 remains open. Hosted automation strongly supports Variant A across both Hosts; interactive Orca/VoiceOver, attended native-window critique, real source selection, and induced WebKit process termination remain untested."
+}

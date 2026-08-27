@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "repository": "bomkino/font-previewer",
+  "branch": "prototype/p1-macos-shared-studio",
+  "workflow_run_id": 33013245969,
+  "workflow_job_id": 98324702131,
+  "remote_commit": "f6acb4451f4fbe7946b492cf0f9c90adea32c595",
+  "local_equivalent_commit": "561877c",
+  "evidence_artifact": {
+    "id": 9623417053,
+    "name": "p1-macos-wkwebview-33013245969",
+    "size_bytes": 729089,
+    "digest": "sha256:1ccfdcc74b251783755faa8294858599920b7e70bdaeadafa0d5c48d8bda0acb",
+    "expires_at": "2026-09-09"
+  },
+  "prototype_artifact": {
+    "id": 9623417947,
+    "name": "p1-macos-host-33013245969",
+    "size_bytes": 348727,
+    "digest": "sha256:c3eb15a345374b3f6787306303573cb96e9a895e77234fa8c3d178f3eac979af",
+    "expires_at": "2026-09-09"
+  },
+  "generated_at": "2026-08-26T21:00:49Z",
+  "downloaded_and_inspected_at": "2026-08-27",
+  "workflow_conclusion": "success",
+  "visual_inspection": "pass-with-recorded-limits",
+  "notes": [
+    "Five WKWebView content snapshots show coherent Review, Compare, System, Handoff, and recovered Handoff states.",
+    "The screenshots do not include the complete native NSWindow title bar or prove attended Mac interaction quality.",
+    "A real NSOpenPanel opened and was automatically cancelled; no source file was selected.",
+    "The recovery trace preserves stage and revision and restores focus to workspace-heading.",
+    "VoiceOver and actual web-content-process termination were not exercised.",
+    "Font names are fixture data; screenshots assess workspace ownership and interaction architecture, not font-rendering fidelity.",
+    "The committed files preserve evidence beyond GitHub artifact retention."
+  ]
+}

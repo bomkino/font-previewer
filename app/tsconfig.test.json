@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "skipLibCheck": true,
+    "rootDir": ".",
+    "outDir": ".test-dist",
+    "types": ["node"]
+  },
+  "include": [
+    "src/App.tsx",
+    "src/domain.ts",
+    "src/fixture.ts",
+    "src/host-bridge.ts",
+    "src/protocol.ts",
+    "electron/catalog-index.ts",
+    "electron/handoff.ts",
+    "electron/host-storage.ts",
+    "electron/font-variation-worker.ts",
+    "tests/**/*.ts",
+    "tests/**/*.tsx"
+  ]
+}

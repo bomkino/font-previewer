@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "repository": "bomkino/font-previewer",
+  "branch": "prototype/p1-full-shared-studio",
+  "workflow_run_id": 33010127784,
+  "workflow_job_id": 98313927154,
+  "remote_commit": "0623d98c3f9895be30c596dd7dcc988b73dce7bf",
+  "local_equivalent_commit": "9351d2a",
+  "artifact_id": 9622173630,
+  "artifact_name": "p1-linux-electron-33010127784",
+  "artifact_size_bytes": 532381,
+  "artifact_digest": "sha256:86af413d98ccf3c0fa420d259947909c0c4bc16df25bf31664f87e7d0878248c",
+  "generated_at": "2026-08-26T20:23:43.058Z",
+  "downloaded_and_inspected_at": "2026-08-27",
+  "workflow_conclusion": "success",
+  "visual_inspection": "pass-with-recorded-limits",
+  "notes": [
+    "Five 1440 by 960 screenshots show Review, Compare, System, Handoff, and recovered Handoff states.",
+    "The final recovery screenshot and trace preserve stage and revision and restore focus to workspace-heading.",
+    "Font names are fixture data; screenshots assess workspace ownership and interaction architecture, not font-rendering fidelity.",
+    "The committed files preserve evidence beyond the seven-day GitHub artifact retention window."
+  ]
+}

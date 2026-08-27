@@ -1,88 +1,71 @@
-# Font Previewer Status
+# Font Previewer status
 
 ## Baseline
 
-- source repository: `bomkino/pitch-deck-tools`
-- reference branch: `codex/native-macos-font-lab`
-- reference SHA: `be77221cb7cb809fdf119945f3fee3d2e1e72ed6`
-- standalone extracted SHA: `f89cde8c3e6e347e29829e5bcd7ee59160d7b3ad`
-- working branch: `codex/d00-reconciliation`
-- latest verified shared SHA: none
-- latest verified Mac SHA: none; baseline CI is red
-- latest verified Linux SHA: none; Linux Host does not exist
+- Public repository: `bomkino/font-previewer`
+- Preserved reference: `bomkino/pitch-deck-tools`, branch `codex/native-macos-font-lab`, SHA `be77221cb7cb809fdf119945f3fee3d2e1e72ed6`
+- Release-candidate branch: `codex/v1-release-candidate`
+- Pre-Mac integration branch: `codex/v0.2-pre-mac`
+- Integration PR: [#3](https://github.com/bomkino/font-previewer/pull/3)
+- Latest verified product/evidence SHA: `5d368650436bd2b1aca6f7efdf8825087a65d4e3`
+- Exact verified tree: `ebfbce480d26e05d75cdd6f5b2a0a92d24883dd9`
+- Exact-head Cross-Host workflow: [33043015559](https://github.com/bomkino/font-previewer/actions/runs/33043015559)
 
 ## Current milestone
 
-R0 — evidence and architecture decisions.
+R3 — pre-Mac release hardening and `main` integration.
+
+The autonomous hardening slice is complete and the owner authorized a free GitHub v0.1 prerelease after exact-head CI. Stable v1.0 remains incomplete because attended accessibility/typography, independent reconstruction/reference-machine evidence, and hostile-font corpus gates remain open. Apple Developer signing/notarization is explicitly out of scope for v0.1.
 
 ## Current frontier
 
-- D00 / P0 reconciliation: complete on the working branch.
-- Next unblocked decision: D01 / P1 workspace ownership.
-- D02 / P2 rendering research may proceed independently, but no renderer decision is accepted.
+- T10 Family Groups: implementation and public-seam tests pass; attended design review remains.
+- T15 installed Catalog: Host-local separation, bounded index/search/paging/cache, explicit Add, rebuild, opaque font load, Study non-mutation, cancellation, and Linux variable-axis/named-instance discovery pass. Current 10,000-entry search p95 is 0.408 ms hosted Linux / 0.253 ms hosted Mac. A 500-Face, 2,000-operation, 100-recovery-round-trip diagnostic passes on both hosted architectures with stable entity counts and about 1.55 MB final post-GC heap growth. Actual 500-Face import/100-card rendering and reference-hardware budgets remain.
+- T17 hardening: automated keyboard, semantics, forced-colors/reduced-motion CSS, path redaction, renderer request allowlisting, 1,000 malformed bridge messages, 250 corrupt Study documents, strict recovery parsing, stale-test-output rejection, reload/focus, cancellation, transactional failure recovery, bounded Linux font subprocesses, cross-format hostile headers, and real forced Electron renderer termination pass locally. VoiceOver, Orca, a real hostile-font corpus, real WKWebView termination, and attended native review remain.
+- T18 packaging: hardened-runtime/ad-hoc Mac `.app` ZIP and Linux `.deb`/portable archive pass integrity, notices, extraction/install, displayed journey, removal, and residue checks on disposable hosted runners. The pre-Mac slice also removes production source maps, audits package inventory/privacy, embeds SBOM/install guidance, and proves repeated Linux packages byte-identical locally. Hosted native Wayland launch/render smoke and exact-head Mac/Linux evidence are pending on PR #3. V0.1 targets Mac 13+ arm64 and Linux x64; Developer ID/notarization, RPM, and Linux arm64 are out of scope.
 
-## Claimed work
+## Implemented product
 
-- None. D00 is closed; D01 has not yet been claimed on a prototype branch.
+- One React/TypeScript Studio across AppKit/WKWebView and Electron.
+- Study v4 with distinct Source, Binding, Face, Candidate, Recipe, Comparison Set, Font Use, Typography System, and Handoff concepts.
+- Review, Compare, System, and Handoff with native menu/dialog integration.
+- Host-owned recovery separate from intentional Save; revision barrier before Save/Handoff.
+- Transactional Handoff with checksums and visible default-on internal Source copies plus opt-out.
+- Secure bounded protocol v2 with no renderer filesystem capability or path-bearing preview URLs.
+- Real installed-font discovery through CoreText and Fontconfig.
+- Mac and Linux package-candidate workflows with immutable action pins, SBOM, audit, legal notices, and retained evidence.
 
-## Open decisions
+## Decision state
 
-- D01 — full shared Studio versus narrowed shared stage versus separate UIs.
-- D02 — interactive renderer, reference renderer, Linux backend, and format tiers.
-- D03 — Study authority, mirror, recovery, and Save barrier.
-- D04 — Study v4 and migration.
-- D05 — UX composition and visible stage labels.
-- D06 — Mac documents, sandbox, engine isolation, and minimum OS.
-- D07 — Linux process transport and package set.
-- D08 — cross-platform accessibility and security contract.
-- D09 — tracer contract freeze.
+Accepted ADR-001 through ADR-013 remain unchanged. Implementation evidence strongly supports the leading full-shared-Studio and optimistic-Host-mirror hypotheses, but no open/leading ADR was silently accepted.
 
-## Accepted ADRs
+Stable-v1 follow-up:
 
-- ADR-001 — one product, two Hosts.
-- ADR-002 — Mac reference, Linux first-class.
-- ADR-003 — Review, Compare, System, Handoff.
-- ADR-004 — Catalog separate from Study.
-- ADR-005 — Source, Face, Candidate, Font Use are distinct.
-- ADR-006 — portable IDs are not paths or names.
-- ADR-007 — new Candidates are Unreviewed.
-- ADR-008 — semantic parity, not raster parity.
-- ADR-009 — local-only V1.
-- ADR-010 — no font installation mutation.
-- ADR-011 — expand–contract migration.
-- ADR-012 — risk-led public-seam testing.
-- ADR-013 — owner controls irreversible actions.
+- hostile-font corpus and stronger process-termination evidence;
+- attended accessibility, native-window, typography, and reconstruction work;
+- independent clean/reference machines and displayed 500-Face budgets;
+- any future Developer ID/notarized distribution, RPM, or additional architecture work.
 
 ## Evidence
 
-- `docs/programme/RECONCILIATION.md`
-- `evidence/D00/2026-08-26/fixture-manifest.json`
-- `evidence/D00/2026-08-26/reference-output-index.json`
-- `evidence/D00/2026-08-26/repository-inventory.json`
-- GitHub Actions run `32954024459`: failed at Swift compilation for reference SHA.
-- Source equivalence check: extracted `macos/` tree matches the reference subtree.
+- Linux passes 28/28 domain, grouping, protocol, Host-utility, durability, Catalog, font-inspection, migration, and surface tests. Mac passes 27 with the Linux-only malformed-font execution test explicitly not applicable. The runner deletes compiled test output first and proves a planted stale test cannot execute.
+- Strict Studio, Electron main, and sandboxed preload builds pass.
+- Renderer bundle is approximately 86.1 kB gzip; preload is approximately 6.5 kB gzip.
+- CycloneDX 1.6 SBOM contains 81 resolved components; npm audit reports zero known vulnerabilities.
+- macOS displayed evidence passes warning-free Host compilation, AppKit menu dispatch, real panel open/cancel/focus, actual CoreText Catalog font load, Catalog/Study separation, 15 ms cancellation, transactional Handoff commit-failure recovery, semantics, layout, security, reload recovery, and six snapshots.
+- Linux displayed evidence passes native menu semantics, actual Fontconfig Catalog font load, Catalog/Study separation, 3.9 ms cancellation, Chromium AX tree, layout, security, transactional Handoff, reload recovery, and six screenshots.
+- Packaged-app round trips pass from the extracted Mac ZIP, extracted Linux archive, and installed Linux `.deb`; checksums, ad-hoc Mac integrity, SUID sandbox ownership, application journey, uninstall, and installed-file removal are asserted. These are disposable hosted-runner checks, not independent clean-machine or notarization evidence.
+- Exact-SHA soak artifacts record stable 500-Source/Face/Candidate counts across 2,000 operations and 100 recovery round trips. Hosted totals are 740.605 ms Linux and 618.764 ms Mac; final post-GC heap growth is 1,553,568 bytes Linux and 1,548,336 bytes Mac. These are diagnostic, not universal budgets.
+- Exact details: [`app/REPORT.md`](../../app/REPORT.md).
 
-## Risks changed
+## Owner authorization
 
-- Increased: reference branch was described as working, but current reference SHA does not compile in macOS CI.
-- Increased: no committed redistributable font corpus, Study file, screenshot, or successful output artifact exists at the reference SHA.
-- Clarified: current schema collapses Source, Face, Candidate, and Font Use and defaults imports to Maybe.
-- Clarified: current autosave writes the intentional document; it is not crash recovery.
-- Reduced: standalone history extraction preserves the reference implementation without changing the source repository.
-
-## Packages
-
-- Mac: none verified at the reference SHA.
-- Linux: none exists.
-
-## Owner gates
-
-- New GitHub repository visibility remains unselected.
-- No merge, public release, deployment, signing identity use, or source-font delivery authorized.
-- Repository creation is not exposed by the connected GitHub API surface; local standalone history is prepared first.
+- The owner superseded the earlier no-merge restriction and authorized verified pre-Mac work to merge to `main` after exact-head CI is green.
+- Do not publish a stable v1.0, claim Apple signing/notarization, or claim attended evidence.
+- New internal Handoffs copy locally bound Sources by default; users remain responsible for font rights outside their team.
 
 ## Latest update
 
-- date: 2026-08-26
-- author: primary agent
-- summary: D00 complete. Extracted standalone history, installed handover authority, audited reference code and CI, and produced reconciliation evidence. No product source changed.
+- Date: 2026-08-27
+- Author: primary agent
+- Summary: PR #3 adds bounded hostile-font supervision, strict recovery validation, forced Electron crash recovery, renderer request allowlisting, native Wayland evidence, accessibility-color fallbacks, source-map removal, reproducible Linux packaging, package privacy/inventory gates, and first-run guidance. Local verification is green; exact-head public CI and `main` integration remain pending. No signing, notarization, or attended accessibility claim occurred.

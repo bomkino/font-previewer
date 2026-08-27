@@ -1,0 +1,216 @@
+{
+  "schema_version": 3,
+  "verified_at": "2026-08-27",
+  "repository": "bomkino/font-previewer",
+  "branch": "prototype/p1-full-shared-studio",
+  "base_sha": "c707590",
+  "local_verified_sha": "9351d2a",
+  "remote_verified_sha": "0623d98c3f9895be30c596dd7dcc988b73dce7bf",
+  "results": {
+    "renderer_typecheck": "pass",
+    "electron_typecheck": "pass",
+    "tests": {
+      "status": "pass",
+      "passed": 10,
+      "failed": 0,
+      "ci_duration_ms": 133.10108
+    },
+    "renderer_build": {
+      "status": "pass",
+      "html_bytes": 720,
+      "css_bytes": 15312,
+      "javascript_bytes": 219059,
+      "javascript_gzip_kb": 67.59
+    },
+    "sandboxed_preload_build": {
+      "status": "pass",
+      "commonjs_bytes": 2629,
+      "residual_esm_import": false,
+      "external_modules": [
+        "electron"
+      ]
+    },
+    "sbom": {
+      "status": "pass",
+      "format": "CycloneDX",
+      "spec_version": "1.6",
+      "components": 81,
+      "invalid_sha512_hashes": 0
+    },
+    "npm_audit": {
+      "status": "pass",
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0
+    },
+    "dependency_currency": {
+      "status": "reviewed",
+      "deliberate_hold": {
+        "package": "@types/node",
+        "installed": "24.13.3",
+        "latest_at_review": "26.3.0",
+        "reason": "Align type declarations with the Node 24 runtime."
+      }
+    },
+    "git_diff_check": "pass"
+  },
+  "linux_native_runtime": {
+    "status": "pass",
+    "workflow_run_id": 33010127784,
+    "workflow_job_id": 98313927154,
+    "artifact_id": 9622173630,
+    "artifact_digest": "sha256:86af413d98ccf3c0fa420d259947909c0c4bc16df25bf31664f87e7d0878248c",
+    "environment": {
+      "runner": "ubuntu-24.04",
+      "architecture": "x64",
+      "node": "24.18.1",
+      "electron": "44.0.0",
+      "chrome": "152.0.7977.54",
+      "display": "Xvfb",
+      "dbus": "isolated session"
+    },
+    "screenshots": 5,
+    "native_menu": {
+      "installed": true,
+      "undo_role_present": true,
+      "import_item_present": true,
+      "semantic_keep_item_present": true
+    },
+    "bridge_round_trip_ms": {
+      "samples": 40,
+      "minimum": 0.1,
+      "median": 0.2,
+      "p95": 0.3,
+      "maximum": 1.0
+    },
+    "input_to_frame_ms": {
+      "samples": 20,
+      "minimum": 3.3,
+      "median": 16.6,
+      "p95": 17.3,
+      "maximum": 17.5
+    },
+    "edit_then_native_undo": "pass",
+    "reload_recovery": {
+      "status": "pass",
+      "duration_ms": 217.722,
+      "stage_preserved": true,
+      "revision_preserved": true,
+      "workspace_focus_restored": true
+    },
+    "accessibility_tree": {
+      "status": "pass-with-limit",
+      "nodes": 608,
+      "unnamed_interactive_nodes": 0,
+      "named_navigation": "Study stages",
+      "named_main": "Handoff readiness",
+      "named_complementary_regions": 2,
+      "limit": "Chromium accessibility tree captured; no interactive Orca or VoiceOver traversal."
+    }
+  },
+  "mac_reference": {
+    "status": "pass",
+    "remote_verified_sha": "d0d3cf9a4b1e6839021f562c6ec88e99f8f0b302",
+    "workflow_run_id": 33008885071,
+    "app_artifact_digest": "sha256:70df77891d6152c82f829b4da27ad82c80d69d14ec4804e59f075fae43f0aff3",
+    "smoke_artifact_digest": "sha256:2a945d0087c59c728c6986763feca24636b11bdee6404a05724ba787916ced24"
+  },
+  "mac_shared_studio": {
+    "status": "pass-with-limits",
+    "branch": "prototype/p1-macos-shared-studio",
+    "workflow_run_id": 33013245969,
+    "workflow_job_id": 98324702131,
+    "remote_verified_sha": "f6acb4451f4fbe7946b492cf0f9c90adea32c595",
+    "local_equivalent_sha": "561877c",
+    "evidence_artifact": {
+      "id": 9623417053,
+      "digest": "sha256:1ccfdcc74b251783755faa8294858599920b7e70bdaeadafa0d5c48d8bda0acb"
+    },
+    "prototype_artifact": {
+      "id": 9623417947,
+      "digest": "sha256:c3eb15a345374b3f6787306303573cb96e9a895e77234fa8c3d178f3eac979af"
+    },
+    "environment": {
+      "operating_system": "macOS 14.8.7 (Build 23J520)",
+      "architecture": "arm64",
+      "host": "AppKit and WKWebView"
+    },
+    "screenshots": 5,
+    "native_menu": {
+      "installed": true,
+      "import_item_present": true,
+      "keep_item_present": true,
+      "undo_item_present": true,
+      "reload_item_present": true,
+      "commands_dispatched": 3
+    },
+    "native_panel": {
+      "status": "pass-with-limit",
+      "opened": 1,
+      "cancelled": 1,
+      "focus_restored_to": "import-fonts-button",
+      "limit": "The real NSOpenPanel was shown and automatically cancelled; no font source was selected."
+    },
+    "bridge_round_trip_ms": {
+      "samples": 40,
+      "minimum": 0,
+      "median": 0,
+      "p95": 1,
+      "maximum": 1,
+      "timer_limit": "WKWebView performance timing is quantized; zero-valued samples are not literal zero-latency claims."
+    },
+    "input_to_frame_ms": {
+      "samples": 20,
+      "minimum": 7,
+      "median": 17,
+      "p95": 18,
+      "maximum": 18
+    },
+    "edit_then_native_undo": "pass",
+    "reload_recovery": {
+      "status": "pass",
+      "duration_ms": 185.811,
+      "stage_preserved": true,
+      "revision_preserved": true,
+      "workspace_focus_restored": true
+    },
+    "accessibility_semantics": {
+      "status": "pass-with-limit",
+      "interactive_elements": 48,
+      "unnamed_interactive_elements": 0,
+      "landmarks": {
+        "banner": 1,
+        "navigation": 1,
+        "main": 1,
+        "complementary": 2,
+        "contentinfo": 1
+      },
+      "native_web_view_role": "AXGroup",
+      "native_web_view_direct_children": 1,
+      "limit": "Automated semantics and basic native accessibility hosting passed; VoiceOver traversal was not run."
+    },
+    "security": {
+      "bundled_local_content_only": true,
+      "read_only_custom_scheme": "font-previewer://studio",
+      "named_content_world": "FontPreviewerHostBridge",
+      "persistent_website_data": false,
+      "invalid_bridge_requests_rejected": 3,
+      "navigation_attempts": 0,
+      "popup_attempts": 0,
+      "web_process_terminations": 0
+    }
+  },
+  "remaining_limits": [
+    "Linux evidence used an automated Xvfb session, not an attended product-quality review.",
+    "Mac and Linux native menu paths were automated, not clicked by a human.",
+    "The Mac NSOpenPanel opened and restored focus after automatic cancellation, but no real source was selected; the Linux dialog was not shown.",
+    "No interactive Orca traversal has run.",
+    "No interactive VoiceOver traversal has run.",
+    "Mac screenshots capture WKWebView content, not complete native window chrome; attended Mac quality critique remains open.",
+    "The WKWebView termination recovery handler exists, but an actual web-content-process termination was not induced.",
+    "Fixture font names are architectural test data; P1 does not prove cross-engine typography fidelity."
+  ],
+  "decision": "D01 remains open. Automated Mac and Linux evidence strongly supports Variant A, but attended native-window critique, VoiceOver and Orca traversal, real source selection, and WKWebView process-termination recovery remain untested."
+}

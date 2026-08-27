@@ -1,0 +1,128 @@
+{
+  "accessibilitySemantics" : {
+    "activeElement" : "workspace-heading",
+    "interactiveElements" : 48,
+    "landmarks" : {
+      "banner" : 1,
+      "complementary" : 2,
+      "contentinfo" : 1,
+      "main" : 1,
+      "navigation" : 1
+    },
+    "stageNavigationName" : "Study stages",
+    "unnamedDetails" : [
+
+    ],
+    "unnamedInteractiveElements" : 0
+  },
+  "afterNativeMenuCommand" : {
+    "activeElement" : "BODY",
+    "heading" : "Form follows attention.",
+    "reviewState" : "+ keep",
+    "revision" : "revision 1",
+    "selected" : "+Aperture SansLight · Variable instance",
+    "stage" : "01 Review",
+    "storedBytes" : 6061
+  },
+  "architecture" : "arm64",
+  "bridgeRoundTrip" : {
+    "maximumMs" : 1,
+    "medianMs" : 0,
+    "minimumMs" : 0,
+    "p95Ms" : 1,
+    "samples" : 40
+  },
+  "compare" : {
+    "activeElement" : "workspace-heading",
+    "heading" : "Compare set",
+    "reviewState" : null,
+    "revision" : "revision 27",
+    "selected" : "+Aperture SansLight · Variable instanceDisplay",
+    "stage" : "02 Compare",
+    "storedBytes" : 6253
+  },
+  "contentWorld" : "FontPreviewerHostBridge",
+  "editAndUndo" : {
+    "afterInsert" : "Form follows attention. undo-probe",
+    "afterUndo" : "Form follows attention.",
+    "before" : "Form follows attention."
+  },
+  "focusAfterStageChange" : {
+    "activeElement" : "workspace-heading",
+    "heading" : "Type system",
+    "reviewState" : null,
+    "revision" : "revision 28",
+    "selected" : "+Aperture SansLight · Variable instanceDisplay",
+    "stage" : "03 System",
+    "storedBytes" : 6252
+  },
+  "generatedAt" : "2026-08-26T21:00:49Z",
+  "host" : "wkwebview",
+  "initial" : {
+    "activeElement" : "BODY",
+    "heading" : "Form follows attention.",
+    "reviewState" : "○ unreviewed",
+    "revision" : "revision 0",
+    "selected" : "○Aperture SansLight · Variable instance",
+    "stage" : "01 Review",
+    "storedBytes" : 6067
+  },
+  "inputToFrame" : {
+    "maximumMs" : 18,
+    "medianMs" : 17,
+    "minimumMs" : 7,
+    "p95Ms" : 18,
+    "samples" : 20
+  },
+  "nativeAccessibility" : {
+    "directChildren" : 1,
+    "voiceOverTraversal" : "not-run",
+    "webViewRole" : "Optional(__C.NSAccessibilityRole(_rawValue: AXGroup))"
+  },
+  "nativeMenu" : {
+    "commandsDispatched" : 3,
+    "importItemPresent" : true,
+    "installed" : true,
+    "keepItemPresent" : true,
+    "reloadItemPresent" : true,
+    "undoItemPresent" : true
+  },
+  "nativePanel" : {
+    "cancelled" : 1,
+    "focusRestoredTo" : "import-fonts-button",
+    "opened" : 1
+  },
+  "operatingSystem" : "Version 14.8.7 (Build 23J520)",
+  "platform" : "macos",
+  "reload" : {
+    "after" : {
+      "activeElement" : "workspace-heading",
+      "heading" : "Handoff readiness",
+      "reviewState" : null,
+      "revision" : "revision 29",
+      "selected" : "+Aperture SansLight · Variable instanceDisplay",
+      "stage" : "04 Handoff",
+      "storedBytes" : 6253
+    },
+    "before" : {
+      "activeElement" : "workspace-heading",
+      "heading" : "Handoff readiness",
+      "reviewState" : null,
+      "revision" : "revision 29",
+      "selected" : "+Aperture SansLight · Variable instanceDisplay",
+      "stage" : "04 Handoff",
+      "storedBytes" : 6253
+    },
+    "durationMs" : 185.81100000000001
+  },
+  "security" : {
+    "bundledLocalContentOnly" : true,
+    "namedContentWorld" : "FontPreviewerHostBridge",
+    "persistentWebsiteData" : false,
+    "readOnlyCustomScheme" : "font-previewer:\/\/studio",
+    "rejectedBridgeRequests" : 3,
+    "rejectedNavigations" : 0,
+    "rejectedPopups" : 0,
+    "webProcessTerminations" : 0
+  }
+}
