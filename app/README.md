@@ -9,8 +9,9 @@ This directory contains the active shared Studio and the two desktop Hosts. The 
 - `macos/FontPreviewerHost.swift` — AppKit/WKWebView Host with CoreText discovery, native menus/panels, persistence, export, and displayed evidence runner.
 - `tests/` — public-seam domain, protocol, Catalog, grouping, migration, recovery, Handoff, accessibility, and Host tests.
 - `scripts/` — deterministic test/build cleanup, version checks, SBOM generation, package audits, Linux packaging, and macOS assembly.
+- `assets/icon/` and `public/` — the source icon pair and mechanically derived native/browser icon family.
 
-Source version is `0.1.0`. Current `main` is preparing the unreleased `v0.1.0-rc.2` candidate; the latest published prerelease is `v0.1.0-rc.1`.
+Source version is `0.1.0`. The current public prerelease is `v0.1.0-rc.2`.
 
 ## Prerequisites
 
@@ -79,20 +80,21 @@ Outputs:
 - `font-previewer_0.1.0_amd64.deb`
 - `checksums.sha256`
 
-macOS:
+macOS active Host package from the repository root:
 
 ```bash
-npm run build
-./scripts/build-macos-host.sh
+./build-font-previewer-app.command --no-install
 ```
 
-Outputs under `output/macos-host/`:
+Each run writes a timestamped, exact-source output directory under `app/output/` containing:
 
 - `Font Previewer.app`
 - `Font Previewer.zip`
 - `Font Previewer.zip.sha256`
 
 The Mac package enables hardened runtime and is signed ad hoc for integrity checks. It is not Developer-ID signed or notarised. No Gatekeeper acceptance claim follows from CI.
+
+Omit `--no-install` to stage a verified copy into `/Applications/Font Previewer.app` and launch it. The script refuses dirty source, running-app replacement, unsafe symlink destinations, or a package that fails checksum, extraction, inventory, architecture, or signature checks. Use `./build-reference-app.command` only for the preserved SwiftUI reference; it requires full Xcode.
 
 Both package paths include the project licence, third-party notices, installation guidance, and SBOM. Linux additionally retains required Electron/Chromium licence payloads.
 

@@ -1,6 +1,6 @@
 # Font Previewer repository state
 
-Last reviewed: 2026-08-27
+Last reviewed: 2026-08-28
 
 ## Purpose
 
@@ -11,13 +11,29 @@ Font Previewer is a local typography decision tool. The active product is the sh
 - Canonical branch: `main`
 - Default branch: `main`
 - Source version: `0.1.0`
-- Verified product base before repository-only canonicalisation: `f1a6df73246eab2d52b0ac582af8e9f737fcafd0`
-- Current source posture: unreleased `v0.1.0-rc.2` candidate
-- Latest published release: `v0.1.0-rc.1`
-- Published tag commit: `6ae51f5618387e1e4e39f4816f797da35aaee57b`
+- Current source posture: published `v0.1.0-rc.2` prerelease
+- Latest published release: `v0.1.0-rc.2`
+- Exact release source: the commit named by the immutable tag and `SOURCE_SHA` release asset
+- Prior published release: `v0.1.0-rc.1` at `6ae51f5618387e1e4e39f4816f797da35aaee57b`
 - Stable release: none
 
-The exact final `main` SHA and exact-head workflow runs are recorded in [`REPOSITORY_CLEANUP_2026-08-27.md`](REPOSITORY_CLEANUP_2026-08-27.md) after canonicalisation. The RC, hardening, and pre-Mac product work entered `main` through PRs #1, #2, and #3.
+The RC, hardening, pre-Mac product work, canonicalisation, and Mac finalisation all reached `main` through reviewed pull requests. Published tags and releases remain immutable; exact source-to-package correspondence is carried by the release tag, workflow run, artifact names, checksums, and `SOURCE_SHA`.
+
+## Current workflow evidence
+
+- The release workflow accepted only a successful `Verify Font Previewer` run whose `head_sha` equalled the exact current `main` commit.
+- That run produced separately named macOS and Linux evidence/package artifacts with matching `SOURCE_SHA` manifests.
+- The exact-main repository-truth and preserved-reference workflows remained separate gates; a green application workflow is not substituted for either.
+- The public release assets were re-downloaded and checked against `SHA256SUMS` after publication.
+
+Run IDs, conclusions, artifacts, and the source SHA remain available in GitHub Actions and the immutable release rather than being copied into a self-referential source file.
+
+## Current GitHub maintenance state
+
+- Open release pull requests: none after finalisation.
+- Open stable-v1 gates: issues [#5](https://github.com/bomkino/font-previewer/issues/5), [#6](https://github.com/bomkino/font-previewer/issues/6), and [#7](https://github.com/bomkino/font-previewer/issues/7).
+- Superseded remote working branches are disposable after their commits and PR history are verified reachable from `main` or preserved tags.
+- Force-push and deletion protection belongs on `main`; merged working branches should be deleted automatically.
 
 ## Platform posture
 
@@ -48,15 +64,15 @@ The exact final `main` SHA and exact-head workflow runs are recorded in [`REPOSI
 - Human typography, native-interface, and competent complex-script review.
 - Independent clean-machine Study/Handoff reconstruction.
 - Reference-hardware import, scrolling, long-session, and memory measurements.
-- Hostile cross-format font corpus beyond current synthetic/malformed fixtures.
+- Broader hostile cross-format font corpus beyond the retained disposable 24-case/mutated-font run.
 - Induced WKWebView content-process termination on a packaged real session.
-- Developer ID signing/notarisation only if that distribution path is deliberately adopted.
+- Developer ID signing/notarisation is outside the current free distribution path; it would require a separate future decision.
 
 These gates prohibit stable `v1.0.0`, broad support claims, attended accessibility claims, and production signing/notarisation claims. They do not make current verified source unsuitable for canonical `main`.
 
 ## Release posture
 
-The latest public prerelease remains intact. Current source is newer and unreleased. `.github/workflows/release.yml` is manual, exact-SHA guarded, exact-run guarded, non-overwriting, and dry-run first. No automatic release occurs on a push, PR, tag, or successful verification run.
+`v0.1.0-rc.2` is the latest public prerelease. `.github/workflows/release.yml` remains manual, exact-SHA guarded, exact-run guarded, non-overwriting, and dry-run first. No later release occurs automatically on a push, PR, tag, or successful verification run.
 
 ## Current documents
 

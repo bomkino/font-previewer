@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { access, mkdir, readdir, rm, writeFile } from "node:fs/promises";
-import { join, resolve, sep } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 const applicationRoot = resolve(import.meta.dirname, "..");
 const outputRoot = join(applicationRoot, ".test-dist");
@@ -25,6 +25,19 @@ function run(command, arguments_) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
+function runTests(arguments_) {
+  const result = spawnSync(process.execPath, arguments_, {
+    cwd: applicationRoot,
+    encoding: "utf8",
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (result.error) throw result.error;
+  process.stdout.write(result.stdout ?? "");
+  process.stderr.write(result.stderr ?? "");
+  if (result.status !== 0) process.exit(result.status ?? 1);
+  return result.stdout ?? "";
+}
+
 run(process.execPath, [join(applicationRoot, "node_modules", "typescript", "bin", "tsc"), "-p", "tsconfig.test.json"]);
 
 async function testFilesWithin(directory) {
@@ -39,4 +52,14 @@ async function testFilesWithin(directory) {
 
 const testFiles = (await testFilesWithin(join(outputRoot, "tests"))).sort();
 if (testFiles.length === 0) throw new Error("The test compiler emitted no test files.");
-run(process.execPath, ["--test", ...testFiles]);
+// Node 26 treats absolute test paths as glob patterns. Workspace names may
+// legitimately contain glob metacharacters such as `[` and `]`, causing a
+// false-green run with zero discovered tests. Paths relative to the fixed cwd
+// contain only repository-controlled segments and identify every emitted file.
+const relativeTestFiles = testFiles.map((file) => `./${relative(applicationRoot, file)}`);
+const testOutput = runTests(["--test", "--test-reporter=tap", ...relativeTestFiles]);
+const summary = /(?:^|\n)# tests (\d+)(?:\n|$)/u.exec(testOutput);
+const executedTests = summary ? Number(summary[1]) : 0;
+if (!Number.isSafeInteger(executedTests) || executedTests < testFiles.length) {
+  throw new Error(`Test runner executed ${executedTests} tests from ${testFiles.length} emitted files.`);
+}

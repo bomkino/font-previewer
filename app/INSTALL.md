@@ -2,7 +2,7 @@
 
 Font Previewer is a local desktop app. It has no account, updater, analytics, cloud processing, or required network connection.
 
-The latest published package set is the `v0.1.0-rc.1` prerelease. Current `main` is ahead and preparing `v0.1.0-rc.2`; CI artifacts are exact-SHA evidence, not public releases.
+The latest published package set is the [`v0.1.0-rc.2`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.2) prerelease. CI artifacts remain exact-SHA evidence, not substitutes for release assets.
 
 ## Verify downloads
 
@@ -29,7 +29,7 @@ Do not install an asset whose checksum fails or whose release tag does not point
 3. The app is ad-hoc signed with hardened runtime. It is not Developer-ID signed or notarised.
 4. macOS may warn or block first launch. Control-click the app, choose **Open**, then confirm only after trusting the repository, tag, and checksum.
 
-No Developer ID signing, notarisation, stapling, or Gatekeeper acceptance is claimed.
+Do not disable Gatekeeper globally. No Developer ID signing, notarisation, stapling, or Gatekeeper acceptance is claimed.
 
 ## Ubuntu/Debian x64
 

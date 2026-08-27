@@ -201,6 +201,7 @@ private enum HostRequest {
     case relinkSource(String)
     case revealSource(String)
     case nativeUndo
+    case finishTerminate(Int, Bool)
     case reloadStudio
     case probe(Int)
 }
@@ -231,6 +232,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     fileprivate var navigationRejections = 0
     fileprivate var popupRejections = 0
     fileprivate var processTerminations = 0
+    fileprivate var nativeTextHistoryCommands = 0
 
     private var studioRoot: URL!
     private var studioHandler: BoundedSchemeHandler!
@@ -262,6 +264,8 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     private var recentDocuments: [URL] = []
     private var evidenceRunner: MacEvidenceRunner?
     private var evidenceStarted = false
+    private var terminationReplyPending = false
+    private var terminationTimeout: DispatchWorkItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -276,6 +280,21 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !terminationReplyPending else { return .terminateLater }
+        terminationReplyPending = true
+        sendMenu(["type": "flush-recovery"])
+        let timeout = DispatchWorkItem { [weak self, weak sender] in
+            guard let self, let sender, self.terminationReplyPending else { return }
+            self.terminationReplyPending = false
+            self.terminationTimeout = nil
+            self.sendEvent(["type": "mirror-warning", "message": "Quit cancelled because the final recovery checkpoint was not confirmed."])
+            sender.reply(toApplicationShouldTerminate: false)
+        }
+        terminationTimeout = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: timeout)
+        return .terminateLater
+    }
     func applicationWillTerminate(_ notification: Notification) { scopedURLs.forEach { $0.stopAccessingSecurityScopedResource() } }
 
     private func configureStorage() throws {
@@ -310,7 +329,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         webView.uiDelegate = self
         webView.allowsBackForwardNavigationGestures = false
         webView.allowsMagnification = true
-        webView.underPageBackgroundColor = NSColor(calibratedWhite: 0.96, alpha: 1)
+        webView.underPageBackgroundColor = NSColor(calibratedRed: 0.082, green: 0.082, blue: 0.071, alpha: 1)
         webView.setAccessibilityLabel("Font Previewer Studio")
         webView.setAccessibilityHelp("Review fonts, compare Candidates, build a typography System, and export a Handoff.")
         webView.translatesAutoresizingMaskIntoConstraints = false
@@ -353,8 +372,8 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         file.addItem(.separator()); file.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         fileItem.submenu = file; root.addItem(fileItem)
         let editItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: ""); let edit = NSMenu(title: "Edit")
-        addMenu(edit, "Undo Study Change", "z", [], #selector(undoStudyMenu(_:)), "font-previewer-undo")
-        addMenu(edit, "Redo Study Change", "Z", [.command, .shift], #selector(redoStudyMenu(_:)), "font-previewer-redo")
+        addMenu(edit, "Undo", "z", [], #selector(undoStudyMenu(_:)), "font-previewer-undo")
+        addMenu(edit, "Redo", "Z", [.command, .shift], #selector(redoStudyMenu(_:)), "font-previewer-redo")
         edit.addItem(.separator())
         edit.addItem(NSMenuItem(title: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")); edit.addItem(NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")); edit.addItem(NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")); edit.addItem(NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
         edit.addItem(.separator()); addMenu(edit, "Mark Candidate Keep", "k", [.command, .shift], #selector(keepMenu(_:)), "font-previewer-keep"); addMenu(edit, "Next Unreviewed Candidate", "u", [.command, .shift], #selector(nextMenu(_:)), "font-previewer-next")
@@ -383,12 +402,39 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     @objc private func saveMenu(_ sender: Any?) { sendMenu(["type": "save-study"]) }
     @objc private func saveAsMenu(_ sender: Any?) { sendMenu(["type": "save-study-as"]) }
     @objc private func exportMenu(_ sender: Any?) { sendMenu(["type": "export-handoff"]) }
-    @objc private func undoStudyMenu(_ sender: Any?) { sendMenu(["type": "undo-study"]) }
-    @objc private func redoStudyMenu(_ sender: Any?) { sendMenu(["type": "redo-study"]) }
+    @objc private func undoStudyMenu(_ sender: Any?) { performHistoryCommand("undo-study", redo: false) }
+    @objc private func redoStudyMenu(_ sender: Any?) { performHistoryCommand("redo-study", redo: true) }
     @objc private func keepMenu(_ sender: Any?) { sendMenu(["type": "mark-keep"]) }
     @objc private func nextMenu(_ sender: Any?) { sendMenu(["type": "next-unreviewed"]) }
     @objc private func stageMenu(_ sender: NSMenuItem) { if let stage = sender.representedObject as? String { sendMenu(["type": "set-stage", "stage": stage]) } }
     @objc private func reloadMenu(_ sender: Any?) { sendMenu(["type": "reload-studio"]) }
+
+    private func performHistoryCommand(_ command: String, redo: Bool) {
+        webView.evaluateJavaScript("""
+            (() => {
+              const element = document.activeElement;
+              return element instanceof HTMLInputElement ||
+                element instanceof HTMLTextAreaElement ||
+                element instanceof HTMLSelectElement ||
+                Boolean(element?.isContentEditable);
+            })()
+            """) { [weak self] value, _ in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    guard value as? Bool == true else {
+                        self.sendMenu(["type": command])
+                        return
+                    }
+                    self.nativeTextHistoryCommands += 1
+                    self.window.makeFirstResponder(self.webView)
+                    if redo {
+                        if self.webView.undoManager?.canRedo == true { self.webView.undoManager?.redo() }
+                    } else if self.webView.undoManager?.canUndo == true {
+                        self.webView.undoManager?.undo()
+                    }
+                }
+            }
+    }
 
     fileprivate func sendMenu(_ command: [String: Any]) {
         menuCommands += 1
@@ -426,6 +472,9 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         case "relink-source": guard exact(object, ["type", "sourceId"]), let id = object["sourceId"] as? String, !id.isEmpty else { return nil }; return .relinkSource(id)
         case "reveal-source": guard exact(object, ["type", "sourceId"]), let id = object["sourceId"] as? String, !id.isEmpty else { return nil }; return .revealSource(id)
         case "native-undo": return exact(object, ["type"]) ? .nativeUndo : nil
+        case "finish-terminate":
+            guard exact(object, ["type", "revision", "recoveryPersisted"]), let revision = integer(object["revision"]), let recoveryPersisted = object["recoveryPersisted"] as? Bool else { return nil }
+            return .finishTerminate(revision, recoveryPersisted)
         case "reload-studio": return exact(object, ["type"]) ? .reloadStudio : nil
         case "probe": guard exact(object, ["type", "serial"]), let serial = integer(object["serial"]) else { return nil }; return .probe(serial)
         default: return nil
@@ -465,6 +514,15 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
                 guard let url = sourceBindings[id] else { replyHandler(nil, "Source is not locally bound."); return }
                 NSWorkspace.shared.activateFileViewerSelecting([url]); replyHandler(["type": "ack", "action": "reveal-source"], nil)
             case .nativeUndo: window.makeFirstResponder(webView); if webView.undoManager?.canUndo == true { webView.undoManager?.undo() }; replyHandler(["type": "ack", "action": "native-undo"], nil)
+            case .finishTerminate(let revision, let recoveryPersisted):
+                guard terminationReplyPending else { replyHandler(nil, "No quit checkpoint is pending."); return }
+                let shouldTerminate = recoveryPersisted && mirroredRevision == revision
+                terminationTimeout?.cancel()
+                terminationTimeout = nil
+                terminationReplyPending = false
+                replyHandler(["type": "ack", "action": "finish-terminate"], nil)
+                if !shouldTerminate { sendEvent(["type": "mirror-warning", "message": "Quit cancelled because the latest edit could not be recovered safely."]) }
+                DispatchQueue.main.async { NSApp.reply(toApplicationShouldTerminate: shouldTerminate) }
             case .reloadStudio: replyHandler(["type": "ack", "action": "reload-studio"], nil); DispatchQueue.main.asyncAfter(deadline: .now() + 0.025) { [weak self] in self?.webView.reload() }
             case .probe(let serial): replyHandler(["type": "probe-result", "serial": serial, "host": "wkwebview"], nil)
             }
@@ -616,13 +674,19 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         return changed
     }
 
-    private func importedSource(_ selected: URL, forcedID: String? = nil, catalogOnly: Bool = false) throws -> [String: Any] {
+    fileprivate func importedSource(_ selected: URL, forcedID: String? = nil, catalogOnly: Bool = false) throws -> [String: Any] {
         let initial = try selected.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
         guard initial.isRegularFile == true, initial.isSymbolicLink != true else { throw HostError.unavailable("Source is not a regular file.") }
-        if !catalogOnly { _ = selected.startAccessingSecurityScopedResource(); scopedURLs.append(selected) }
+        let accessStarted = !catalogOnly && selected.startAccessingSecurityScopedResource()
+        var retainAccess = false
+        defer { if accessStarted && !retainAccess { selected.stopAccessingSecurityScopedResource() } }
         let canonical = selected.resolvingSymlinksInPath().standardizedFileURL
         let values = try canonical.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey])
         guard values.isRegularFile == true, values.isSymbolicLink != true, let size = values.fileSize, size > 0, size <= maximumSourceBytes, allowedExtensions.contains(canonical.pathExtension.lowercased()) else { throw HostError.unavailable("Source is unreadable, unsupported, or too large.") }
+        let full = fullExtensions.contains(canonical.pathExtension.lowercased())
+        let descriptors = (CTFontManagerCreateFontDescriptorsFromURL(canonical as CFURL) as? [CTFontDescriptor]) ?? []
+        guard !full || !descriptors.isEmpty else { throw HostError.unavailable("Source font metadata could not be read.") }
+        if accessStarted { scopedURLs.append(selected); retainAccess = true }
         let id = forcedID ?? sourceIDsByPath[canonical.path] ?? catalogSourceIDsByPath[canonical.path] ?? "source:\(UUID().uuidString.lowercased())"
         if let old = sourceBindings[id] { sourceIDsByPath.removeValue(forKey: old.path) }
         if catalogOnly && sourceBindings[id] == nil {
@@ -631,9 +695,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
             sourceBindings[id] = canonical; sourceIDsByPath[canonical.path] = id
             catalogSourceIDsByPath.removeValue(forKey: canonical.path); catalogURLsBySourceID.removeValue(forKey: id)
         }
-        let full = fullExtensions.contains(canonical.pathExtension.lowercased())
         let token = full ? fontAssets.assign(canonical) : nil
-        let descriptors = (CTFontManagerCreateFontDescriptorsFromURL(canonical as CFURL) as? [CTFontDescriptor]) ?? []
         let fallbackName = canonical.deletingPathExtension().lastPathComponent.replacingOccurrences(of: "_", with: " ").replacingOccurrences(of: "-", with: " ")
         let faceDescriptors: [CTFontDescriptor?] = descriptors.isEmpty ? [nil] : descriptors.map(Optional.some)
         let faces = faceDescriptors.prefix(256).enumerated().map { index, descriptor -> [String: Any] in
@@ -858,7 +920,7 @@ private final class MacEvidenceRunner {
     private func run() async throws {
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         try await wait("Studio") { try await self.bool("window.fontPreviewerHost && document.querySelector('#workspace-heading') && document.querySelector('.host-probe')?.textContent?.includes('wkwebview')") }
-        var trace: [String: Any] = ["generatedAt": ISO8601DateFormatter().string(from: Date()), "host": "wkwebview", "initial": try await inspect(), "nativeMenu": ["installed": NSApp.mainMenu != nil, "import": NSApp.mainMenu?.item(withTitle: "File")?.submenu?.item(withTitle: "Import Sources…") != nil, "undo": NSApp.mainMenu?.item(withTitle: "Edit")?.submenu?.item(withTitle: "Undo Study Change") != nil]]
+        var trace: [String: Any] = ["generatedAt": ISO8601DateFormatter().string(from: Date()), "host": "wkwebview", "initial": try await inspect(), "nativeMenu": ["installed": NSApp.mainMenu != nil, "import": NSApp.mainMenu?.item(withTitle: "File")?.submenu?.item(withTitle: "Import Sources…") != nil, "undo": NSApp.mainMenu?.item(withTitle: "Edit")?.submenu?.item(withTitle: "Undo") != nil]]
         try await host.snapshot(to: output.appendingPathComponent("01-review.png"))
         _ = try await host.evaluate("document.querySelector('#import-fonts-button')?.focus(); true")
         try performMenu("File", "Import Sources…")
@@ -876,6 +938,7 @@ private final class MacEvidenceRunner {
         try await host.snapshot(to: output.appendingPathComponent("06-catalog.png"))
         for (stage, file) in [("Compare", "02-compare.png"), ("System", "03-system.png"), ("Handoff", "04-handoff.png")] { _ = try await host.evaluate("([...document.querySelectorAll('.stage-nav button')].find((item)=>item.textContent?.includes('\(stage)')))?.click();true"); try await Task.sleep(nanoseconds: 150_000_000); try await host.snapshot(to: output.appendingPathComponent(file)) }
         trace["security"] = try await host.evaluateAsync("(async()=>{const bad=[{type:'open-import',path:'/tmp/x'},{type:'probe',serial:-1},{type:'read-file',path:'/etc/passwd'},{type:'scan-installed'},{type:'scan-installed',query:'',cursor:0,limit:10000,refresh:false}];let rejected=0;for(const r of bad){try{await window.fontPreviewerHost.request(r)}catch{rejected++}}return {attempts:bad.length,rejected,nodeUnavailable:typeof window.require==='undefined'&&typeof window.process==='undefined',hostKeys:Object.keys(window.fontPreviewerHost).sort()}})()") ?? NSNull()
+        trace["invalidFullPreviewSource"] = try invalidFullPreviewSourceAudit()
         trace["semantics"] = try await host.evaluate("(()=>{const controls=[...document.querySelectorAll('button,input,select,textarea')];const named=el=>el.getAttribute('aria-label')||el.getAttribute('aria-labelledby')||el.closest('label')?.textContent?.trim()||el.textContent?.trim();const roleLabel=[...document.querySelectorAll('.field-label')].find(label=>label.querySelector(':scope > span')?.textContent?.trim()==='Role');const roleSelect=roleLabel?.querySelector('select')?.getBoundingClientRect();const roleHelp=roleLabel?.querySelector(':scope > small')?.getBoundingClientRect();return {controls:controls.length,unnamed:controls.filter(el=>!named(el)).length,mains:document.querySelectorAll('main').length,asides:document.querySelectorAll('aside').length,duplicateIds:[...document.querySelectorAll('[id]')].map(el=>el.id).filter((id,i,a)=>a.indexOf(id)!==i).length,horizontalOverflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,roleHelpSeparated:Boolean(roleSelect&&roleHelp&&roleSelect.bottom<=roleHelp.top)}})()") ?? NSNull()
         trace["transactionalHandoffFault"] = try await host.verifyHandoffFaultInjection(in: output.appendingPathComponent("handoff-fault-target", isDirectory: true))
         try await wait("Recovery") { try await self.bool("document.querySelector('.document-title > span:last-child')?.textContent?.includes('recovery ready')") }
@@ -885,9 +948,20 @@ private final class MacEvidenceRunner {
         trace["nativePanel"] = ["opened": host.panelOpened, "cancelled": host.panelCancelled]
         trace["hostCounters"] = ["rejectedRequests": host.rejectedRequests, "menuCommands": host.menuCommands, "navigationRejections": host.navigationRejections, "popupRejections": host.popupRejections, "processTerminations": host.processTerminations]
         try JSONSerialization.data(withJSONObject: trace, options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("run.json"), options: [.atomic])
-        let security = trace["security"] as? [String: Any]; let semantics = trace["semantics"] as? [String: Any]; let keyboard = trace["keyboardAccessibility"] as? [String: Any]; let catalog = trace["installedCatalog"] as? [String: Any]; let handoffFault = trace["transactionalHandoffFault"] as? [String: Any]; let termination = trace["terminationCallbackRecovery"] as? [String: Any]; let terminationAfter = termination?["after"] as? [String: Any]
+        let security = trace["security"] as? [String: Any]; let invalidSource = trace["invalidFullPreviewSource"] as? [String: Any]; let semantics = trace["semantics"] as? [String: Any]; let keyboard = trace["keyboardAccessibility"] as? [String: Any]; let catalog = trace["installedCatalog"] as? [String: Any]; let handoffFault = trace["transactionalHandoffFault"] as? [String: Any]; let termination = trace["terminationCallbackRecovery"] as? [String: Any]; let terminationAfter = termination?["after"] as? [String: Any]
         let cancellation = catalog?["cancellation"] as? [String: Any]
-        guard security?["attempts"] as? Int == security?["rejected"] as? Int, security?["nodeUnavailable"] as? Bool == true, semantics?["unnamed"] as? Int == 0, semantics?["duplicateIds"] as? Int == 0, semantics?["horizontalOverflow"] as? Bool == false, semantics?["roleHelpSeparated"] as? Bool == true, keyboard?["forwardWrap"] as? Bool == true, keyboard?["backwardWrap"] as? Bool == true, keyboard?["candidateUnchanged"] as? Bool == true, keyboard?["trayUnchanged"] as? Bool == true, keyboard?["returnFocus"] as? Bool == true, ((catalog?["count"] as? Int) ?? 0) > 0, ((catalog?["indexed"] as? Int) ?? 0) > 0, catalog?["pageBounded"] as? Bool == true, catalog?["studyUnchanged"] as? Bool == true, catalog?["pathLeak"] as? Bool == false, catalog?["opaquePreviewUrls"] as? Bool == true, catalog?["previewAvailable"] as? Bool == true, catalog?["fontLoaded"] as? Bool == true, cancellation?["acknowledged"] as? Bool == true, cancellation?["obsoleteResultCancelled"] as? Bool == true, ((cancellation?["durationMs"] as? Double) ?? .infinity) <= 100, handoffFault?["failureObserved"] as? Bool == true, handoffFault?["priorExportByteIdentical"] as? Bool == true, handoffFault?["stagingClean"] as? Bool == true, handoffFault?["finalFolderCount"] as? Int == 1, termination?["simulatedDelegateCallback"] as? Bool == true, termination?["counterAdvanced"] as? Bool == true, terminationAfter?["activeElement"] as? String == "workspace-heading", terminationAfter?["reviewState"] as? String == "Keep", host.panelOpened > 0, host.panelCancelled > 0 else { throw HostError.unavailable("Evidence assertions failed") }
+        guard security?["attempts"] as? Int == security?["rejected"] as? Int, security?["nodeUnavailable"] as? Bool == true, invalidSource?["rejected"] as? Bool == true, semantics?["unnamed"] as? Int == 0, semantics?["duplicateIds"] as? Int == 0, semantics?["horizontalOverflow"] as? Bool == false, semantics?["roleHelpSeparated"] as? Bool == true, keyboard?["forwardWrap"] as? Bool == true, keyboard?["backwardWrap"] as? Bool == true, keyboard?["nativeTextUndo"] as? Bool == true, keyboard?["candidateUnchanged"] as? Bool == true, keyboard?["trayUnchanged"] as? Bool == true, keyboard?["returnFocus"] as? Bool == true, ((catalog?["count"] as? Int) ?? 0) > 0, ((catalog?["indexed"] as? Int) ?? 0) > 0, catalog?["pageBounded"] as? Bool == true, catalog?["studyUnchanged"] as? Bool == true, catalog?["pathLeak"] as? Bool == false, catalog?["opaquePreviewUrls"] as? Bool == true, catalog?["previewAvailable"] as? Bool == true, catalog?["fontLoaded"] as? Bool == true, cancellation?["acknowledged"] as? Bool == true, cancellation?["obsoleteResultCancelled"] as? Bool == true, ((cancellation?["durationMs"] as? Double) ?? .infinity) <= 100, handoffFault?["failureObserved"] as? Bool == true, handoffFault?["priorExportByteIdentical"] as? Bool == true, handoffFault?["stagingClean"] as? Bool == true, handoffFault?["finalFolderCount"] as? Int == 1, termination?["simulatedDelegateCallback"] as? Bool == true, termination?["counterAdvanced"] as? Bool == true, terminationAfter?["activeElement"] as? String == "workspace-heading", terminationAfter?["reviewState"] as? String == "Keep", host.panelOpened > 0, host.panelCancelled > 0 else { throw HostError.unavailable("Evidence assertions failed") }
+    }
+    private func invalidFullPreviewSourceAudit() throws -> [String: Any] {
+        var rejected = 0
+        for fileExtension in ["otf", "ttf", "woff", "woff2"] {
+            let url = output.appendingPathComponent("invalid-full-preview.\(fileExtension)")
+            try Data("not a font".utf8).write(to: url, options: [.atomic])
+            defer { try? FileManager.default.removeItem(at: url) }
+            do { _ = try host.importedSource(url, catalogOnly: true) }
+            catch { rejected += 1 }
+        }
+        return ["attempts": 4, "rejections": rejected, "rejected": rejected == 4]
     }
     private func performMenu(_ menuTitle: String, _ itemTitle: String) throws {
         guard let menu = NSApp.mainMenu?.item(withTitle: menuTitle)?.submenu, let item = menu.item(withTitle: itemTitle) else { throw HostError.unavailable("Missing native menu item \(menuTitle) → \(itemTitle)") }
@@ -899,10 +973,17 @@ private final class MacEvidenceRunner {
         host.sendMenu(["type": "new-study"])
         try await wait("New Study dialog") { try await self.bool("document.querySelector('.new-study-dialog') && document.activeElement?.closest('.new-study-dialog')") }
         let trap = try await host.evaluate("(()=>{const d=document.querySelector('.new-study-dialog');const f=[...d.querySelectorAll(\"button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex='-1'])\")];const first=f[0],last=f.at(-1);last.focus();last.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));const forwardWrap=document.activeElement===first;first.focus();first.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));return {forwardWrap,backwardWrap:document.activeElement===last}})()") as? [String: Any] ?? [:]
-        _ = try await host.evaluate("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})); true")
+        _ = try await host.evaluateAsync("(async()=>{await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));return true})()")
         try await wait("New Study close") { try await self.bool("!document.querySelector('.new-study-dialog') && document.activeElement?.id==='import-fonts-button'") }
+        let nativeHistoryBefore = host.nativeTextHistoryCommands
+        let studyMenuBefore = host.menuCommands
+        _ = try await host.evaluate("document.querySelector('.document-title input')?.focus(); true")
+        try performMenu("Edit", "Undo")
+        try await wait("native text undo route") { self.host.nativeTextHistoryCommands == nativeHistoryBefore + 1 }
+        let textInputStillFocused = try await bool("document.activeElement?.matches('.document-title input')")
+        let nativeTextUndo = host.menuCommands == studyMenuBefore && textInputStillFocused
         let collision = try await host.evaluateAsync("(async()=>{const s=document.querySelector('.stage-nav [aria-current=\"step\"]');const beforeCandidate=document.querySelector('.candidate-row[aria-current=\"true\"]')?.textContent;const beforeTray=document.querySelectorAll('.tray-item').length;s.focus();s.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));s.dispatchEvent(new KeyboardEvent('keydown',{key:' ',code:'Space',bubbles:true,cancelable:true}));await new Promise(r=>requestAnimationFrame(r));return {candidateUnchanged:beforeCandidate===document.querySelector('.candidate-row[aria-current=\"true\"]')?.textContent,trayUnchanged:beforeTray===document.querySelectorAll('.tray-item').length,returnFocus:document.activeElement===s}})()") as? [String: Any] ?? [:]
-        return trap.merging(collision) { _, right in right }
+        return trap.merging(collision) { _, right in right }.merging(["nativeTextUndo": nativeTextUndo]) { _, right in right }
     }
     private func inspect() async throws -> [String: Any] { (try await host.evaluate("(()=>({heading:document.querySelector('#workspace-heading')?.textContent?.replace(/\\s+/g,' ').trim()??null,stage:document.querySelector('.stage-nav [aria-current=\"step\"]')?.textContent?.replace(/\\s+/g,' ').trim()??null,reviewState:document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label')??null,activeElement:document.activeElement?.id||document.activeElement?.tagName||null,durability:document.querySelector('.document-title > span:last-child')?.textContent?.trim()??null}))()")) as? [String: Any] ?? [:] }
     private func bool(_ expression: String) async throws -> Bool { (try await host.evaluate("Boolean(\(expression))")) as? Bool == true }

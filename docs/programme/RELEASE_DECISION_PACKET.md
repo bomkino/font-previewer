@@ -4,10 +4,10 @@
 
 - `main` is canonical and contains the merged RC, hardening, and pre-Mac implementation.
 - Source version remains `0.1.0`.
-- The next candidate tag is `v0.1.0-rc.2`.
-- The latest published prerelease, `v0.1.0-rc.1`, remains fixed to `6ae51f5618387e1e4e39f4816f797da35aaee57b` with its original assets.
+- The current prerelease tag is `v0.1.0-rc.2`.
+- The prior `v0.1.0-rc.1` remains fixed to `6ae51f5618387e1e4e39f4816f797da35aaee57b` with its original assets.
 - No stable release is approved or claimed.
-- This repository cleanup does **not** authorize publication of `v0.1.0-rc.2`.
+- The owner explicitly authorized exact-green-main publication of `v0.1.0-rc.2`; that authorization does not extend to later releases.
 
 The prior owner decision that authorized the first prerelease while work remained isolated on an RC branch is preserved unchanged at [`../archive/2026-08-27/RELEASE_DECISION_PACKET_PRE_MAIN.md`](../archive/2026-08-27/RELEASE_DECISION_PACKET_PRE_MAIN.md). Its branch instructions are historical and do not override current `main`.
 

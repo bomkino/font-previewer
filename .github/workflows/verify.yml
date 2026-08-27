@@ -253,7 +253,7 @@ jobs:
           test ! -e /usr/bin/font-previewer
           test ! -e /opt/font-previewer
           test ! -e /usr/share/applications/font-previewer.desktop
-          test ! -e /usr/share/icons/hicolor/scalable/apps/font-previewer.svg
+          test ! -e /usr/share/icons/hicolor/512x512/apps/font-previewer.png
           if dpkg-query -W -f='${db:Status-Status}\n' font-previewer 2>/dev/null | grep -qx installed; then exit 1; fi
 
       - name: Upload Linux package round-trip evidence
@@ -369,6 +369,7 @@ jobs:
           test -s "$APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
           test -s "$APP/Contents/Resources/sbom.cdx.json"
           test -s "$APP/Contents/Resources/INSTALL.md"
+          test -s "$APP/Contents/Resources/FontPreviewer.icns"
           plutil -lint "$APP/Contents/Info.plist"
           codesign -d --verbose=4 "$APP" 2>&1 | grep -q 'flags=.*runtime'
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")" = "dog.pitch.fontpreviewer"

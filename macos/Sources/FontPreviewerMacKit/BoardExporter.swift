@@ -136,13 +136,12 @@ public enum BoardExporter {
             if !committed { try? fileManager.removeItem(at: stagingURL) }
         }
 
-        let total = max(1,
-            (options.formats.contains(.png) ? pages.count : 0)
-            + (options.formats.contains(.pdf) ? pages.count : 0)
-            + (options.formats.contains(.json) ? 1 : 0)
-            + (options.formats.contains(.markdown) ? 1 : 0)
-            + (options.selection.includeFontCopies ? Set(records.map(\.sourcePath)).count : 0)
-        )
+        let pngCount = options.formats.contains(.png) ? pages.count : 0
+        let pdfCount = options.formats.contains(.pdf) ? pages.count : 0
+        let jsonCount = options.formats.contains(.json) ? 1 : 0
+        let markdownCount = options.formats.contains(.markdown) ? 1 : 0
+        let fontCopyCount = options.selection.includeFontCopies ? Set(records.map(\.sourcePath)).count : 0
+        let total = max(1, pngCount + pdfCount + jsonCount + markdownCount + fontCopyCount)
         var completed = 0
         progress(.init(completed: completed, total: total, message: "Preparing export"))
         let size = CGSize(width: options.canvasPreset.width, height: options.canvasPreset.height)

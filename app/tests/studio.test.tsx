@@ -16,6 +16,7 @@ const inertHost: HostPort = {
     if (request.type === "scan-installed") return { type: "catalog-result", imports: [], indexed: 0, total: 0, rejected: 0, truncated: false, cancelled: false };
     if (request.type === "cancel-catalog") return { type: "ack", action: "cancel-catalog" };
     if (request.type === "mirror-study") return { type: "mirror-ack", revision: request.revision, recoveryPersisted: false };
+    if (request.type === "finish-terminate") return { type: "ack", action: "finish-terminate" };
     if (request.type === "save-study") return { type: "save-result", revision: request.revision, displayName: "Test.pitchfontstudy", saved: true };
     if (request.type === "export-handoff") return { type: "export-result", displayName: "Test Handoff", exported: true, fileCount: 4 };
     if (request.type === "relink-source") return { type: "relink-result", relinked: false };
@@ -43,10 +44,24 @@ test("shared Studio renders the complete Review-to-Handoff product seam", () => 
   assert.match(html, /Comparison tray/);
   assert.match(html, /Family Group/);
   assert.match(html, /aria-live="polite"/);
+  assert.match(html, /font-previewer-icon-64\.png/);
   assert.match(html, /aria-current="step"/);
+  assert.match(html, /class="skip-link" href="#workspace-heading">Skip to main content/);
   assert.equal((html.match(/<main/g) ?? []).length, 1);
   assert.equal((html.match(/<aside/g) ?? []).length, 2);
   assert.equal((html.match(/<nav/g) ?? []).length, 1);
   assert.equal((html.match(/<footer/g) ?? []).length, 1);
   assert.doesNotMatch(html, /(?:file:\/\/|\/Users\/|\/home\/)/);
+});
+
+test("welcome skip link has a focusable destination", () => {
+  globalThis.location.search = "";
+  let html = "";
+  try {
+    html = renderToStaticMarkup(<App />);
+  } finally {
+    globalThis.location.search = "?fixture=1";
+  }
+  assert.match(html, /class="skip-link" href="#welcome-heading">Skip to main content/);
+  assert.match(html, /<h1 id="welcome-heading" tabindex="-1">/);
 });

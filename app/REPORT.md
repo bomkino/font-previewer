@@ -4,8 +4,8 @@
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Current release posture: unreleased `v0.1.0-rc.2` candidate
-- Latest published prerelease: `v0.1.0-rc.1` at `6ae51f5618387e1e4e39f4816f797da35aaee57b`
+- Current release posture: published `v0.1.0-rc.2` prerelease
+- Prior prerelease: `v0.1.0-rc.1` at `6ae51f5618387e1e4e39f4816f797da35aaee57b`
 - Stable release: not approved or claimed
 
 The RC, hardening, and pre-Mac implementation are represented on `main`. PRs #1, #2, and #3 are merged. No current product implementation remains intentionally based on those old branch names.
@@ -36,7 +36,7 @@ Permanent application verification is defined by [`.github/workflows/verify.yml`
 - macOS app assembly, hardened runtime, ad-hoc signature verification, archive round trip, and checksums;
 - package inventory, private-path, credential-marker, source-map, licence, notice, SBOM, and font-binary checks.
 
-Exact final-head workflow evidence is recorded in [`../docs/maintenance/REPOSITORY_STATE.md`](../docs/maintenance/REPOSITORY_STATE.md) and the cleanup receipt after CI completes.
+Current workflow evidence is recorded in [`../docs/maintenance/REPOSITORY_STATE.md`](../docs/maintenance/REPOSITORY_STATE.md), the exact-SHA `SOURCE_SHA` release asset, and the release-linked Actions runs. The older cleanup receipt remains historical evidence for the canonicalisation that preceded this release.
 
 ## Release machinery
 
@@ -48,7 +48,7 @@ Exact final-head workflow evidence is recorded in [`../docs/maintenance/REPOSITO
 - verified source-SHA manifests, checksums, package contents, notices, SBOM, and release notes;
 - an explicit publication boolean and exact tag confirmation before any GitHub release write.
 
-The default path creates a downloadable dry-run bundle. It refuses existing tags and releases. This report does not authorize or claim publication.
+The default path creates a downloadable dry-run bundle. It refuses existing tags and releases. Publication requires the repository owner's explicit release instruction; that authorization was supplied for `v0.1.0-rc.2`.
 
 ## Remaining human and physical gates
 
@@ -59,8 +59,9 @@ Automated success does not close:
 3. competent complex-script review;
 4. independent clean-machine reconstruction and broader reference-hardware performance;
 5. hostile cross-format font containment beyond current automated fixtures;
-6. induced WKWebView content-process termination on a real packaged session;
-7. Developer ID signing, notarisation, stapling, or Gatekeeper acceptance, should that distribution path ever be desired.
+6. induced WKWebView content-process termination on a real packaged session.
+
+Developer ID signing, notarisation, stapling, and Gatekeeper acceptance are deliberately outside this free prerelease path, not hidden completion claims.
 
 These gates block stable `v1.0.0` and any stronger support claim. They do not block keeping verified prerelease code on `main`.
 

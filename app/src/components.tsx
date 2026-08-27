@@ -111,7 +111,7 @@ export function Welcome({ actions, capabilities }: WelcomeProps) {
     <main className="welcome" aria-labelledby="welcome-heading">
       <div className="welcome-copy">
         <p className="section-kicker">Local typography decisions</p>
-        <h1 id="welcome-heading">Find the voice.<br />Keep the evidence.</h1>
+        <h1 id="welcome-heading" tabIndex={-1}>Find the voice.<br />Keep the evidence.</h1>
         <p>
           Review local font Sources, compare exact Candidates, build a deck system, and hand it off without
           installing a thing.

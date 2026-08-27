@@ -1,21 +1,22 @@
 :root {
-  color: #1b1b18;
-  background: #e7e4dd;
+  color: #efede7;
+  background: #151512;
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --paper: #f5f2eb;
-  --paper-strong: #fcfaf5;
-  --paper-muted: #ebe8e0;
-  --ink: #1b1b18;
-  --ink-muted: #69675f;
-  --line: #d2cec4;
-  --line-strong: #9f9b91;
-  --accent: #d05e3e;
-  --accent-soft: #f1d5ca;
-  --focus: #245bd6;
-  --success: #2f7455;
-  --warning: #9b4b2e;
+  color-scheme: dark;
+  --paper: #1e1e1a;
+  --paper-strong: #24241f;
+  --paper-muted: #191916;
+  --ink: #efede7;
+  --ink-muted: #a7a49b;
+  --line: #3e3d37;
+  --line-strong: #5b5950;
+  --accent: #ef7957;
+  --accent-soft: #5a3025;
+  --focus: #70a0ff;
+  --success: #70bd91;
+  --warning: #f09370;
 }
 
 * {
@@ -133,15 +134,10 @@ button:disabled {
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
   width: 30px;
   height: 30px;
-  color: var(--paper-strong);
-  background: var(--ink);
-  font-family: Georgia, serif;
-  font-size: 14px;
-  font-style: italic;
+  border-radius: 7px;
+  object-fit: cover;
 }
 
 .brand-lockup div,
@@ -1180,35 +1176,15 @@ kbd {
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #efede7;
-    background: #151512;
-    --paper: #1e1e1a;
-    --paper-strong: #24241f;
-    --paper-muted: #191916;
-    --ink: #efede7;
-    --ink-muted: #a7a49b;
-    --line: #3e3d37;
-    --line-strong: #5b5950;
-    --accent: #ef7957;
-    --accent-soft: #5a3025;
-    --focus: #70a0ff;
-    --success: #70bd91;
-    --warning: #f09370;
-  }
+.primary-button {
+  color: #171714;
+}
 
-  .brand-mark,
-  .primary-button {
-    color: #171714;
-  }
-
-  .tray,
-  .tray-item,
-  .open-compare {
-    color: #efede7;
-    background: #11110f;
-  }
+.tray,
+.tray-item,
+.open-compare {
+  color: #efede7;
+  background: #11110f;
 }
 
 @media (prefers-reduced-motion: reduce) {

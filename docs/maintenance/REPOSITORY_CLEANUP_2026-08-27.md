@@ -7,22 +7,24 @@ Repository canonicalisation is complete for product integration, current documen
 - Canonical/default branch: `main`
 - Starting `main`: `f1a6df73246eab2d52b0ac582af8e9f737fcafd0`
 - Final product-integration `main`: `671e9feeebcf39c7333d5abf7296d24b9641e74b`
+- Readback `main` after receipt correction: `806b419f00f6f0662783bef9b00c9bcfd526edb0`
 - Merged cleanup PR: #4
 - Final PR head: `3aabf186b233a033e99e4c04915e7608a326713e`
-- Final tree: `212c38a48f59a945ad873b6535c52a75b09fa5c8`
+- Product-integration tree: `212c38a48f59a945ad873b6535c52a75b09fa5c8`
+- Readback tree: `116639a2679b37edf48005b0782b1b337371bf0c`
 - Source version: `0.1.0`
 - Current source posture: unreleased `v0.1.0-rc.2` candidate
 - Latest published release: `v0.1.0-rc.1`
 - Published release commit: `6ae51f5618387e1e4e39f4816f797da35aaee57b`
 - Stable release: none
 
-The merged `main` commit and final PR head have the same tree. No product implementation was lost during squash merge.
+The product-integration `main` commit and final PR head have the same tree. No product implementation was lost during squash merge. The 2026-08-28 readback `main` adds only the corrected version of this receipt; its `app/` and `.github/workflows/` subtrees remain byte-identical to the product-integration commit.
 
 ## Branches reviewed
 
 | Branch | Recorded tip | Classification | Disposition |
 |---|---|---|---|
-| `main` | `671e9feeebcf39c7333d5abf7296d24b9641e74b` | Canonical product and repository truth | Retain |
+| `main` | `806b419f00f6f0662783bef9b00c9bcfd526edb0` | Readback canonical truth; documentation-only child of product-integration commit | Retain |
 | `codex/v1-release-candidate` | `6ae51f5618387e1e4e39f4816f797da35aaee57b` | Merged ancestor and published RC tip | Delete branch; retain tag, release, and PR history |
 | `codex/v1-release-candidate-hardening-02` | `82072911d20ac10ae5e79aa31e0c0b2f7b404a11` | Merged ancestor | Delete branch |
 | `codex/v0.2-pre-mac` | `84c9f4a527783bb2d121d346830b8a6bc42506ff` | Merged ancestor | Delete branch |
@@ -44,20 +46,29 @@ No branch contains newer unsalvaged product implementation. The branches remain 
 - Added version consistency checks and source-SHA manifests.
 - Reconciled README, changelog, roadmap, contribution, security, installation, QA, status, and release documentation.
 - Preserved branch-era reports under `docs/archive/2026-08-27/` and replaced their former current paths with current truth.
-- Removed the published security-contact email from the tree in favour of private vulnerability reporting.
+- Removed the published security-contact email from the tree and retained non-public vulnerability-reporting instructions.
 - Kept FontBlind product and implementation concepts out of Font Previewer.
 
-## Exact-main verification
+## Product-integration verification
 
-All permanent workflows passed on `671e9feeebcf39c7333d5abf7296d24b9641e74b`:
+All permanent workflows passed on product-integration commit `671e9feeebcf39c7333d5abf7296d24b9641e74b`:
 
-- Repository truth: run `33119845629`
-- macOS reference: run `33119845491`
-- Verify Font Previewer: run `33119845596`
+- [Repository truth: run `33119845629`](https://github.com/bomkino/font-previewer/actions/runs/33119845629)
+- [macOS reference: run `33119845491`](https://github.com/bomkino/font-previewer/actions/runs/33119845491)
+- [Verify Font Previewer: run `33119845596`](https://github.com/bomkino/font-previewer/actions/runs/33119845596)
   - macOS AppKit/WKWebView evidence and package round trip: pass
   - Linux Electron/X11 and Wayland/Ozone evidence: pass
   - reproducible `.deb` and portable packages: pass
   - install, launch, remove, residue, privacy, SBOM, audit, checksum, and font-binary exclusion checks: pass
+
+After this receipt was corrected, [Repository truth run `33120587354`](https://github.com/bomkino/font-previewer/actions/runs/33120587354) passed at exact readback `main` commit `806b419f00f6f0662783bef9b00c9bcfd526edb0`. The application and reference workflows did not run there because their path filters excluded this documentation-only change. Their evidence remains attached to `671e9feeebcf39c7333d5abf7296d24b9641e74b`; the readback `main` had the same `app/` and workflow subtrees.
+
+## Post-cleanup repository readback — 2026-08-28
+
+- PRs #1 through #4 are merged; no pull request is open.
+- Issues #5, #6, and #7 remain open as the human, accessibility, physical, and containment gates.
+- All eight reviewed non-`main` branches remain at the recorded tips. No deletion occurred.
+- `main` remains unprotected, no repository ruleset exists, and automatic merged-branch deletion remains disabled.
 
 ## Remaining human and physical gates
 

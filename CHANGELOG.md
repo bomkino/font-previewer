@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0-rc.2 — Unreleased
+## 0.1.0-rc.2 — 2026-08-28
 
 ### Changed
 
@@ -10,6 +10,8 @@
 - Added a version-consistency gate covering npm metadata, lockfile, macOS bundle metadata, Linux package names, SBOM metadata, documentation, and CI.
 - Added a manual, exact-SHA, exact-run, non-overwriting release-preparation workflow. Its default path produces a validated dry-run bundle; publication requires an explicit second confirmation.
 - Clarified that current source is ahead of the published `v0.1.0-rc.1` prerelease.
+- Added an original pitch.dog app-icon family across the macOS bundle, Linux package, Studio chrome, favicons, and web manifest: a coral loupe reveals one letter's typographic character.
+- Made the Studio's dark field the default presentation instead of conditioning it on the operating-system theme.
 
 ### Hardened
 
@@ -22,6 +24,11 @@
 - Made Linux tar/deb packaging reproducible from `SOURCE_DATE_EPOCH`.
 - Added native Wayland/Ozone launch evidence alongside the full X11 displayed journey.
 - Labelled the Mac web-content termination-callback simulation honestly.
+- Made the AppKit/WKWebView Host the default Mac build, run, package, and install path while retaining the SwiftUI implementation as an explicit reference target.
+- Rejected OTF, TTF, WOFF, and WOFF2 inputs when CoreText returns no font descriptors, before any preview capability is issued.
+- Preserved native text-field undo, fixed Save after a focused draft edit, and flushed an acknowledged recovery checkpoint before ordinary quit or last-window close.
+- Added a focusable welcome skip-link destination and a 100-card Review regression surface.
+- Fixed the test launcher in paths containing square brackets and made zero-test runs fail closed.
 
 ### Not claimed
 

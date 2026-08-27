@@ -6,7 +6,7 @@ Deliver one trustworthy local typography-decision product on Mac and Linux. A de
 
 ## Current reality
 
-The v0.1 release-candidate branch now implements the end-to-end journey in one shared Studio with narrow AppKit/WKWebView and Electron Hosts. Automated displayed-app and packaging evidence is green on both platforms.
+Canonical `main` contains the v0.1 end-to-end journey in one shared Studio with narrow AppKit/WKWebView and Electron Hosts. Automated displayed-app and packaging evidence passed for the current application tree on both platforms.
 
 The root `macos/` application remains a preserved CoreText oracle. It is not the active product because its historical model stores paths in the Study and collapses concepts that Study v4 keeps distinct.
 
