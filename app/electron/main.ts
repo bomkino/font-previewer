@@ -718,6 +718,15 @@ void app.whenReady().then(async () => {
   Menu.setApplicationMenu(buildMenu());
   const firstWindow = await createWindow();
   if (waylandSmokePath) {
+    await firstWindow.webContents.executeJavaScript(`new Promise((resolve, reject) => {
+      const started = Date.now();
+      const poll = () => {
+        if (document.querySelector('.host-probe')?.textContent?.includes('electron')) resolve(true);
+        else if (Date.now() - started > 5000) reject(new Error('Wayland Host bridge did not become ready.'));
+        else setTimeout(poll, 50);
+      };
+      poll();
+    })`, true);
     const renderer = await firstWindow.webContents.executeJavaScript(`(() => ({
       heading: document.querySelector('#workspace-heading')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
       host: document.querySelector('.host-probe')?.textContent?.trim() ?? null,
