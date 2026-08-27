@@ -65,6 +65,7 @@ const applicationRoot = join(currentDirectory, "..", "..");
 const rendererPath = join(applicationRoot, "dist", "renderer", "index.html");
 const preloadPath = join(currentDirectory, "preload.cjs");
 const evidenceDirectory = process.env.FONT_PREVIEWER_EVIDENCE_DIR;
+const waylandSmokePath = process.env.FONT_PREVIEWER_WAYLAND_SMOKE_PATH;
 const maximumStudyBytes = 8_000_000;
 const maximumSourceBytes = 512 * 1024 * 1024;
 const maximumImportBytes = 2 * 1024 * 1024 * 1024;
@@ -633,7 +634,7 @@ async function handleHostRequest(event: IpcMainInvokeEvent, rawRequest: unknown)
 }
 
 async function createWindow(): Promise<BrowserWindow> {
-  const evidenceMode = Boolean(evidenceDirectory);
+  const evidenceMode = Boolean(evidenceDirectory || waylandSmokePath);
   const window = new BrowserWindow({
     width: 1500,
     height: 980,
@@ -716,6 +717,27 @@ void app.whenReady().then(async () => {
   });
   Menu.setApplicationMenu(buildMenu());
   const firstWindow = await createWindow();
+  if (waylandSmokePath) {
+    const renderer = await firstWindow.webContents.executeJavaScript(`(() => ({
+      heading: document.querySelector('#workspace-heading')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
+      host: document.querySelector('.host-probe')?.textContent?.trim() ?? null,
+      stage: document.querySelector('.stage-nav [aria-current="step"]')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
+      candidates: document.querySelectorAll('.candidate-row').length,
+    }))()`, true) as Record<string, unknown>;
+    await atomicWrite(waylandSmokePath, `${JSON.stringify({
+      schemaVersion: 1,
+      platform: process.platform,
+      architecture: process.arch,
+      display: process.env.DISPLAY ?? null,
+      waylandDisplay: process.env.WAYLAND_DISPLAY ?? null,
+      sessionType: process.env.XDG_SESSION_TYPE ?? null,
+      ozonePlatformHint: process.env.ELECTRON_OZONE_PLATFORM_HINT ?? null,
+      commandLine: process.argv,
+      renderer,
+    }, null, 2)}\n`);
+    app.exit(0);
+    return;
+  }
   if (evidenceDirectory) {
     await runEvidenceFlow({
       window: firstWindow,

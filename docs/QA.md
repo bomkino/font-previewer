@@ -16,7 +16,7 @@ The test runner removes the compiled test directory before every run, plants a d
 The cross-Host workflow additionally requires:
 
 - a real displayed Electron run under Xvfb and isolated D-Bus;
-- a second displayed Electron run through native Wayland/Ozone under a headless compositor;
+- a native Wayland/Ozone launch-and-render smoke under a headless compositor with `DISPLAY` absent; the complete displayed journey remains the X11 gate because hosted Weston has no input seat;
 - a real displayed AppKit/WKWebView run on macOS;
 - native menu and panel routes;
 - semantic undo/redo and keyboard-collision checks;

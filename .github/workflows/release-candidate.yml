@@ -123,11 +123,13 @@ jobs:
 
       - name: Run native Wayland/Ozone evidence
         env:
-          FONT_PREVIEWER_EVIDENCE_DIR: ${{ runner.temp }}/font-previewer-wayland-evidence
+          FONT_PREVIEWER_WAYLAND_SMOKE_PATH: ${{ runner.temp }}/font-previewer-wayland-evidence/wayland-smoke.json
           ELECTRON_ENABLE_LOGGING: "1"
         run: |
           runtime="$RUNNER_TEMP/font-previewer-wayland-runtime"
+          evidence="$RUNNER_TEMP/font-previewer-wayland-evidence"
           mkdir -p "$runtime"
+          mkdir -p "$evidence"
           chmod 700 "$runtime"
           XDG_RUNTIME_DIR="$runtime" weston --backend=headless-backend.so --use-pixman --socket=wayland-font-previewer --idle-time=0 --log="$RUNNER_TEMP/weston.log" &
           weston_pid=$!
@@ -147,12 +149,18 @@ jobs:
               --disable-dev-shm-usage
           jq -e '
             .platform == "linux" and
-            .rendererCrashRecovery.forced == true and
-            .rendererCrashRecovery.after.reviewState == "Keep" and
-            .installedCatalog.fontLoaded == true and
-            .reloadRecovery.after.activeElement == "workspace-heading"
-          ' "$FONT_PREVIEWER_EVIDENCE_DIR/trace.json" >/dev/null
-          (cd "$FONT_PREVIEWER_EVIDENCE_DIR" && sha256sum -c checksums.sha256)
+            .display == null and
+            .waylandDisplay == "wayland-font-previewer" and
+            .sessionType == "wayland" and
+            .ozonePlatformHint == "wayland" and
+            (.commandLine | index("--ozone-platform=wayland")) != null and
+            (.renderer.heading | type) == "string" and
+            (.renderer.host | contains("electron")) and
+            .renderer.stage == "Review" and
+            .renderer.candidates > 0
+          ' "$FONT_PREVIEWER_WAYLAND_SMOKE_PATH" >/dev/null
+          cp "$RUNNER_TEMP/weston.log" "$evidence/weston.log"
+          (cd "$evidence" && sha256sum wayland-smoke.json weston.log > checksums.sha256 && sha256sum -c checksums.sha256)
 
       - name: Assemble Linux release candidates
         run: node scripts/package-linux.mjs
