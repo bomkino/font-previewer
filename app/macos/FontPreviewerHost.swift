@@ -15,6 +15,7 @@ private let studioHost = "studio"
 private let fontScheme = "pitch-font"
 private let fontHost = "asset"
 private let evidenceEnvironmentKey = "FONT_PREVIEWER_MAC_EVIDENCE_DIR"
+private let stateEnvironmentKey = "FONT_PREVIEWER_MAC_STATE_DIR"
 
 private let isolatedBridgeSource = #"""
 (() => {
@@ -211,6 +212,15 @@ private struct InstalledCatalogEntry {
     let searchText: String
 }
 
+private struct SimpleExportManifest {
+    let width: Int
+    let height: Int
+    let boardCount: Int
+    let indexCount: Int
+    let fontCount: Int
+    let includeIndex: Bool
+}
+
 @main
 private struct FontPreviewerHostMain {
     @MainActor static func main() {
@@ -298,8 +308,16 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     func applicationWillTerminate(_ notification: Notification) { scopedURLs.forEach { $0.stopAccessingSecurityScopedResource() } }
 
     private func configureStorage() throws {
-        let support = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            .appendingPathComponent("Font Previewer", isDirectory: true)
+        let environment = ProcessInfo.processInfo.environment
+        let support: URL
+        if let evidencePath = environment[evidenceEnvironmentKey], !evidencePath.isEmpty {
+            support = URL(fileURLWithPath: evidencePath, isDirectory: true).appendingPathComponent("state", isDirectory: true)
+        } else if let statePath = environment[stateEnvironmentKey], !statePath.isEmpty {
+            support = URL(fileURLWithPath: statePath, isDirectory: true)
+        } else {
+            support = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+                .appendingPathComponent("Font Previewer", isDirectory: true)
+        }
         try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
         localStateURL = support.appendingPathComponent("host-state-v1.json")
         recoveryURL = support.appendingPathComponent("recovery-v1.json")
@@ -331,7 +349,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         webView.allowsMagnification = true
         webView.underPageBackgroundColor = NSColor(calibratedRed: 0.082, green: 0.082, blue: 0.071, alpha: 1)
         webView.setAccessibilityLabel("Font Previewer Studio")
-        webView.setAccessibilityHelp("Review fonts, compare Candidates, build a typography System, and export a Handoff.")
+        webView.setAccessibilityHelp("Add fonts, make four-up boards, compare Candidates, build a typography System, and export a Handoff.")
         webView.translatesAutoresizingMaskIntoConstraints = false
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1_500, height: 980), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "Font Previewer"
@@ -802,13 +820,15 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
             if outputs.contains("json") { try JSONSerialization.data(withJSONObject: document, options: [.prettyPrinted, .sortedKeys]).write(to: staging.appendingPathComponent("study.pitchfontstudy"), options: [.atomic]) }
             if outputs.contains("summary") { try summary(document).data(using: .utf8)!.write(to: staging.appendingPathComponent("README.md"), options: [.atomic]) }
             if outputs.contains("csv") { try candidateCSV(document).data(using: .utf8)!.write(to: staging.appendingPathComponent("candidates.csv"), options: [.atomic]) }
-            let activeStage = (try? await evaluate("document.querySelector('.stage-nav [aria-current=\"step\"]')?.textContent ?? 'Handoff'")) as? String ?? "Handoff"
-            for (key, label, name) in [("review-png", "Review", "review.png"), ("compare-png", "Compare", "compare.png"), ("system-png", "System", "system.png")] where outputs.contains(key) {
+            let simple = try await simpleExportManifest(document)
+            let activeStage = simple == nil ? ((try? await evaluate("document.querySelector('.stage-nav [aria-current=\"step\"]')?.textContent ?? 'Handoff'")) as? String ?? "Handoff") : nil
+            if let simple { try await renderSimplePages(simple, staging) }
+            for (key, label, name) in [("review-png", "Review", "review.png"), ("compare-png", "Compare", "compare.png"), ("system-png", "System", "system.png")] where simple == nil && outputs.contains(key) {
                 _ = try await evaluate("([...document.querySelectorAll('.stage-nav button')].find((item) => item.textContent?.includes('\(label)')))?.click(); true")
                 try await Task.sleep(nanoseconds: 120_000_000); try await snapshot(to: staging.appendingPathComponent(name))
             }
             if outputs.contains("pdf") { try await pdfData().write(to: staging.appendingPathComponent("study.pdf"), options: [.atomic]) }
-            if let restore = ["Review", "Compare", "System", "Handoff"].first(where: { activeStage.contains($0) }) { _ = try? await evaluate("([...document.querySelectorAll('.stage-nav button')].find((item) => item.textContent?.includes('\(restore)')))?.click(); true") }
+            if let activeStage, let restore = ["Review", "Compare", "System", "Handoff"].first(where: { activeStage.contains($0) }) { _ = try? await evaluate("([...document.querySelectorAll('.stage-nav button')].find((item) => item.textContent?.includes('\(restore)')))?.click(); true") }
             if preferences["includeSources"] as? Bool == true && permission {
                 let directory = staging.appendingPathComponent("Sources", isDirectory: true); try manager.createDirectory(at: directory, withIntermediateDirectories: false)
                 for source in document["sources"] as? [[String: Any]] ?? [] { guard let id = source["id"] as? String, let url = sourceBindings[id] else { continue }; let name = safeStem(source["displayName"] as? String ?? "Source") + "." + url.pathExtension; try manager.copyItem(at: url, to: uniqueURL(directory.appendingPathComponent(name))) }
@@ -822,6 +842,73 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
             if let commit { try commit(staging, final) } else { try manager.moveItem(at: staging, to: final) }
             return (final.lastPathComponent, entries.count + 2)
         } catch { try? manager.removeItem(at: staging); throw error }
+    }
+
+    private func simpleExportManifest(_ document: [String: Any]) async throws -> SimpleExportManifest? {
+        let raw = try await evaluate("""
+        (() => {
+          const shell = document.querySelector('.app-shell[data-interface-mode="simple"]');
+          const runtime = window.__fontPreviewerSimpleExport;
+          return shell && runtime ? runtime.manifest() : null;
+        })()
+        """)
+        if raw == nil || raw is NSNull { return nil }
+        guard let value = raw as? [String: Any] else { return nil }
+        func integer(_ key: String) throws -> Int {
+            guard let number = value[key] as? NSNumber else { throw HostError.exportFailed("Simple export manifest has an invalid \(key).") }
+            let double = number.doubleValue
+            guard double.isFinite, double >= 0, double.rounded() == double, double <= Double(Int.max) else { throw HostError.exportFailed("Simple export manifest has an invalid \(key).") }
+            return Int(double)
+        }
+        let width = try integer("width")
+        let height = try integer("height")
+        let fontCount = try integer("fontCount")
+        let boardCount = try integer("boardCount")
+        let indexCount = try integer("indexCount")
+        guard let includeIndex = value["includeIndex"] as? Bool else { throw HostError.exportFailed("Simple export manifest has an invalid index setting.") }
+        guard width == 5_152, height == 2_160 else { throw HostError.exportFailed("Simple boards must be 5152 × 2160.") }
+        guard fontCount >= 1, fontCount <= 8_192 else { throw HostError.exportFailed("Simple export font count is outside the Study limit.") }
+        let expectedFontCount = (document["candidates"] as? [[String: Any]] ?? []).filter { $0["reviewState"] as? String != "reject" }.count
+        guard fontCount == expectedFontCount else { throw HostError.exportFailed("Simple export font count does not match the mirrored Study.") }
+        guard boardCount == Int(ceil(Double(fontCount) / 4.0)) else { throw HostError.exportFailed("Simple export board count does not match its fonts.") }
+        guard indexCount == (includeIndex ? Int(ceil(Double(fontCount) / 12.0)) : 0) else { throw HostError.exportFailed("Simple export index count does not match its fonts.") }
+        return SimpleExportManifest(width: width, height: height, boardCount: boardCount, indexCount: indexCount, fontCount: fontCount, includeIndex: includeIndex)
+    }
+
+    private func simplePNG(_ raw: Any?) throws -> Data {
+        let prefix = "data:image/png;base64,"
+        guard let dataURL = raw as? String, dataURL.hasPrefix(prefix), dataURL.count <= 128 * 1024 * 1024 else { throw HostError.exportFailed("Simple board renderer returned an invalid PNG payload.") }
+        let encoded = String(dataURL.dropFirst(prefix.count))
+        guard !encoded.isEmpty, encoded.count.isMultiple(of: 4), encoded.range(of: #"^[A-Za-z0-9+/]+={0,2}$"#, options: .regularExpression) != nil,
+              let data = Data(base64Encoded: encoded), data.count <= 96 * 1024 * 1024,
+              let bitmap = NSBitmapImageRep(data: data), bitmap.pixelsWide == 5_152, bitmap.pixelsHigh == 2_160
+        else { throw HostError.exportFailed("Simple board PNG failed 5152 × 2160 decode verification.") }
+        return data
+    }
+
+    private func renderSimplePages(_ manifest: SimpleExportManifest, _ staging: URL) async throws {
+        let manager = FileManager.default
+        let pageGroups: [(kind: String, count: Int, directory: String, stem: String)] = [
+            ("board", manifest.boardCount, "Boards", "Board"),
+            ("index", manifest.indexCount, "Index", "Index"),
+        ]
+        let total = manifest.boardCount + manifest.indexCount
+        var completed = 0
+        for group in pageGroups where group.count > 0 {
+            let directory = staging.appendingPathComponent(group.directory, isDirectory: true)
+            try manager.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+            let digits = max(2, String(group.count).count)
+            for index in 0..<group.count {
+                let raw = try await evaluateAsync("window.__fontPreviewerSimpleExport.render('\(group.kind)', \(index))")
+                let data = try simplePNG(raw)
+                let number = String(format: "%0*d", digits, index + 1)
+                let output = directory.appendingPathComponent("\(group.stem)_\(number).png")
+                try data.write(to: output, options: [.atomic])
+                try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: output.path)
+                completed += 1
+                sendEvent(["type": "task-progress", "task": "boards", "completed": completed, "total": total])
+            }
+        }
     }
 
     fileprivate func verifyHandoffFaultInjection(in target: URL) async throws -> [String: Any] {
@@ -922,35 +1009,207 @@ private final class MacEvidenceRunner {
         try await wait("Studio") { try await self.bool("window.fontPreviewerHost && document.querySelector('#workspace-heading') && document.querySelector('.host-probe')?.textContent?.includes('wkwebview')") }
         var trace: [String: Any] = ["generatedAt": ISO8601DateFormatter().string(from: Date()), "host": "wkwebview", "initial": try await inspect(), "nativeMenu": ["installed": NSApp.mainMenu != nil, "import": NSApp.mainMenu?.item(withTitle: "File")?.submenu?.item(withTitle: "Import Sources…") != nil, "undo": NSApp.mainMenu?.item(withTitle: "Edit")?.submenu?.item(withTitle: "Undo") != nil]]
         try await host.snapshot(to: output.appendingPathComponent("01-review.png"))
+        let simpleVisual = try await simpleVisualAudit()
+        trace["simpleVisual"] = simpleVisual
+        try JSONSerialization.data(withJSONObject: simpleVisual, options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("simple-visual.json"), options: [.atomic])
+        let studioVisual = try await studioVisualAudit()
+        trace["studioVisual"] = studioVisual
+        try JSONSerialization.data(withJSONObject: studioVisual, options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("studio-visual.json"), options: [.atomic])
         _ = try await host.evaluate("document.querySelector('#import-fonts-button')?.focus(); true")
         try performMenu("File", "Import Sources…")
         try await wait("native Import panel") { self.host.panelOpened > 0 && self.host.panelCancelled > 0 }
         try await wait("native Import focus restoration") { try await self.bool("document.activeElement?.id==='import-fonts-button'") }
         trace["nativePanelFocus"] = "import-fonts-button"
         trace["keyboardAccessibility"] = try await keyboardAccessibilityAudit()
+        let reviewStateBeforeMenu = try await currentReviewState()
         host.sendMenu(["type": "mark-keep"]); try await wait("Keep") { try await self.bool("document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label') === 'Keep'") }
-        host.sendMenu(["type": "undo-study"]); try await wait("Undo") { try await self.bool("document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label') === 'Unreviewed'") }; host.sendMenu(["type": "redo-study"]); try await wait("Redo") { try await self.bool("document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label') === 'Keep'") }
+        host.sendMenu(["type": "undo-study"]); try await wait("Undo") { try await self.currentReviewState() == reviewStateBeforeMenu }; host.sendMenu(["type": "redo-study"]); try await wait("Redo") { try await self.bool("document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label') === 'Keep'") }
         trace["afterMenuUndoRedo"] = try await inspect()
         trace["bridge"] = try await host.evaluateAsync("(async()=>{const v=[];for(let i=0;i<40;i++){const s=performance.now();const r=await window.fontPreviewerHost.request({type:'probe',serial:i});if(r.serial!==i)throw new Error('probe');v.push(performance.now()-s)}return {samples:v.length,max:Math.max(...v),mean:v.reduce((a,b)=>a+b,0)/v.length}})()") ?? NSNull()
-        trace["installedCatalog"] = try await host.evaluateAsync("(async()=>{const studyCount=()=>Number([...document.querySelectorAll('.catalog-switcher button')].find(item=>item.textContent?.trim().startsWith('Study'))?.querySelector('span')?.textContent??-1);const beforeStudy=studyCount();[...document.querySelectorAll('.catalog-switcher button')].find(item=>item.textContent?.trim().startsWith('Catalog'))?.click();const deadline=performance.now()+30000;while(!document.querySelector('.catalog-results .catalog-source')&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,50));const afterStudy=studyCount();const r=await window.fontPreviewerHost.request({type:'scan-installed',query:'',cursor:0,limit:40,refresh:false});if(r.type!=='catalog-result')throw new Error('catalog');const raw=JSON.stringify(r);const preview=r.imports.find(item=>item.binding.previewUrl)?.binding.previewUrl;let fontLoaded=false;if(preview){const face=new FontFace('Font Previewer Evidence','url(\"'+preview+'\")');await face.load();fontLoaded=face.status==='loaded'}return {count:r.imports.length,indexed:r.indexed,total:r.total,rejected:r.rejected,truncated:r.truncated,pageBounded:r.imports.length<=40,studyUnchanged:beforeStudy>=0&&beforeStudy===afterStudy,rendered:document.querySelectorAll('.catalog-results .catalog-source').length,pathLeak:/(?:file:\\/\\/|\\/home\\/|\\/Users\\/|[A-Za-z]:\\\\)/.test(raw),opaquePreviewUrls:r.imports.every(item=>!item.binding.previewUrl||item.binding.previewUrl.startsWith('pitch-font://asset/')),previewAvailable:Boolean(preview),fontLoaded}})()") ?? NSNull()
+        trace["installedCatalog"] = try await host.evaluateAsync("(async()=>{const studyCount=()=>Number([...document.querySelectorAll('.catalog-switcher button')].find(item=>item.textContent?.trim().startsWith('Study'))?.querySelector('span')?.textContent??-1);const beforeStudy=studyCount();[...document.querySelectorAll('.catalog-switcher button')].find(item=>item.textContent?.trim().startsWith('Catalog'))?.click();const deadline=performance.now()+30000;while(!document.querySelector('.catalog-family-card')&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,50));const afterStudy=studyCount();const r=await window.fontPreviewerHost.request({type:'scan-installed',query:'',cursor:0,limit:40,refresh:false});if(r.type!=='catalog-result')throw new Error('catalog');const raw=JSON.stringify(r);const preview=r.imports.find(item=>item.binding.previewUrl)?.binding.previewUrl;let fontLoaded=false;if(preview){const face=new FontFace('Font Previewer Evidence','url(\"'+preview+'\")');await face.load();fontLoaded=face.status==='loaded'}return {count:r.imports.length,indexed:r.indexed,total:r.total,rejected:r.rejected,truncated:r.truncated,pageBounded:r.imports.length<=40,studyUnchanged:beforeStudy>=0&&beforeStudy===afterStudy,rendered:document.querySelectorAll('.catalog-family-card').length,pathLeak:/(?:file:\\/\\/|\\/home\\/|\\/Users\\/|[A-Za-z]:\\\\)/.test(raw),opaquePreviewUrls:r.imports.every(item=>!item.binding.previewUrl||item.binding.previewUrl.startsWith('pitch-font://asset/')),previewAvailable:Boolean(preview),fontLoaded}})()") ?? NSNull()
         let catalogCancellation = try await host.evaluateAsync("(async()=>{const obsolete=window.fontPreviewerHost.request({type:'scan-installed',query:'',cursor:0,limit:200,refresh:true});await new Promise(resolve=>setTimeout(resolve,0));const started=performance.now();const ack=await window.fontPreviewerHost.request({type:'cancel-catalog'});const durationMs=performance.now()-started;const result=await obsolete;return {acknowledged:ack.type==='ack'&&ack.action==='cancel-catalog',durationMs,obsoleteResultCancelled:result.type==='catalog-result'&&result.cancelled===true}})()") ?? NSNull()
         if var installedCatalog = trace["installedCatalog"] as? [String: Any] { installedCatalog["cancellation"] = catalogCancellation; trace["installedCatalog"] = installedCatalog }
         try await host.snapshot(to: output.appendingPathComponent("06-catalog.png"))
-        for (stage, file) in [("Compare", "02-compare.png"), ("System", "03-system.png"), ("Handoff", "04-handoff.png")] { _ = try await host.evaluate("([...document.querySelectorAll('.stage-nav button')].find((item)=>item.textContent?.includes('\(stage)')))?.click();true"); try await Task.sleep(nanoseconds: 150_000_000); try await host.snapshot(to: output.appendingPathComponent(file)) }
+        _ = try await host.evaluate("document.querySelector('.catalog-family-card [data-family-key]')?.click(); true")
+        try await wait("Studio Catalog family styles") { try await self.bool("document.querySelector('.catalog-family-detail') && document.activeElement?.textContent?.includes('All families')") }
+        trace["studioCatalogDetail"] = try await host.evaluate("(()=>({styleRows:document.querySelectorAll('.catalog-style-list .catalog-source').length,backFocused:document.activeElement?.textContent?.includes('All families')===true,horizontalOverflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,truncated:[...document.querySelectorAll('.catalog-family-detail strong,.catalog-family-detail small')].filter(item=>getComputedStyle(item).textOverflow==='ellipsis').length}))()") ?? NSNull()
+        try await host.snapshot(to: output.appendingPathComponent("16-studio-catalog-styles.png"))
+        _ = try await host.evaluate("window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})); true")
+        try await wait("Studio Catalog family return") { try await self.bool("!document.querySelector('.catalog-family-detail') && document.activeElement?.dataset.familyKey != null") }
+        _ = try await host.evaluate("[...document.querySelectorAll('.catalog-switcher button')].find(item=>item.textContent?.trim().startsWith('Study'))?.click(); true")
+        try await wait("Studio Study navigator") { try await self.bool("document.querySelector('.candidate-list .candidate-row')") }
+        for (stage, file) in [("Compare", "02-compare.png"), ("System", "03-system.png"), ("Handoff", "04-handoff.png")] {
+            _ = try await host.evaluate("([...document.querySelectorAll('.stage-nav button')].find((item)=>item.textContent?.includes('\(stage)')))?.click();true")
+            try await Task.sleep(nanoseconds: 150_000_000)
+            try await host.snapshot(to: output.appendingPathComponent(file))
+        }
+        trace["stageNavigation"] = try await host.evaluate("(()=>{const titlebar=document.querySelector('.titlebar').getBoundingClientRect();const title=document.querySelector('.document-title input');return {titlebarVisible:titlebar.top>=-1&&titlebar.bottom>0,rootScroll:document.scrollingElement?.scrollTop??0,titleTextClipped:Boolean(title&&title.scrollWidth>title.clientWidth)}})()") ?? NSNull()
+        _ = try await host.evaluate("([...document.querySelectorAll('.stage-nav button')].find((item)=>item.textContent?.includes('Review')))?.click(); true")
+        try await wait("Review restoration") { try await self.bool("document.querySelector('.candidate-row') && document.querySelector('.inspector .field-label select')") }
         trace["security"] = try await host.evaluateAsync("(async()=>{const bad=[{type:'open-import',path:'/tmp/x'},{type:'probe',serial:-1},{type:'read-file',path:'/etc/passwd'},{type:'scan-installed'},{type:'scan-installed',query:'',cursor:0,limit:10000,refresh:false}];let rejected=0;for(const r of bad){try{await window.fontPreviewerHost.request(r)}catch{rejected++}}return {attempts:bad.length,rejected,nodeUnavailable:typeof window.require==='undefined'&&typeof window.process==='undefined',hostKeys:Object.keys(window.fontPreviewerHost).sort()}})()") ?? NSNull()
         trace["invalidFullPreviewSource"] = try invalidFullPreviewSourceAudit()
         trace["semantics"] = try await host.evaluate("(()=>{const controls=[...document.querySelectorAll('button,input,select,textarea')];const named=el=>el.getAttribute('aria-label')||el.getAttribute('aria-labelledby')||el.closest('label')?.textContent?.trim()||el.textContent?.trim();const roleLabel=[...document.querySelectorAll('.field-label')].find(label=>label.querySelector(':scope > span')?.textContent?.trim()==='Role');const roleSelect=roleLabel?.querySelector('select')?.getBoundingClientRect();const roleHelp=roleLabel?.querySelector(':scope > small')?.getBoundingClientRect();return {controls:controls.length,unnamed:controls.filter(el=>!named(el)).length,mains:document.querySelectorAll('main').length,asides:document.querySelectorAll('aside').length,duplicateIds:[...document.querySelectorAll('[id]')].map(el=>el.id).filter((id,i,a)=>a.indexOf(id)!==i).length,horizontalOverflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,roleHelpSeparated:Boolean(roleSelect&&roleHelp&&roleSelect.bottom<=roleHelp.top)}})()") ?? NSNull()
         trace["transactionalHandoffFault"] = try await host.verifyHandoffFaultInjection(in: output.appendingPathComponent("handoff-fault-target", isDirectory: true))
-        try await wait("Recovery") { try await self.bool("document.querySelector('.document-title > span:last-child')?.textContent?.includes('recovery ready')") }
+        try await wait("Recovery") { try await self.bool("document.querySelector('.app-shell')?.dataset.recoveryCheckpoint==='ready'") }
         let beforeTerminationCallback = try await inspect(); let terminationsBefore = host.processTerminations; host.webViewWebContentProcessDidTerminate(host.webView); try await wait("simulated WebKit termination callback recovery") { try await self.bool("document.querySelector('#workspace-heading') && document.activeElement?.id==='workspace-heading' && document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label')==='Keep'") }; let afterTerminationCallback = try await inspect(); trace["terminationCallbackRecovery"] = ["simulatedDelegateCallback": true, "counterAdvanced": host.processTerminations == terminationsBefore + 1, "before": beforeTerminationCallback, "after": afterTerminationCallback]
         let before = try await inspect(); host.webView.reload(); try await wait("Reload") { try await self.bool("document.querySelector('#workspace-heading') && document.activeElement?.id==='workspace-heading' && document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label')==='Keep'") }; let after = try await inspect(); trace["reload"] = ["before": before, "after": after]
         try await host.snapshot(to: output.appendingPathComponent("05-recovered.png"))
         trace["nativePanel"] = ["opened": host.panelOpened, "cancelled": host.panelCancelled]
         trace["hostCounters"] = ["rejectedRequests": host.rejectedRequests, "menuCommands": host.menuCommands, "navigationRejections": host.navigationRejections, "popupRejections": host.popupRejections, "processTerminations": host.processTerminations]
         try JSONSerialization.data(withJSONObject: trace, options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("run.json"), options: [.atomic])
-        let security = trace["security"] as? [String: Any]; let invalidSource = trace["invalidFullPreviewSource"] as? [String: Any]; let semantics = trace["semantics"] as? [String: Any]; let keyboard = trace["keyboardAccessibility"] as? [String: Any]; let catalog = trace["installedCatalog"] as? [String: Any]; let handoffFault = trace["transactionalHandoffFault"] as? [String: Any]; let termination = trace["terminationCallbackRecovery"] as? [String: Any]; let terminationAfter = termination?["after"] as? [String: Any]
+        let security = trace["security"] as? [String: Any]; let invalidSource = trace["invalidFullPreviewSource"] as? [String: Any]; let semantics = trace["semantics"] as? [String: Any]; let keyboard = trace["keyboardAccessibility"] as? [String: Any]; let catalog = trace["installedCatalog"] as? [String: Any]; let studioCatalogDetail = trace["studioCatalogDetail"] as? [String: Any]; let stageNavigation = trace["stageNavigation"] as? [String: Any]; let handoffFault = trace["transactionalHandoffFault"] as? [String: Any]; let termination = trace["terminationCallbackRecovery"] as? [String: Any]; let terminationAfter = termination?["after"] as? [String: Any]
         let cancellation = catalog?["cancellation"] as? [String: Any]
-        guard security?["attempts"] as? Int == security?["rejected"] as? Int, security?["nodeUnavailable"] as? Bool == true, invalidSource?["rejected"] as? Bool == true, semantics?["unnamed"] as? Int == 0, semantics?["duplicateIds"] as? Int == 0, semantics?["horizontalOverflow"] as? Bool == false, semantics?["roleHelpSeparated"] as? Bool == true, keyboard?["forwardWrap"] as? Bool == true, keyboard?["backwardWrap"] as? Bool == true, keyboard?["nativeTextUndo"] as? Bool == true, keyboard?["candidateUnchanged"] as? Bool == true, keyboard?["trayUnchanged"] as? Bool == true, keyboard?["returnFocus"] as? Bool == true, ((catalog?["count"] as? Int) ?? 0) > 0, ((catalog?["indexed"] as? Int) ?? 0) > 0, catalog?["pageBounded"] as? Bool == true, catalog?["studyUnchanged"] as? Bool == true, catalog?["pathLeak"] as? Bool == false, catalog?["opaquePreviewUrls"] as? Bool == true, catalog?["previewAvailable"] as? Bool == true, catalog?["fontLoaded"] as? Bool == true, cancellation?["acknowledged"] as? Bool == true, cancellation?["obsoleteResultCancelled"] as? Bool == true, ((cancellation?["durationMs"] as? Double) ?? .infinity) <= 100, handoffFault?["failureObserved"] as? Bool == true, handoffFault?["priorExportByteIdentical"] as? Bool == true, handoffFault?["stagingClean"] as? Bool == true, handoffFault?["finalFolderCount"] as? Int == 1, termination?["simulatedDelegateCallback"] as? Bool == true, termination?["counterAdvanced"] as? Bool == true, terminationAfter?["activeElement"] as? String == "workspace-heading", terminationAfter?["reviewState"] as? String == "Keep", host.panelOpened > 0, host.panelCancelled > 0 else { throw HostError.unavailable("Evidence assertions failed") }
+        let simpleCatalog = (trace["simpleVisual"] as? [String: Any])?["catalog"] as? [String: Any]
+        let simpleDetail = (trace["simpleVisual"] as? [String: Any])?["detail"] as? [String: Any]
+        let simpleStateTravel = (trace["simpleVisual"] as? [String: Any])?["stateTravel"] as? [String: Any]
+        let simpleScale = (trace["simpleVisual"] as? [String: Any])?["scale"] as? [String: Any]
+        let simpleScalePass = [80, 90, 100, 110, 120, 130, 140].allSatisfy { target in
+            guard let metrics = simpleScale?[String(target)] as? [String: Any] else { return false }
+            return metrics["scale"] as? Int == target
+                && metrics["headerOverflow"] as? Bool == false
+                && metrics["workspaceOverflow"] as? Bool == false
+                && metrics["clippedTitleButtons"] as? Int == 0
+                && metrics["titleTextClipped"] as? Bool == false
+                && ((metrics["minTouchHeight"] as? Double) ?? 0) >= 44
+                && metrics["horizontalOverflow"] as? Bool == false
+        }
+        let simpleBoards = (trace["simpleVisual"] as? [String: Any])?["boards"] as? [String: Any]
+        let simpleLongCopy = simpleBoards?["longCopy"] as? [String: Any]
+        let simpleLockedLines = simpleBoards?["lockedLines"] as? [String: Any]
+        let simpleStress = simpleBoards?["stress"] as? [String: Any]
+        let simpleTuning = (trace["simpleVisual"] as? [String: Any])?["tuning"] as? [String: Any]
+        let simplePreview = simpleTuning?["preview"] as? [String: Any]
+        let studioEvidence = trace["studioVisual"] as? [String: Any]
+        let studioScale = studioEvidence?["scale"] as? [String: Any]
+        let studioScalePass = [80, 90, 100, 110, 120, 130, 140].allSatisfy { target in
+            guard let metrics = studioScale?[String(target)] as? [String: Any] else { return false }
+            return metrics["scale"] as? Int == target
+                && metrics["headerOverflow"] as? Bool == false
+                && metrics["stageOverflow"] as? Bool == false
+                && metrics["workspaceOverflow"] as? Bool == false
+                && metrics["clippedTitleButtons"] as? Int == 0
+                && metrics["titleTextClipped"] as? Bool == false
+                && ((metrics["minTouchHeight"] as? Double) ?? 0) >= 44
+                && metrics["horizontalOverflow"] as? Bool == false
+                && metrics["candidateTruncation"] as? Int == 0
+        }
+        let studioReview = studioEvidence?["review"] as? [String: Any]
+        let studioCompare = studioEvidence?["compare"] as? [String: Any]
+        let studioLocked = studioEvidence?["lockedLines"] as? [String: Any]
+        let studioSystem = studioEvidence?["system"] as? [String: Any]
+        let studioHandoff = studioEvidence?["handoff"] as? [String: Any]
+        let checks: [(String, Bool)] = [
+            ("security", security?["attempts"] as? Int == security?["rejected"] as? Int
+                && security?["nodeUnavailable"] as? Bool == true
+                && invalidSource?["rejected"] as? Bool == true),
+            ("semantics", semantics?["unnamed"] as? Int == 0
+                && semantics?["duplicateIds"] as? Int == 0
+                && semantics?["horizontalOverflow"] as? Bool == false
+                && semantics?["roleHelpSeparated"] as? Bool == true),
+            ("keyboard", keyboard?["forwardWrap"] as? Bool == true
+                && keyboard?["backwardWrap"] as? Bool == true
+                && keyboard?["nativeTextUndo"] as? Bool == true
+                && keyboard?["candidateUnchanged"] as? Bool == true
+                && keyboard?["trayUnchanged"] as? Bool == true
+                && keyboard?["returnFocus"] as? Bool == true),
+            ("simple boards", simpleLongCopy?["quadrants"] as? Int == 4
+                && simpleLongCopy?["fullText"] as? Bool == true
+                && simpleLongCopy?["withinFrames"] as? Bool == true
+                && simpleLongCopy?["noEllipsis"] as? Bool == true
+                && simpleLongCopy?["paletteCount"] as? Int == 4
+                && simpleLockedLines?["count"] as? Int == 4
+                && simpleLockedLines?["fullText"] as? Bool == true
+                && simpleLockedLines?["whiteSpace"] as? Bool == true
+                && simpleLockedLines?["sharedSize"] as? Bool == true
+                && simpleStress?["rupee"] as? Bool == true
+                && simpleStress?["copyright"] as? Bool == true
+                && simpleStress?["trademark"] as? Bool == true
+                && simpleStress?["numerals"] as? Bool == true),
+            ("simple tuning", simpleTuning?["cards"] as? Int == 24
+                && simpleTuning?["casingLabels"] as? String == "As is|UPPER|lower|Title|AP Title"
+                && simpleTuning?["apTitle"] as? Bool == true
+                && ((simpleTuning?["axisSliders"] as? Int) ?? 0) > 0
+                && ((simpleTuning?["minButtonHeight"] as? Double) ?? 0) >= 44
+                && simpleTuning?["cardOverflow"] as? Int == 0
+                && simplePreview?["initialFocus"] as? Bool == true
+                && simplePreview?["forwardWrap"] as? Bool == true
+                && simplePreview?["backwardWrap"] as? Bool == true
+                && simplePreview?["escapeClosed"] as? Bool == true
+                && simplePreview?["returnFocus"] as? Bool == true),
+            ("simple catalog", ((simpleCatalog?["count"] as? Int) ?? 0) > 0
+                && simpleCatalog?["overlaps"] as? Int == 0
+                && simpleCatalog?["initialFocus"] as? Bool == true
+                && simpleCatalog?["forwardWrap"] as? Bool == true
+                && simpleCatalog?["backwardWrap"] as? Bool == true
+                && simpleCatalog?["horizontalOverflow"] as? Bool == false),
+            ("simple catalog detail", simpleDetail?["rendered"] as? Bool == true
+                && ((simpleDetail?["styleRows"] as? Int) ?? 0) > 0
+                && simpleDetail?["backFocused"] as? Bool == true
+                && simpleDetail?["returnFocus"] as? Bool == true
+                && simpleDetail?["horizontalOverflow"] as? Bool == false),
+            ("simple to Studio state", ((simpleStateTravel?["added"] as? Int) ?? 0) > 0
+                && simpleStateTravel?["simpleAfter"] as? Int == simpleStateTravel?["studioAfter"] as? Int
+                && simpleStateTravel?["fitPolicy"] as? String == "locked-lines"
+                && simpleStateTravel?["restored"] as? Bool == true),
+            ("simple scaling", simpleScalePass),
+            ("Studio scaling", studioScalePass),
+            ("Studio review", studioReview?["navigatorTabs"] as? Int == 4
+                && studioReview?["candidateTruncation"] as? Int == 0
+                && studioReview?["reviewLabels"] as? String == "Unreviewed|Keep|Maybe|Reject"
+                && studioReview?["trayPresent"] as? Bool == true
+                && studioReview?["asideCount"] as? Int == 2),
+            ("Studio compare", ((studioCompare?["count"] as? Int) ?? 0) >= 2
+                && studioCompare?["fullText"] as? Bool == true
+                && studioCompare?["withinFrames"] as? Bool == true
+                && studioCompare?["noEllipsis"] as? Bool == true
+                && studioCompare?["overflow"] as? Int == 0),
+            ("Studio locked lines", ((studioLocked?["count"] as? Int) ?? 0) >= 2
+                && studioLocked?["fullText"] as? Bool == true
+                && studioLocked?["whiteSpace"] as? Bool == true
+                && studioLocked?["sharedSize"] as? Bool == true),
+            ("Studio system", studioSystem?["trayAbsent"] as? Bool == true
+                && studioSystem?["asideCount"] as? Int == 2
+                && studioSystem?["displayComplete"] as? Bool == true
+                && studioSystem?["displayOverflow"] as? Bool == false),
+            ("Studio handoff", studioHandoff?["asideCount"] as? Int == 0
+                && studioHandoff?["trayAbsent"] as? Bool == true
+                && studioHandoff?["panels"] as? Int == 4
+                && studioHandoff?["workspaceFullWidth"] as? Bool == true
+                && studioHandoff?["titlebarVisible"] as? Bool == true
+                && studioHandoff?["rootScroll"] as? Int == 0
+                && studioHandoff?["horizontalOverflow"] as? Bool == false),
+            ("stage navigation viewport", stageNavigation?["titlebarVisible"] as? Bool == true
+                && stageNavigation?["rootScroll"] as? Int == 0
+                && stageNavigation?["titleTextClipped"] as? Bool == false),
+            ("installed catalog", ((catalog?["count"] as? Int) ?? 0) > 0
+                && ((catalog?["indexed"] as? Int) ?? 0) > 0
+                && ((catalog?["rendered"] as? Int) ?? 0) > 0
+                && catalog?["pageBounded"] as? Bool == true
+                && catalog?["studyUnchanged"] as? Bool == true
+                && catalog?["pathLeak"] as? Bool == false
+                && catalog?["opaquePreviewUrls"] as? Bool == true
+                && catalog?["previewAvailable"] as? Bool == true
+                && catalog?["fontLoaded"] as? Bool == true),
+            ("Studio catalog detail", ((studioCatalogDetail?["styleRows"] as? Int) ?? 0) > 0
+                && studioCatalogDetail?["backFocused"] as? Bool == true
+                && studioCatalogDetail?["horizontalOverflow"] as? Bool == false
+                && studioCatalogDetail?["truncated"] as? Int == 0),
+            ("catalog cancellation", cancellation?["acknowledged"] as? Bool == true
+                && cancellation?["obsoleteResultCancelled"] as? Bool == true
+                && ((cancellation?["durationMs"] as? Double) ?? .infinity) <= 100),
+            ("transactional handoff", handoffFault?["failureObserved"] as? Bool == true
+                && handoffFault?["priorExportByteIdentical"] as? Bool == true
+                && handoffFault?["stagingClean"] as? Bool == true
+                && handoffFault?["finalFolderCount"] as? Int == 1),
+            ("termination recovery", termination?["simulatedDelegateCallback"] as? Bool == true
+                && termination?["counterAdvanced"] as? Bool == true
+                && terminationAfter?["reviewState"] as? String == "Keep"),
+            ("native import panel", host.panelOpened > 0 && host.panelCancelled > 0),
+        ]
+        let failures = checks.filter { !$0.1 }.map { $0.0 }
+        guard failures.isEmpty else {
+            throw HostError.unavailable("Evidence assertions failed: \(failures.joined(separator: ", "))")
+        }
     }
     private func invalidFullPreviewSourceAudit() throws -> [String: Any] {
         var rejected = 0
@@ -968,12 +1227,212 @@ private final class MacEvidenceRunner {
         let index = menu.index(of: item); guard index >= 0 else { throw HostError.unavailable("Detached native menu item \(itemTitle)") }
         menu.performActionForItem(at: index)
     }
+    private func studioVisualAudit() async throws -> [String: Any] {
+        _ = try await host.evaluate("[...document.querySelectorAll('.interface-switch button')].find(item=>item.textContent?.trim()==='Studio')?.click(); [...document.querySelectorAll('.stage-nav button')].find(item=>item.textContent?.includes('Review'))?.click(); [...document.querySelectorAll('.catalog-switcher button')].find(item=>item.textContent?.trim().startsWith('Study'))?.click(); true")
+        try await wait("Studio Review") { try await self.bool("document.querySelector('.mode-studio .review-workspace') && document.querySelector('.candidate-row')") }
+        var scale: [String: Any] = [:]
+        for target in [80, 90, 100, 110, 120, 130, 140] {
+            try await setInterfaceScale(target)
+            scale[String(target)] = try await studioScaleMetrics()
+            if target == 80 { try await host.snapshot(to: output.appendingPathComponent("18-studio-scale-80.png")) }
+            if target == 140 { try await host.snapshot(to: output.appendingPathComponent("17-studio-scale-140.png")) }
+        }
+        try await setInterfaceScale(100)
+        let review = try await host.evaluate("(()=>{const actions=document.querySelector('.specimen-card .card-actions');return {navigatorTabs:document.querySelectorAll('.catalog-switcher button').length,candidateTruncation:[...document.querySelectorAll('.candidate-name strong,.candidate-name small')].filter(item=>getComputedStyle(item).textOverflow==='ellipsis').length,reviewLabels:[...actions.querySelectorAll('button small')].map(item=>item.textContent?.trim()).join('|'),trayPresent:Boolean(document.querySelector('.tray')),asideCount:document.querySelectorAll('aside').length}})()") as? [String: Any] ?? [:]
+
+        try await setCopyThroughSimple("THE UNREASONABLY LONG TITLE THAT MUST NEVER BE CUT OFF OR TURN INTO DOTS")
+        _ = try await host.evaluate("[...document.querySelectorAll('.stage-nav button')].find(item=>item.textContent?.includes('Compare'))?.click(); true")
+        try await wait("Studio Compare") { try await self.bool("document.querySelectorAll('.compare-card').length >= 2") }
+        _ = try await host.evaluate("document.querySelector('input[name=\"fit-policy\"][value=\"fit\"]')?.click(); true")
+        try await wait("Studio Compare fitting") { try await self.bool("document.querySelectorAll('.simple-fitted-compare[data-natural-fit]').length === document.querySelectorAll('.compare-card').length") }
+        let compare = try await host.evaluate(#"(()=>{const expected='THE UNREASONABLY LONG TITLE THAT MUST NEVER BE CUT OFF OR TURN INTO DOTS';const cards=[...document.querySelectorAll('.compare-card')];const copies=cards.map(card=>card.querySelector('.compare-copy'));return {count:cards.length,fullText:copies.every(copy=>copy?.textContent===expected),withinFrames:copies.every((copy,index)=>{const text=copy.getBoundingClientRect(),card=cards[index].getBoundingClientRect();return text.left>=card.left-1&&text.right<=card.right+1&&text.top>=card.top-1&&text.bottom<=card.bottom+1}),noEllipsis:copies.every(copy=>getComputedStyle(copy).textOverflow!=='ellipsis'),overflow:cards.filter(card=>card.scrollWidth>card.clientWidth||card.scrollHeight>card.clientHeight).length}})()"#) as? [String: Any] ?? [:]
+        try await host.snapshot(to: output.appendingPathComponent("19-studio-compare-long-copy.png"))
+
+        try await setCopyThroughSimple("A House\nWith No Doors")
+        _ = try await host.evaluate("[...document.querySelectorAll('.stage-nav button')].find(item=>item.textContent?.includes('Compare'))?.click(); document.querySelector('input[name=\"fit-policy\"][value=\"locked-lines\"]')?.click(); true")
+        try await wait("Studio locked lines") { try await self.bool("document.querySelectorAll('.simple-fitted-compare[data-natural-fit]').length === document.querySelectorAll('.compare-card').length && [...document.querySelectorAll('.simple-fitted-compare')].every(item=>getComputedStyle(item).whiteSpace==='pre')") }
+        let lockedLines = try await host.evaluate(#"(()=>{const expected='A House\nWith No Doors';const copies=[...document.querySelectorAll('.simple-fitted-compare')];const sizes=copies.map(item=>Number.parseFloat(getComputedStyle(item).fontSize));return {count:copies.length,fullText:copies.every(copy=>copy.textContent===expected),whiteSpace:copies.every(copy=>getComputedStyle(copy).whiteSpace==='pre'),sharedSize:new Set(sizes.map(value=>value.toFixed(3))).size===1}})()"#) as? [String: Any] ?? [:]
+        try await host.snapshot(to: output.appendingPathComponent("20-studio-compare-locked-lines.png"))
+
+        try await setCopyThroughSimple("A House With No Doors")
+        _ = try await host.evaluate("[...document.querySelectorAll('.stage-nav button')].find(item=>item.textContent?.includes('System'))?.click(); true")
+        try await wait("Studio System") { try await self.bool("document.querySelector('.deck-scene .role-display') && !document.querySelector('.tray')") }
+        let system = try await host.evaluate("(()=>{const display=document.querySelector('.deck-scene .role-display');return {trayAbsent:!document.querySelector('.tray'),asideCount:document.querySelectorAll('aside').length,displayComplete:display?.textContent?.replace(/\\s+/g,' ').trim()==='Display unassigned',displayOverflow:Boolean(display&&(display.scrollWidth>display.clientWidth||display.scrollHeight>display.clientHeight))}})()") as? [String: Any] ?? [:]
+        _ = try await host.evaluate("[...document.querySelectorAll('.stage-nav button')].find(item=>item.textContent?.includes('Handoff'))?.click(); true")
+        try await wait("Studio Handoff") { try await self.bool("document.querySelector('.handoff-workspace') && document.querySelectorAll('aside').length===0 && !document.querySelector('.tray')") }
+        let handoff = try await host.evaluate("(()=>{const shell=document.querySelector('.app-shell').getBoundingClientRect();const workspace=document.querySelector('.handoff-workspace').getBoundingClientRect();const titlebar=document.querySelector('.titlebar').getBoundingClientRect();return {asideCount:document.querySelectorAll('aside').length,trayAbsent:!document.querySelector('.tray'),panels:document.querySelectorAll('.handoff-panel').length,workspaceFullWidth:Math.abs(workspace.left-shell.left)<=1&&Math.abs(workspace.right-shell.right)<=1,titlebarVisible:titlebar.top>=-1&&titlebar.bottom>0,rootScroll:document.scrollingElement?.scrollTop??0,horizontalOverflow:document.documentElement.scrollWidth>document.documentElement.clientWidth}})()") as? [String: Any] ?? [:]
+        _ = try await host.evaluate("[...document.querySelectorAll('.stage-nav button')].find(item=>item.textContent?.includes('Review'))?.click(); true")
+        try await wait("Studio Review restoration") { try await self.bool("document.querySelector('.review-workspace') && document.querySelector('.tray')") }
+        return ["compare": compare, "handoff": handoff, "lockedLines": lockedLines, "review": review, "scale": scale, "system": system]
+    }
+    private func setCopyThroughSimple(_ value: String) async throws {
+        _ = try await host.evaluate("[...document.querySelectorAll('.interface-switch button')].find(item=>item.textContent?.trim()==='Simple')?.click(); true")
+        try await wait("Simple copy field") { try await self.bool("document.querySelector('.simple-copy-field textarea')") }
+        let literal = String(data: try JSONEncoder().encode(value), encoding: .utf8) ?? "\"\""
+        _ = try await host.evaluate("(()=>{const field=document.querySelector('.simple-copy-field textarea');const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;setter.call(field,\(literal));field.dispatchEvent(new Event('input',{bubbles:true}));return true})()")
+        _ = try await host.evaluate("[...document.querySelectorAll('.interface-switch button')].find(item=>item.textContent?.trim()==='Studio')?.click(); true")
+        try await wait("Studio after shared copy") { try await self.bool("document.querySelector('.stage-nav')") }
+    }
+    private func studioScaleMetrics() async throws -> [String: Any] {
+        let metrics = try await host.evaluate(#"""
+        (() => {
+          const shell = document.querySelector('.app-shell');
+          const title = document.querySelector('.titlebar');
+          const stages = document.querySelector('.stage-nav');
+          const workspace = document.querySelector('.workspace');
+          const shellRect = shell.getBoundingClientRect();
+          const controls = [...document.querySelectorAll('.titlebar button,.titlebar input,.stage-nav button,.catalog-switcher button,.catalog-tools input,.catalog-tools select,.candidate-row,.segmented-control button')]
+            .filter((item) => {
+              const rect = item.getBoundingClientRect();
+              return rect.width > 0 && rect.height > 0;
+            });
+          const measuredControls = controls
+            .map((item) => ({ item, height: item.getBoundingClientRect().height }))
+            .sort((left, right) => left.height - right.height);
+          const minimum = measuredControls[0];
+          const minimumStyle = minimum ? getComputedStyle(minimum.item) : null;
+          const titleButtons = [...title.querySelectorAll('button')].filter((item) => {
+            const rect = item.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+          });
+          return {
+            scale: Number(shell.dataset.uiScale),
+            headerOverflow: title.scrollWidth > title.clientWidth,
+            stageOverflow: stages.scrollWidth > stages.clientWidth,
+            workspaceOverflow: workspace.scrollWidth > workspace.clientWidth,
+            clippedTitleButtons: titleButtons.filter((item) => {
+              const rect = item.getBoundingClientRect();
+              return rect.left < shellRect.left - 1 || rect.right > shellRect.right + 1;
+            }).length,
+            titleTextClipped: (() => {
+              const input = title.querySelector('.document-title input');
+              return Boolean(input && input.scrollWidth > input.clientWidth);
+            })(),
+            minTouchHeight: minimum?.height ?? 0,
+            minTouchElement: minimum ? {
+              tag: minimum.item.tagName,
+              className: minimum.item.className,
+              ariaLabel: minimum.item.getAttribute('aria-label') ?? '',
+              text: minimum.item.textContent?.trim().slice(0, 80) ?? '',
+              cssHeight: minimumStyle?.height ?? '',
+              cssMinHeight: minimumStyle?.minHeight ?? '',
+            } : null,
+            horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+            candidateTruncation: [...document.querySelectorAll('.candidate-name strong,.candidate-name small')]
+              .filter((item) => getComputedStyle(item).textOverflow === 'ellipsis').length,
+          };
+        })()
+        """#)
+        return metrics as? [String: Any] ?? [:]
+    }
+    private func simpleVisualAudit() async throws -> [String: Any] {
+        _ = try await host.evaluate("[...document.querySelectorAll('.interface-switch button')].find(item=>item.textContent?.trim()==='Simple')?.click(); true")
+        try await wait("Simple mode") { try await self.bool("document.querySelector('.simple-workspace') && document.querySelector('.simple-hero-actions')") }
+        try await host.snapshot(to: output.appendingPathComponent("07-simple.png"))
+        let boards = try await simpleBoardAudit()
+        let tuning = try await simpleTuningAudit()
+        var scale: [String: Any] = [:]
+        for target in [80, 90, 100, 110, 120, 130, 140] {
+            try await setInterfaceScale(target)
+            scale[String(target)] = try await simpleScaleMetrics()
+            if target == 80 { try await host.snapshot(to: output.appendingPathComponent("11-simple-scale-80.png")) }
+            if target == 140 { try await host.snapshot(to: output.appendingPathComponent("10-simple-scale-140.png")) }
+        }
+        try await setInterfaceScale(100)
+        _ = try await host.evaluate("[...document.querySelectorAll('.simple-hero-actions button')].find(item=>item.textContent?.includes('Installed Fonts'))?.click(); true")
+        try await wait("Simple installed Catalog") { try await self.bool("document.querySelectorAll('.simple-catalog-family').length > 0") }
+        let catalog = try await host.evaluate("(()=>{const dialog=document.querySelector('.simple-catalog-dialog');const dialogRect=dialog?.getBoundingClientRect();const cards=[...document.querySelectorAll('.simple-catalog-family')].map((element)=>{const rect=element.getBoundingClientRect();return {left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom,width:rect.width,height:rect.height}});let overlaps=0;for(let i=0;i<cards.length;i++)for(let j=i+1;j<cards.length;j++){const a=cards[i],b=cards[j];if(Math.min(a.right,b.right)-Math.max(a.left,b.left)>1&&Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1)overlaps++}const controls=[...dialog.querySelectorAll(\"button:not(:disabled),input:not(:disabled),[href],[tabindex]:not([tabindex='-1'])\")];const first=controls[0],last=controls.at(-1);const initialFocus=document.activeElement?.matches('.simple-catalog-search input')===true;last.focus();last.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));const forwardWrap=document.activeElement===first;first.focus();first.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));const backwardWrap=document.activeElement===last;document.querySelector('.simple-catalog-search input')?.focus();return {count:cards.length,overlaps,initialFocus,forwardWrap,backwardWrap,dialog:dialogRect?{left:dialogRect.left,top:dialogRect.top,right:dialogRect.right,bottom:dialogRect.bottom,width:dialogRect.width,height:dialogRect.height}:null,viewport:{width:innerWidth,height:innerHeight},horizontalOverflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,cards:cards.slice(0,12)}})()") as? [String: Any] ?? [:]
+        try await host.snapshot(to: output.appendingPathComponent("08-simple-catalog.png"))
+        _ = try await host.evaluate("document.querySelector('.simple-catalog-family button')?.click(); true")
+        try await wait("Simple family styles") { try await self.bool("document.querySelector('.simple-catalog-family-detail') && document.activeElement?.textContent?.includes('All families')") }
+        var detail = try await host.evaluate("(()=>{const panel=document.querySelector('.simple-catalog-family-detail')?.getBoundingClientRect();return {rendered:Boolean(panel),width:panel?.width??0,height:panel?.height??0,styleRows:document.querySelectorAll('.simple-catalog-style-grid > section').length,backFocused:document.activeElement?.textContent?.includes('All families')===true,horizontalOverflow:document.documentElement.scrollWidth>document.documentElement.clientWidth}})()") as? [String: Any] ?? [:]
+        try await host.snapshot(to: output.appendingPathComponent("09-simple-styles.png"))
+        _ = try await host.evaluate("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));true")
+        try await wait("Simple family return") { try await self.bool("!document.querySelector('.simple-catalog-family-detail') && document.querySelectorAll('.simple-catalog-family').length > 0") }
+        detail["returnFocus"] = try await bool("document.activeElement?.dataset.familyKey != null")
+        let stateTravel = try await host.evaluateAsync(#"""
+        (async () => {
+          const count = () => Number(document.querySelector('.simple-font-summary > span:first-child')?.textContent ?? -1);
+          const before = count();
+          document.querySelector('.simple-catalog-family header > div button:last-child:not(:disabled)')?.click();
+          const deadline = performance.now() + 10000;
+          while (count() <= before && performance.now() < deadline) {
+            await new Promise(resolve => setTimeout(resolve, 25));
+          }
+          const simpleAfter = count();
+          document.querySelector('.simple-catalog-dialog > header button')?.click();
+          document.querySelector('input[name="simple-fit-policy"][value="locked-lines"]')?.click();
+          [...document.querySelectorAll('.interface-switch button')]
+            .find(item => item.textContent?.trim() === 'Studio')?.click();
+          while (!document.querySelector('.stage-nav') && performance.now() < deadline) {
+            await new Promise(resolve => setTimeout(resolve, 25));
+          }
+          [...document.querySelectorAll('.stage-nav button')]
+            .find(item => item.textContent?.includes('Compare'))?.click();
+          const studioCount = () => Number(
+            [...document.querySelectorAll('.catalog-switcher button')]
+              .find(item => item.textContent?.trim().startsWith('Study'))
+              ?.querySelector('span')?.textContent ?? -1
+          );
+          while (
+            (studioCount() !== simpleAfter
+              || !document.querySelector('input[name="fit-policy"][value="locked-lines"]:checked'))
+            && performance.now() < deadline
+          ) {
+            await new Promise(resolve => setTimeout(resolve, 25));
+          }
+          return {
+            before,
+            simpleAfter,
+            studioAfter: studioCount(),
+            added: simpleAfter - before,
+            fitPolicy: document.querySelector('input[name="fit-policy"]:checked')?.value ?? null,
+          };
+        })()
+        """#) as? [String: Any] ?? [:]
+        try await wait("Studio restore") { try await self.bool("document.querySelector('.stage-nav') && document.querySelector('.candidate-row')") }
+        host.sendMenu(["type": "undo-study"])
+        let originalCount = stateTravel["before"] as? Int ?? -1
+        try await wait("Simple-to-Studio state cleanup") { try await self.bool("Number([...document.querySelectorAll('.catalog-switcher button')].find(item=>item.textContent?.trim().startsWith('Study'))?.querySelector('span')?.textContent??-1)===\(originalCount)") }
+        var verifiedStateTravel = stateTravel
+        verifiedStateTravel["restored"] = true
+        return ["boards": boards, "catalog": catalog, "detail": detail, "stateTravel": verifiedStateTravel, "scale": scale, "tuning": tuning]
+    }
+    private func simpleBoardAudit() async throws -> [String: Any] {
+        _ = try await host.evaluateAsync(#"(async()=>{const field=document.querySelector('.simple-copy-field textarea');const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;setter.call(field,'THE UNREASONABLY LONG TITLE THAT MUST NEVER BE CUT OFF OR TURN INTO DOTS');field.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('input[name="simple-fit-policy"][value="fit"]')?.click();const deadline=performance.now()+10000;while(!([...document.querySelectorAll('.simple-quadrant-copy')].length===4&&[...document.querySelectorAll('.simple-quadrant-copy')].every(item=>item.dataset.naturalFit))&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,16));document.querySelector('.simple-pages-section')?.scrollIntoView({block:'start'});await new Promise(resolve=>setTimeout(resolve,32));return true})()"#)
+        try await host.snapshot(to: output.appendingPathComponent("12-simple-long-copy.png"))
+        let longCopy = try await host.evaluate(#"(()=>{const expected='THE UNREASONABLY LONG TITLE THAT MUST NEVER BE CUT OFF OR TURN INTO DOTS';const board=document.querySelector('.simple-board');const quadrants=[...board.querySelectorAll('.simple-quadrant')];const copies=quadrants.map(item=>item.querySelector('.simple-quadrant-copy'));return {quadrants:quadrants.length,fullText:copies.every(item=>item?.textContent===expected),withinFrames:copies.every((item,index)=>{const copy=item.getBoundingClientRect(),frame=quadrants[index].getBoundingClientRect();return copy.left>=frame.left-1&&copy.right<=frame.right+1&&copy.top>=frame.top-1&&copy.bottom<=frame.bottom+1}),noEllipsis:copies.every(item=>getComputedStyle(item).textOverflow!=='ellipsis'),paletteCount:new Set(quadrants.map(item=>getComputedStyle(item).backgroundColor)).size}})()"#) as? [String: Any] ?? [:]
+        _ = try await host.evaluateAsync(#"(async()=>{const field=document.querySelector('.simple-copy-field textarea');const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;setter.call(field,'A House\nWith No Doors');field.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('input[name="simple-fit-policy"][value="locked-lines"]')?.click();const deadline=performance.now()+10000;while(!(()=>{const copies=[...document.querySelectorAll('.simple-quadrant-copy')];const sizes=copies.map(item=>getComputedStyle(item).fontSize);return copies.length===4&&copies.every(item=>item.dataset.naturalFit&&getComputedStyle(item).whiteSpace==='pre')&&new Set(sizes).size===1})()&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,16));return true})()"#)
+        let lockedLines = try await host.evaluate(#"(()=>{const board=document.querySelector('.simple-board');const copies=[...board.querySelectorAll('.simple-quadrant-copy')];const sizes=copies.map(item=>Number.parseFloat(getComputedStyle(item).fontSize));return {count:copies.length,fullText:copies.every(item=>item.textContent==='A House\nWith No Doors'),whiteSpace:copies.every(item=>getComputedStyle(item).whiteSpace==='pre'),sharedSize:new Set(sizes.map(value=>value.toFixed(3))).size===1}})()"#) as? [String: Any] ?? [:]
+        try await host.snapshot(to: output.appendingPathComponent("13-simple-locked-lines.png"))
+        let stress = try await host.evaluateAsync(#"(async()=>{const checkbox=[...document.querySelectorAll('.simple-options input[type="checkbox"]')].find(item=>item.closest('label')?.textContent?.includes('Stress test'));checkbox?.click();const deadline=performance.now()+10000;while(!document.querySelector('.simple-quadrant-copy')?.textContent?.includes('₹')&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,16));const text=document.querySelector('.simple-quadrant-copy')?.textContent??'';return {rupee:text.includes('₹'),copyright:text.includes('©'),trademark:text.includes('™'),numerals:text.includes('0123456789')}})()"#) as? [String: Any] ?? [:]
+        _ = try await host.evaluateAsync(#"(async()=>{const field=document.querySelector('.simple-copy-field textarea');const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;setter.call(field,'A House With No Doors');field.dispatchEvent(new Event('input',{bubbles:true}));const checkbox=[...document.querySelectorAll('.simple-options input[type="checkbox"]')].find(item=>item.closest('label')?.textContent?.includes('Stress test'));if(checkbox?.checked)checkbox.click();document.querySelector('input[name="simple-fit-policy"][value="fit"]')?.click();document.querySelector('.simple-hero')?.scrollIntoView({block:'start'});await new Promise(resolve=>setTimeout(resolve,32));return true})()"#)
+        return ["lockedLines": lockedLines, "longCopy": longCopy, "stress": stress]
+    }
+    private func simpleTuningAudit() async throws -> [String: Any] {
+        _ = try await host.evaluateAsync(#"(async()=>{document.querySelector('.simple-section-actions button[aria-expanded]')?.click();const deadline=performance.now()+10000;while(!document.querySelector('.simple-font-card')&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,16));document.querySelector('.simple-font-section')?.scrollIntoView({block:'start'});await new Promise(resolve=>setTimeout(resolve,32));return true})()"#)
+        try await host.snapshot(to: output.appendingPathComponent("14-simple-tuning.png"))
+        var metrics = try await host.evaluateAsync(#"(async()=>{const cards=[...document.querySelectorAll('.simple-font-card')];const first=cards[0];const labels=[...first.querySelectorAll('.simple-casing button')].map(item=>item.textContent?.trim());const ap=[...first.querySelectorAll('.simple-casing button')].find(item=>item.textContent?.trim()==='AP Title');const field=document.querySelector('.simple-copy-field textarea');const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;setter.call(field,'war and peace: a field guide');field.dispatchEvent(new Event('input',{bubbles:true}));ap?.click();const deadline=performance.now()+10000;while(first.querySelector('.simple-card-copy')?.textContent!=='War and Peace: a Field Guide'&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,16));const touch=[...first.querySelectorAll('button')].map(item=>item.getBoundingClientRect().height);const result={cards:cards.length,casingLabels:labels.join('|'),apTitle:first.querySelector('.simple-card-copy')?.textContent==='War and Peace: a Field Guide',axisSliders:document.querySelectorAll('.simple-axes input[type="range"]').length,minButtonHeight:Math.min(...touch),cardOverflow:cards.filter(item=>item.scrollWidth>item.clientWidth).length};[...first.querySelectorAll('.simple-casing button')].find(item=>item.textContent?.trim()==='As is')?.click();setter.call(field,'A House With No Doors');field.dispatchEvent(new Event('input',{bubbles:true}));return result})()"#) as? [String: Any] ?? [:]
+        _ = try await host.evaluate("const trigger=document.querySelector('.simple-font-preview'); trigger?.focus(); trigger?.click(); true")
+        try await wait("Simple full-size preview") { try await self.bool("document.querySelector('.simple-preview-dialog') && document.activeElement?.textContent?.trim()==='Close'") }
+        try await host.snapshot(to: output.appendingPathComponent("15-simple-full-preview.png"))
+        metrics["preview"] = try await host.evaluateAsync(#"(async()=>{const dialog=document.querySelector('.simple-preview-dialog');const close=dialog?.querySelector('button');const trigger=document.querySelector('.simple-font-preview');const initialFocus=document.activeElement===close;close?.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));const forwardWrap=document.activeElement===close;close?.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));const backwardWrap=document.activeElement===close;window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));const deadline=performance.now()+10000;while((document.querySelector('.simple-preview-dialog')||document.activeElement!==trigger)&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,16));return {initialFocus,forwardWrap,backwardWrap,escapeClosed:!document.querySelector('.simple-preview-dialog'),returnFocus:document.activeElement===trigger}})()"#) as? [String: Any] ?? [:]
+        _ = try await host.evaluateAsync(#"(async()=>{document.querySelector('.simple-section-actions button[aria-expanded]')?.click();document.querySelector('.simple-hero')?.scrollIntoView({block:'start'});await new Promise(resolve=>setTimeout(resolve,32));return true})()"#)
+        return metrics
+    }
+    private func setInterfaceScale(_ target: Int) async throws {
+        _ = try await host.evaluateAsync("(async()=>{const shell=document.querySelector('.app-shell');const decrease=document.querySelector('[aria-label=\"Decrease interface scale\"]');const increase=document.querySelector('[aria-label=\"Increase interface scale\"]');let guardCount=0;while(Number(shell?.dataset.uiScale)!==\(target)&&guardCount<12){(Number(shell?.dataset.uiScale)<\(target)?increase:decrease)?.click();await new Promise(resolve=>setTimeout(resolve,16));guardCount++}return Number(shell?.dataset.uiScale)})()")
+        try await wait("Interface scale \(target)") { try await self.bool("document.querySelector('.app-shell')?.dataset.uiScale==='\(target)'") }
+    }
+    private func simpleScaleMetrics() async throws -> [String: Any] {
+        try await host.evaluate("(()=>{const shell=document.querySelector('.app-shell');const title=document.querySelector('.titlebar');const workspace=document.querySelector('.simple-workspace');const shellRect=shell.getBoundingClientRect();const titleInput=title.querySelector('.document-title input');const controls=[...document.querySelectorAll('.simple-hero-actions button,.ui-scale-control button')].filter(item=>{const rect=item.getBoundingClientRect();return rect.width>0&&rect.height>0});const titleButtons=[...title.querySelectorAll('button')].filter(item=>{const rect=item.getBoundingClientRect();return rect.width>0&&rect.height>0});return {scale:Number(shell.dataset.uiScale),headerOverflow:title.scrollWidth>title.clientWidth,workspaceOverflow:workspace.scrollWidth>workspace.clientWidth,clippedTitleButtons:titleButtons.filter(item=>{const rect=item.getBoundingClientRect();return rect.left<shellRect.left-1||rect.right>shellRect.right+1}).length,titleTextClipped:Boolean(titleInput&&titleInput.scrollWidth>titleInput.clientWidth),minTouchHeight:Math.min(...controls.map(item=>item.getBoundingClientRect().height)),horizontalOverflow:document.documentElement.scrollWidth>document.documentElement.clientWidth}})()") as? [String: Any] ?? [:]
+    }
     private func keyboardAccessibilityAudit() async throws -> [String: Any] {
         _ = try await host.evaluate("document.querySelector('#import-fonts-button')?.focus(); true")
         host.sendMenu(["type": "new-study"])
         try await wait("New Study dialog") { try await self.bool("document.querySelector('.new-study-dialog') && document.activeElement?.closest('.new-study-dialog')") }
         let trap = try await host.evaluate("(()=>{const d=document.querySelector('.new-study-dialog');const f=[...d.querySelectorAll(\"button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex]:not([tabindex='-1'])\")];const first=f[0],last=f.at(-1);last.focus();last.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));const forwardWrap=document.activeElement===first;first.focus();first.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));return {forwardWrap,backwardWrap:document.activeElement===last}})()") as? [String: Any] ?? [:]
-        _ = try await host.evaluateAsync("(async()=>{await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));return true})()")
+        _ = try await host.evaluateAsync("(async()=>{await new Promise(resolve=>setTimeout(resolve,32));document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));return true})()")
         try await wait("New Study close") { try await self.bool("!document.querySelector('.new-study-dialog') && document.activeElement?.id==='import-fonts-button'") }
         let nativeHistoryBefore = host.nativeTextHistoryCommands
         let studyMenuBefore = host.menuCommands
@@ -982,10 +1441,11 @@ private final class MacEvidenceRunner {
         try await wait("native text undo route") { self.host.nativeTextHistoryCommands == nativeHistoryBefore + 1 }
         let textInputStillFocused = try await bool("document.activeElement?.matches('.document-title input')")
         let nativeTextUndo = host.menuCommands == studyMenuBefore && textInputStillFocused
-        let collision = try await host.evaluateAsync("(async()=>{const s=document.querySelector('.stage-nav [aria-current=\"step\"]');const beforeCandidate=document.querySelector('.candidate-row[aria-current=\"true\"]')?.textContent;const beforeTray=document.querySelectorAll('.tray-item').length;s.focus();s.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));s.dispatchEvent(new KeyboardEvent('keydown',{key:' ',code:'Space',bubbles:true,cancelable:true}));await new Promise(r=>requestAnimationFrame(r));return {candidateUnchanged:beforeCandidate===document.querySelector('.candidate-row[aria-current=\"true\"]')?.textContent,trayUnchanged:beforeTray===document.querySelectorAll('.tray-item').length,returnFocus:document.activeElement===s}})()") as? [String: Any] ?? [:]
+        let collision = try await host.evaluateAsync("(async()=>{const s=document.querySelector('.stage-nav [aria-current=\"step\"]');const beforeCandidate=document.querySelector('.candidate-row[aria-current=\"true\"]')?.textContent;const beforeTray=document.querySelectorAll('.tray-item').length;s.focus();s.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true}));s.dispatchEvent(new KeyboardEvent('keydown',{key:' ',code:'Space',bubbles:true,cancelable:true}));await new Promise(resolve=>setTimeout(resolve,16));return {candidateUnchanged:beforeCandidate===document.querySelector('.candidate-row[aria-current=\"true\"]')?.textContent,trayUnchanged:beforeTray===document.querySelectorAll('.tray-item').length,returnFocus:document.activeElement===s}})()") as? [String: Any] ?? [:]
         return trap.merging(collision) { _, right in right }.merging(["nativeTextUndo": nativeTextUndo]) { _, right in right }
     }
     private func inspect() async throws -> [String: Any] { (try await host.evaluate("(()=>({heading:document.querySelector('#workspace-heading')?.textContent?.replace(/\\s+/g,' ').trim()??null,stage:document.querySelector('.stage-nav [aria-current=\"step\"]')?.textContent?.replace(/\\s+/g,' ').trim()??null,reviewState:document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label')??null,activeElement:document.activeElement?.id||document.activeElement?.tagName||null,durability:document.querySelector('.document-title > span:last-child')?.textContent?.trim()??null}))()")) as? [String: Any] ?? [:] }
+    private func currentReviewState() async throws -> String? { try await host.evaluate("document.querySelector('.candidate-row[aria-current=\"true\"] .review-glyph')?.getAttribute('aria-label')") as? String }
     private func bool(_ expression: String) async throws -> Bool { (try await host.evaluate("Boolean(\(expression))")) as? Bool == true }
     private func wait(_ label: String, condition: @escaping () async throws -> Bool) async throws { let deadline = Date().addingTimeInterval(20); while Date() < deadline { if try await condition() { return }; try await Task.sleep(nanoseconds: 100_000_000) }; throw HostError.unavailable("Timed out waiting for \(label)") }
 }

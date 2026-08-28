@@ -19,6 +19,7 @@ coverage/
 .vite/
 .cache/
 .test-dist/
+.playwright-cli/
 
 # Local studies, sources, exports, and client material
 private/

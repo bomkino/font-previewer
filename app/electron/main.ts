@@ -103,6 +103,7 @@ let installedCatalogIndex: readonly CatalogIndexEntry[] = [];
 let installedCatalogTruncated = false;
 let catalogGeneration = 0;
 let activeCatalogProcess: ChildProcess | undefined;
+let recoveryWriteQueue: Promise<void> = Promise.resolve();
 
 if (evidenceDirectory) app.disableHardwareAcceleration();
 
@@ -475,6 +476,23 @@ async function writeRecovery(): Promise<void> {
   await atomicWrite(recoveryPath, `${JSON.stringify(mirrored)}\n`);
 }
 
+async function queueRecoveryCheckpoint(request: Extract<HostRequest, { readonly type: "mirror-study" }>): Promise<void> {
+  const checkpoint = recoveryWriteQueue.then(async () => {
+    if (mirrored?.document.id === request.document.id && request.revision < mirrored.revision) throw new Error("Rejected stale recovery revision.");
+    if (promoteCatalogBindings(request.document)) await persistLocalState();
+    mirrored = {
+      version: 1,
+      document: request.document,
+      workspace: request.workspace,
+      revision: request.revision,
+      intentionallySavedRevision: mirrored?.document.id === request.document.id ? Math.min(mirrored.intentionallySavedRevision, request.revision) : 0,
+    };
+    await writeRecovery();
+  });
+  recoveryWriteQueue = checkpoint.catch(() => undefined);
+  await checkpoint;
+}
+
 async function loadRecovery(): Promise<RecoveryEnvelope | undefined> {
   try {
     mirrored = parseRecoveryDisk(await readBoundedText(recoveryPath, maximumStudyBytes * 2));
@@ -562,16 +580,7 @@ async function handleHostRequest(event: IpcMainInvokeEvent, rawRequest: unknown)
       };
     }
     case "mirror-study": {
-      if (mirrored?.document.id === request.document.id && request.revision < mirrored.revision) throw new Error("Rejected stale recovery revision.");
-      if (promoteCatalogBindings(request.document)) await persistLocalState();
-      mirrored = {
-        version: 1,
-        document: request.document,
-        workspace: request.workspace,
-        revision: request.revision,
-        intentionallySavedRevision: mirrored?.document.id === request.document.id ? Math.min(mirrored.intentionallySavedRevision, request.revision) : 0,
-      };
-      await writeRecovery();
+      await queueRecoveryCheckpoint(request);
       return { type: "mirror-ack", revision: request.revision, recoveryPersisted: true };
     }
     case "save-study": {
@@ -601,9 +610,9 @@ async function handleHostRequest(event: IpcMainInvokeEvent, rawRequest: unknown)
       const exported = await exportTransactionalHandoff({
         window: mainWindow,
         document: request.document,
+        preferences: request.preferences,
         targetDirectory,
         sourcePaths: sourceBindings,
-        includeSources: request.preferences.includeSources,
         sourcePermissionAcknowledged: request.sourcePermissionAcknowledged,
       });
       return { type: "export-result", displayName: exported.displayName, exported: true, fileCount: exported.fileCount };
@@ -643,7 +652,7 @@ async function createWindow(): Promise<BrowserWindow> {
     minWidth: 960,
     minHeight: 640,
     show: false,
-    backgroundColor: "#151512",
+    backgroundColor: "#0b0b0f",
     icon: join(applicationRoot, "assets", "icon", "font-previewer-icon-512.png"),
     title: "Font Previewer",
     webPreferences: {
@@ -769,9 +778,9 @@ void app.whenReady().then(async () => {
         return exportTransactionalHandoff({
           window: firstWindow,
           document: mirrored.document,
+          preferences: mirrored.document.handoff,
           targetDirectory,
           sourcePaths: sourceBindings,
-          includeSources: false,
           sourcePermissionAcknowledged: false,
         });
       },

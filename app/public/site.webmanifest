@@ -1,11 +1,11 @@
 {
   "name": "Font Previewer",
   "short_name": "Font Previewer",
-  "description": "A local typography decision Studio.",
+  "description": "A local font-to-board previewer with a deeper typography decision Studio.",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#151512",
-  "theme_color": "#151512",
+  "background_color": "#0b0b0f",
+  "theme_color": "#0b0b0f",
   "icons": [
     {
       "src": "font-previewer-icon-192.png",

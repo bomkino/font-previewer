@@ -27,7 +27,7 @@ export function useStudyIndex(document: StudyDocument): StudyIndex {
   );
 }
 
-function cssFamily(faceId: string): string {
+export function cssFamily(faceId: string): string {
   let hash = 2_166_136_261;
   for (const character of faceId) {
     hash ^= character.codePointAt(0) ?? 0;
@@ -36,12 +36,21 @@ function cssFamily(faceId: string): string {
   return `FontPreviewer_${(hash >>> 0).toString(36)}`;
 }
 
-function fallbackFamily(face: Face): string {
+export function fallbackFamily(face: Face): string {
   const label = `${face.family} ${face.style}`.toLocaleLowerCase();
   if (label.includes("mono")) return "ui-monospace, SFMono-Regular, Consolas, monospace";
   if (label.includes("serif") || label.includes("ledger")) return "Iowan Old Style, Georgia, serif";
   if (label.includes("display") || label.includes("vector")) return "Impact, Haettenschweiler, sans-serif";
   return "Inter, Helvetica Neue, Arial, sans-serif";
+}
+
+export function candidateFontFamily(
+  document: StudyDocument,
+  candidate: Candidate,
+  state: "loading" | "ready" | "failed" | "unavailable" | undefined,
+): string {
+  const face = faceForCandidate(document, candidate);
+  return state === "ready" ? cssFamily(face.id) : fallbackFamily(face);
 }
 
 export function useFontRegistry(session: StudySession): ReadonlyMap<string, "loading" | "ready" | "failed" | "unavailable"> {
@@ -100,7 +109,7 @@ export function specimenStyle(
   const face = faceForCandidate(document, candidate);
   const size = options.fittedSize ?? recipe.size;
   return {
-    fontFamily: fontState === "ready" ? cssFamily(face.id) : fallbackFamily(face),
+    fontFamily: candidateFontFamily(document, candidate, fontState),
     fontSize: `${options.compact ? Math.min(size, 44) : size}px`,
     fontVariationSettings: cssVariationSettings(candidate) || undefined,
     fontFeatureSettings: cssFeatureSettings(candidate) || undefined,

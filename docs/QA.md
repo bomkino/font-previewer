@@ -51,13 +51,17 @@ The test runner removes compiled output before every run, plants a deliberately 
 ### macOS Host
 
 - Install locked Studio dependencies without downloading Electron.
-- Verify the shared Studio and prove tracked source remains unchanged.
+- Verify the shared Simple + Studio renderer and prove tracked source remains unchanged.
 - Run the retained 500-Face long-session diagnostic.
 - Build the AppKit/WKWebView Host and embed the production Studio, licence, notices, SBOM, and installation guidance.
 - Enable hardened runtime, sign ad hoc, and verify the signature deeply and strictly.
 - Run the displayed Host, native menu/panel routes, installed Catalog, opaque font loading, cancellation, keyboard/focus/semantic checks, recovery, and transactional Handoff fault injection.
+- Exercise Simple file/folder and installed-family/style intake, four-up and index boards, long-copy containment, four colour quadrants, stress characters, five casing controls, variable axes, include/skip, and full-size preview.
+- Prove Simple-added Candidates and the active comparison sizing policy appear unchanged in Studio.
+- Exercise Studio Review, Compare, System, and Handoff with contextual panes, full-width Handoff, no title/candidate truncation, and no unwanted tray on System/Handoff.
+- Measure every 80–140% scale step; require no horizontal overflow and a minimum 44 px visible control at the smallest scale.
 - Label the termination-callback recovery exercise as a simulation; do not claim a real induced WebKit content-process crash.
-- Capture six non-empty displayed states.
+- Capture twenty non-empty displayed states spanning both modes, family/style dialogs, scale extremes, long copy, locked lines, tuning, and stage layouts.
 - Extract the packaged ZIP, reverify signature, run the package journey, and remove the extracted app.
 - Verify package ZIP checksum and add `SOURCE_SHA` to the exact-SHA artifact.
 

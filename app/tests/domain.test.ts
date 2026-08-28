@@ -12,6 +12,7 @@ import {
   parseStudyDocument,
   serializeRecoverySnapshot,
   serializeStudyDocument,
+  transformedCopy,
   type ImportedSource,
 } from "../src/domain.js";
 import { createFixtureSession } from "../src/fixture.js";
@@ -141,6 +142,26 @@ test("duplicated family Candidates keep independent decisions and variable setti
   assert.equal(decided.document.candidates.find((candidate) => candidate.id === original.id)?.axes[0]?.value, original.axes[0]?.value);
   assert.equal(decided.document.candidates.find((candidate) => candidate.id === duplicate.id)?.reviewState, "keep");
   assert.notEqual(decided.document.candidates.find((candidate) => candidate.id === duplicate.id)?.axes[0]?.value, original.axes[0]?.value);
+});
+
+test("Simple-mode candidate order, removal, and original casing controls remain semantic and undoable", () => {
+  const fixture = createFixtureSession();
+  const first = fixture.document.candidates[0];
+  const second = fixture.document.candidates[1];
+  const moved = applyStudyCommand(fixture, { type: "move-candidate", candidateId: first.id, toIndex: 3 });
+  assert.equal(moved.document.candidates[3]?.id, first.id);
+  assert.equal(moved.revision, fixture.revision + 1);
+
+  const removed = applyStudyCommand(moved, { type: "remove-candidate", candidateId: second.id });
+  assert.equal(removed.document.candidates.some((candidate) => candidate.id === second.id), false);
+  assert.equal(removed.workspace.trayIds.includes(second.id), false);
+  assert.ok(removed.document.comparisonSets.every((comparison) => comparison.candidateIds.length >= 2));
+
+  assert.equal(transformedCopy("the dog in the night", "exact"), "the dog in the night");
+  assert.equal(transformedCopy("the dog in the night", "uppercase"), "THE DOG IN THE NIGHT");
+  assert.equal(transformedCopy("THE DOG IN THE NIGHT", "lowercase"), "the dog in the night");
+  assert.equal(transformedCopy("THE DOG IN THE NIGHT", "title"), "The Dog In The Night");
+  assert.equal(transformedCopy("the dog in the night", "ap-title"), "The Dog in the Night");
 });
 
 test("recovery round-trips document/workspace/revisions but never Host-local bindings", () => {

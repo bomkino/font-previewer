@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.1.0-rc.3 — 2026-08-28
+
+### Added
+
+- Restored the original low-friction path as the default Simple mode: add font files/folders or choose installed families and styles, see four-up boards immediately, tune only when useful, then export.
+- Added high-resolution 5,152 × 2,160 four-font boards, optional 12-font index pages, the original four-colour comparison surface, stress text, five casing modes including AP Title, variable-axis controls, reordering, include/skip, and full-size previews.
+- Added one 80–140% interface-scale control, plus keyboard increase/decrease/reset commands, across Simple and Studio.
+- Added family-first installed-font browsing with style detail in both interface modes.
+
+### Changed
+
+- Rebuilt Simple around oversized editorial hierarchy, larger controls, consistent square geometry, generous padding, one clear action sequence, and dark mode by default.
+- Rebuilt Studio’s Review, Compare, System, and Handoff surfaces with contextual panes, labelled decisions, larger touch targets, calmer navigation, full-width Handoff, and no candidate/title ellipsis in verified states.
+- Made imported fonts/styles, copy, casing, axes, ordering, include/skip decisions, and comparison sizing travel between Simple and Studio through one shared session.
+- Shared the same Same size, Fit each, and Lock line breaks logic across Simple boards and Studio Compare.
+
+### Hardened
+
+- Validated renderer-produced board PNG structure, CRCs, dimensions, decoded size, and scanline filters in both desktop Hosts before transactional commit.
+- Added native macOS evidence for Simple/Studio state travel, family/style dialogs, 80–140% scaling, minimum 44 px controls, long-copy containment, locked line breaks, stress characters, no truncation, contextual Studio chrome, and modal focus return.
+- Made workspace-only changes such as stage, selection, tray, search, and scene recover independently; serialized Electron recovery writes and rejected obsolete renderer checkpoints before they can overwrite newer state.
+- Preserved failed-export cleanup, prior-export byte identity, path-free Study data, opaque font capabilities, and explicit Source-copy permission.
+
+### Not claimed
+
+- Attended VoiceOver or Orca usability.
+- Owner acceptance of every visual state or competent complex-script review.
+- Independent clean-machine reconstruction or universal Mac/Linux behavior.
+- Developer ID signing, notarisation, stapling, or Gatekeeper acceptance.
+
 ## 0.1.0-rc.2 — 2026-08-28
 
 ### Changed

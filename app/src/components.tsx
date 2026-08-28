@@ -1,7 +1,9 @@
 import {
   memo,
   useDeferredValue,
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type Dispatch,
@@ -11,6 +13,7 @@ import {
   FIT_POLICIES,
   REVIEW_STATES,
   SYSTEM_ROLES,
+  TEXT_CASINGS,
   activeRecipe,
   activeTypographySystem,
   bindingForSource,
@@ -36,6 +39,15 @@ import {
 } from "./font-runtime.js";
 import { groupByFamily } from "./family-groups.js";
 import type { HostCapabilities } from "./protocol.js";
+import { InterfaceIcon } from "./icons.js";
+import {
+  SIMPLE_INDEX_PAGE_SIZE,
+  SIMPLE_QUADRANTS,
+  SIMPLE_STRESS_COPY,
+  chunked,
+  includedCandidates,
+  simpleDisplayCopy,
+} from "./simple-boards.js";
 
 export const stageLabels: Record<Stage, string> = {
   review: "Review",
@@ -76,12 +88,13 @@ const policyLabels: Record<FitPolicy, { label: string; detail: string }> = {
 
 export interface AppActions {
   readonly importSources: () => void;
-  readonly scanInstalled: (query?: string, refresh?: boolean, cursor?: number) => void;
+  readonly scanInstalled: (query?: string, refresh?: boolean, cursor?: number, destination?: "studio" | "simple") => void;
   readonly cancelCatalog: () => void;
   readonly addCatalogSources: (sourceIds: readonly string[]) => void;
   readonly openStudy: () => void;
   readonly saveStudy: (saveAs: boolean) => void;
   readonly exportHandoff: (sourcePermissionAcknowledged: boolean) => void;
+  readonly exportBoards: (includeSources: boolean) => void;
   readonly relinkSource: (sourceId: string) => void;
   readonly revealSource: (sourceId: string) => void;
   readonly newStudy: () => void;
@@ -110,19 +123,18 @@ export function Welcome({ actions, capabilities }: WelcomeProps) {
   return (
     <main className="welcome" aria-labelledby="welcome-heading">
       <div className="welcome-copy">
-        <p className="section-kicker">Local typography decisions</p>
-        <h1 id="welcome-heading" tabIndex={-1}>Find the voice.<br />Keep the evidence.</h1>
+        <p className="section-kicker">Simple mode · local by default</p>
+        <h1 id="welcome-heading" tabIndex={-1}>Add fonts.<br />Get the boards.</h1>
         <p>
-          Review local font Sources, compare exact Candidates, build a deck system, and hand it off without
-          installing a thing.
+          Four fonts per page. Your copy, your casing, your decisions. Then export the high-resolution boards.
         </p>
         <div className="welcome-actions">
-          <button type="button" className="primary-button" onClick={actions.importSources}>Import Sources</button>
-          {capabilities?.installedCatalog ? <button type="button" className="quiet-button" onClick={() => actions.scanInstalled()}>Browse Installed</button> : null}
-          <button type="button" className="quiet-button" onClick={actions.newStudy}>New Study</button>
-          <button type="button" className="quiet-button" onClick={actions.openStudy}>Open Study</button>
+          <button type="button" className="primary-button has-icon" onClick={actions.importSources}><InterfaceIcon name="add" />Add Fonts…</button>
+          {capabilities?.installedCatalog ? <button type="button" className="quiet-button has-icon" onClick={() => actions.scanInstalled("", false, 0, "simple")}><InterfaceIcon name="library" />Installed Fonts</button> : null}
+          <button type="button" className="quiet-button has-icon" onClick={actions.newStudy}><InterfaceIcon name="add" />New Study</button>
+          <button type="button" className="quiet-button has-icon" onClick={actions.openStudy}><InterfaceIcon name="folder" />Open Study</button>
         </div>
-        <button type="button" className="text-button" onClick={actions.loadSample}>Explore a sample Study</button>
+        <button type="button" className="text-button" onClick={actions.loadSample}>Try it with a sample</button>
       </div>
       <aside className="welcome-proof" aria-label="Product privacy and format summary">
         <span className="proof-number">01</span>
@@ -131,9 +143,575 @@ export function Welcome({ actions, capabilities }: WelcomeProps) {
         <dl>
           <div><dt>Interactive profile</dt><dd>{capabilities?.renderProfile ?? "Loading Host…"}</dd></div>
           <div><dt>Full formats</dt><dd>{capabilities?.fullFormats.join(" · ") || "TTF · OTF · WOFF · WOFF2"}</dd></div>
-          <div><dt>Product path</dt><dd>Review · Compare · System · Handoff</dd></div>
+          <div><dt>Simple path</dt><dd>Add · Tune · Export</dd></div>
+          <div><dt>Advanced path</dt><dd>Studio remains one click away</dd></div>
         </dl>
       </aside>
+    </main>
+  );
+}
+
+const simpleCasingLabels: Record<Candidate["casing"], string> = {
+  exact: "As is",
+  uppercase: "UPPER",
+  lowercase: "lower",
+  title: "Title",
+  "ap-title": "AP Title",
+};
+
+interface SimpleWorkspaceProps {
+  readonly session: StudySession;
+  readonly dispatch: Dispatch<StudyCommand>;
+  readonly fontStates: ReadonlyMap<string, "loading" | "ready" | "failed" | "unavailable">;
+  readonly headingRef: RefObject<HTMLHeadingElement | null>;
+  readonly actions: AppActions;
+  readonly capabilities?: HostCapabilities;
+  readonly stressTest: boolean;
+  readonly onStressTestChange: (enabled: boolean) => void;
+  readonly fitPolicy: FitPolicy;
+  readonly onFitPolicyChange: (policy: FitPolicy) => void;
+  readonly includeIndex: boolean;
+  readonly onIncludeIndexChange: (enabled: boolean) => void;
+  readonly includeSources: boolean;
+  readonly onIncludeSourcesChange: (enabled: boolean) => void;
+  readonly catalog: InstalledCatalogView;
+  readonly catalogBusy: boolean;
+  readonly catalogOpenRequest: number;
+}
+
+function SimpleCandidateCopy({
+  session,
+  candidate,
+  fontStates,
+  stressTest,
+  className,
+  fit,
+  policy = "fit",
+  label,
+}: {
+  readonly session: StudySession;
+  readonly candidate: Candidate;
+  readonly fontStates: ReadonlyMap<string, "loading" | "ready" | "failed" | "unavailable">;
+  readonly stressTest: boolean;
+  readonly className: string;
+  readonly fit: "card" | "board" | "index" | "focus" | "compare";
+  readonly policy?: FitPolicy;
+  readonly label?: string;
+}) {
+  const face = faceForCandidate(session.document, candidate);
+  const recipe = activeRecipe(session);
+  const state = fontStates.get(face.id);
+  const elementRef = useRef<HTMLParagraphElement>(null);
+  const rawCopy = simpleDisplayCopy(session, candidate, stressTest);
+  const copy = (fit === "board" || fit === "compare") && policy !== "locked-lines" ? rawCopy.replace(/\s*\r?\n\s*/gu, " ") : rawCopy;
+  const axisKey = candidate.axes.map((axis) => `${axis.tag}:${axis.value}`).join(";");
+
+  useEffect(() => {
+    const element = elementRef.current;
+    const container = element?.parentElement;
+    if (!element || !container || fit === "focus") return;
+    delete element.dataset.naturalFit;
+    const configuration = {
+      card: { minimum: 12, maximum: 84, width: 0.86, height: 0.68 },
+      board: { minimum: 8, maximum: 72, width: 0.84, height: 0.58 },
+      index: { minimum: 7, maximum: 34, width: 0.82, height: 0.48 },
+      compare: { minimum: 10, maximum: 96, width: 0.84, height: 0.64 },
+    }[fit];
+    let frame = 0;
+    let cancelled = false;
+    const fitCopy = () => {
+      if (cancelled) return;
+      const bounds = container.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0) return;
+      const maximumWidth = bounds.width * configuration.width;
+      const maximumHeight = bounds.height * configuration.height;
+      const wrappingFit = fit === "compare" && policy === "fit";
+      element.style.width = wrappingFit ? `${maximumWidth}px` : "max-content";
+      element.style.maxWidth = wrappingFit ? `${maximumWidth}px` : "none";
+      element.style.whiteSpace = wrappingFit ? "normal" : "pre";
+      element.style.overflow = "visible";
+      element.style.textOverflow = "clip";
+      element.style.transform = "none";
+      element.style.transformOrigin = "center center";
+      element.style.justifySelf = fit === "compare" ? "center" : "auto";
+      let low = configuration.minimum;
+      let high = configuration.maximum;
+      for (let iteration = 0; iteration < 15; iteration += 1) {
+        const size = (low + high) / 2;
+        element.style.fontSize = `${size}px`;
+        const measured = element.getBoundingClientRect();
+        const widthFits = wrappingFit ? element.scrollWidth <= element.clientWidth + 1 : measured.width <= maximumWidth;
+        if (widthFits && measured.height <= maximumHeight) low = size;
+        else high = size;
+      }
+      const naturalSize = Math.floor(low * 10) / 10;
+      element.style.fontSize = `${naturalSize}px`;
+      element.dataset.naturalFit = String(naturalSize);
+      const fitted = element.getBoundingClientRect();
+      if (fitted.width > maximumWidth) element.style.transform = `scaleX(${Math.max(0.1, maximumWidth / fitted.width)})`;
+      if ((fit === "board" || fit === "compare") && policy !== "fit") {
+        const group = element.closest(fit === "board" ? ".simple-board" : ".compare-grid");
+        const members = group ? [...group.querySelectorAll<HTMLElement>(`.simple-fitted-${fit}`)] : [];
+        const naturalSizes = members.map((member) => Number(member.dataset.naturalFit)).filter(Number.isFinite);
+        if (members.length && naturalSizes.length === members.length) {
+          const sharedSize = Math.min(...naturalSizes);
+          members.forEach((member) => {
+            member.style.fontSize = `${sharedSize}px`;
+            member.style.transform = "none";
+            member.style.justifySelf = "center";
+            member.style.transformOrigin = "center center";
+            const memberBounds = member.getBoundingClientRect();
+            const parentBounds = member.parentElement?.getBoundingClientRect();
+            const available = (parentBounds?.width ?? memberBounds.width) * configuration.width;
+            if (memberBounds.width > available) member.style.transform = `scaleX(${Math.max(0.1, available / memberBounds.width)})`;
+          });
+        }
+      }
+    };
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(fitCopy);
+    };
+    const observer = new ResizeObserver(schedule);
+    observer.observe(container);
+    schedule();
+    void document.fonts.ready.then(schedule);
+    document.fonts.addEventListener("loadingdone", schedule);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      document.fonts.removeEventListener("loadingdone", schedule);
+    };
+  }, [axisKey, candidate.casing, copy, fit, policy, state]);
+
+  return (
+    <p
+      ref={elementRef}
+      className={`${className} simple-fitted-copy simple-fitted-${fit}`}
+      style={specimenStyle(session.document, candidate, recipe, state, { fittedSize: fit === "focus" ? 160 : 96 })}
+      lang={recipe.language || undefined}
+      dir={recipe.direction === "auto" ? "auto" : recipe.direction}
+      aria-label={label}
+    >
+      {copy}
+    </p>
+  );
+}
+
+export function SimpleWorkspace({
+  session,
+  dispatch,
+  fontStates,
+  headingRef,
+  actions,
+  capabilities,
+  stressTest,
+  onStressTestChange,
+  fitPolicy,
+  onFitPolicyChange,
+  includeIndex,
+  onIncludeIndexChange,
+  includeSources,
+  onIncludeSourcesChange,
+  catalog,
+  catalogBusy,
+  catalogOpenRequest,
+}: SimpleWorkspaceProps) {
+  const [showFontControls, setShowFontControls] = useState(false);
+  const [showInstalledCatalog, setShowInstalledCatalog] = useState(false);
+  const [installedSearch, setInstalledSearch] = useState("");
+  const [selectedInstalledFamilyKey, setSelectedInstalledFamilyKey] = useState<string>();
+  const [previewCandidateId, setPreviewCandidateId] = useState<string>();
+  const [draggedCandidateId, setDraggedCandidateId] = useState<string>();
+  const previewDialogRef = useRef<HTMLElement>(null);
+  const previewCloseRef = useRef<HTMLButtonElement>(null);
+  const previewReturnFocusRef = useRef<HTMLElement | null>(null);
+  const installedDialogRef = useRef<HTMLElement>(null);
+  const installedFamilyBackRef = useRef<HTMLButtonElement>(null);
+  const installedReturnFocusRef = useRef<HTMLElement | null>(null);
+  const candidates = session.document.candidates;
+  const included = includedCandidates(session);
+  const boards = useMemo(() => chunked(included, 4), [included]);
+  const indexPages = useMemo(() => includeIndex ? chunked(included, SIMPLE_INDEX_PAGE_SIZE) : [], [includeIndex, included]);
+  const recipe = activeRecipe(session);
+  const copy = session.workspace.copyOverride ?? recipe.copy;
+  const previewCandidate = candidates.find((candidate) => candidate.id === previewCandidateId);
+  const studySourceIds = useMemo(() => new Set(session.document.sources.map((source) => source.id)), [session.document.sources]);
+  const installedGroups = useMemo(() => groupByFamily(catalog.imports, (item) => item.faces[0]?.family ?? item.source.displayName), [catalog.imports]);
+  const selectedInstalledGroup = installedGroups.find((group) => group.key === selectedInstalledFamilyKey);
+
+  const returnToInstalledFamilies = () => {
+    const familyKey = selectedInstalledFamilyKey;
+    setSelectedInstalledFamilyKey(undefined);
+    setTimeout(() => {
+      [...document.querySelectorAll<HTMLButtonElement>(".simple-catalog-family [data-family-key]")]
+        .find((button) => button.dataset.familyKey === familyKey)
+        ?.focus();
+    }, 0);
+  };
+
+  useEffect(() => {
+    if (!previewCandidateId && !showInstalledCatalog) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (previewCandidateId) setPreviewCandidateId(undefined);
+      else if (selectedInstalledFamilyKey) returnToInstalledFamilies();
+      else setShowInstalledCatalog(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [previewCandidateId, selectedInstalledFamilyKey, showInstalledCatalog]);
+
+  useEffect(() => {
+    if (!previewCandidateId) return;
+    const dialog = previewDialogRef.current;
+    const returnTarget = previewReturnFocusRef.current;
+    const focusable = () => dialog ? [...dialog.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled), [href], [tabindex]:not([tabindex='-1'])")] : [];
+    const focusTimer = setTimeout(() => previewCloseRef.current?.focus(), 0);
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const controls = focusable();
+      const first = controls[0];
+      const last = controls.at(-1);
+      if (!first || !last) {
+        event.preventDefault();
+        dialog?.focus();
+        return;
+      }
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", trapFocus);
+    return () => {
+      clearTimeout(focusTimer);
+      document.removeEventListener("keydown", trapFocus);
+      setTimeout(() => (returnTarget?.isConnected ? returnTarget : headingRef.current)?.focus(), 0);
+    };
+  }, [headingRef, previewCandidateId]);
+
+  useEffect(() => {
+    if (!showInstalledCatalog || !selectedInstalledFamilyKey) return;
+    const focusTimer = setTimeout(() => installedFamilyBackRef.current?.focus(), 0);
+    return () => clearTimeout(focusTimer);
+  }, [selectedInstalledFamilyKey, showInstalledCatalog]);
+
+  useEffect(() => {
+    if (catalogOpenRequest > 0) setShowInstalledCatalog(true);
+  }, [catalogOpenRequest]);
+
+  useEffect(() => {
+    if (!showInstalledCatalog) return;
+    const dialog = installedDialogRef.current;
+    const returnTarget = installedReturnFocusRef.current;
+    const focusable = () => dialog ? [...dialog.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled), [href], [tabindex]:not([tabindex='-1'])")] : [];
+    const focusTimer = setTimeout(() => dialog?.querySelector<HTMLInputElement>('input[type="search"]')?.focus(), 0);
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const controls = focusable();
+      const first = controls[0];
+      const last = controls.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", trapFocus);
+    return () => {
+      clearTimeout(focusTimer);
+      document.removeEventListener("keydown", trapFocus);
+      setTimeout(() => (returnTarget?.isConnected ? returnTarget : headingRef.current)?.focus(), 0);
+    };
+  }, [headingRef, showInstalledCatalog]);
+
+  const openInstalledCatalog = () => {
+    installedReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setShowInstalledCatalog(true);
+    if (!catalog.indexed) actions.scanInstalled("", false, 0, "simple");
+  };
+
+  const openCandidatePreview = (candidateId: string) => {
+    previewReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setPreviewCandidateId(candidateId);
+  };
+
+  const closeCandidatePreview = () => setPreviewCandidateId(undefined);
+
+  const setAll = (reviewState: ReviewState) => {
+    if (candidates.length) dispatch({ type: "set-review-state", candidateIds: candidates.map((candidate) => candidate.id), reviewState });
+  };
+
+  return (
+    <main className="simple-workspace" id="workspace" aria-labelledby="workspace-heading">
+      <section className="simple-hero">
+        <div>
+          <p className="section-kicker">Simple mode</p>
+          <h1 id="workspace-heading" ref={headingRef} tabIndex={-1}>
+            {candidates.length ? `${included.length} fonts. ${boards.length} ${boards.length === 1 ? "board" : "boards"}.` : "Add fonts. Get boards."}
+          </h1>
+          <p>{candidates.length ? "Tune the fonts once. The four-up pages update immediately." : "Drop in a folder or choose font files. Nothing is installed or uploaded."}</p>
+          {candidates.length ? (
+            <nav className="simple-jump-links" aria-label="Simple sections">
+              <a href="#simple-pages-heading"><span>View</span><strong>{boards.length} {boards.length === 1 ? "board" : "boards"} ↓</strong></a>
+              <a href="#simple-fonts-heading"><span>Tune</span><strong>{candidates.length} fonts ↓</strong></a>
+            </nav>
+          ) : null}
+        </div>
+        <div className="simple-hero-actions">
+          <button id="simple-add-fonts" type="button" className="quiet-button has-icon" onClick={actions.importSources}><InterfaceIcon name="add" />Add Fonts…</button>
+          {capabilities?.installedCatalog ? <button type="button" className="quiet-button has-icon" onClick={openInstalledCatalog}><InterfaceIcon name="library" />Installed Fonts…</button> : null}
+          <button type="button" className="primary-button has-icon" disabled={!included.length || !capabilities?.transactionalHandoff} onClick={() => actions.exportBoards(includeSources)}><InterfaceIcon name="export" />Export Boards…</button>
+        </div>
+      </section>
+
+      <section className="simple-compose" aria-label="Board copy and export options">
+        <label className="simple-copy-field">
+          <span>What should the fonts say?</span>
+          <textarea
+            value={copy}
+            onChange={(event) => dispatch({ type: "set-copy-override", copy: event.target.value })}
+            placeholder="Your Headline"
+            spellCheck={false}
+            rows={2}
+          />
+        </label>
+        <div className="simple-options">
+          <label title="Temporarily swaps your copy for characters, numerals, currency, and punctuation.">
+            <input type="checkbox" checked={stressTest} onChange={(event) => onStressTestChange(event.target.checked)} />
+            <span><strong>Stress test</strong><small>{SIMPLE_STRESS_COPY}</small></span>
+          </label>
+          <label>
+            <input type="checkbox" checked={includeIndex} onChange={(event) => onIncludeIndexChange(event.target.checked)} />
+            <span><strong>Index pages</strong><small>12 fonts per page</small></span>
+          </label>
+          <label title="Copies the original source font files into the export folder.">
+            <input type="checkbox" checked={includeSources} onChange={(event) => onIncludeSourcesChange(event.target.checked)} />
+            <span><strong>Copy source fonts</strong><small>I have permission to share them</small></span>
+          </label>
+        </div>
+        <div className="simple-fit-policy" role="radiogroup" aria-labelledby="simple-fit-policy-heading">
+          <p id="simple-fit-policy-heading">Comparison sizing</p>
+          {FIT_POLICIES.map((policy) => (
+            <label key={policy}>
+              <input type="radio" name="simple-fit-policy" value={policy} checked={fitPolicy === policy} onChange={() => onFitPolicyChange(policy)} />
+              <span><strong>{policyLabels[policy].label}</strong><small>{policyLabels[policy].detail}</small></span>
+            </label>
+          ))}
+        </div>
+      </section>
+
+      {!candidates.length ? (
+        <button type="button" className="simple-empty-drop" onClick={actions.importSources}>
+          <span aria-hidden="true">Aa</span>
+          <strong>Add font files or a folder</strong>
+          <small>OTF · TTF · WOFF · WOFF2 · collections stay metadata-only</small>
+        </button>
+      ) : (
+        <>
+          <section className="simple-pages-section" aria-labelledby="simple-pages-heading">
+            <div className="simple-section-heading">
+              <div><p className="section-kicker">01 · Boards</p><h2 id="simple-pages-heading">Your boards. Already made.</h2></div>
+              <button type="button" className="primary-button has-icon" disabled={!included.length || !capabilities?.transactionalHandoff} onClick={() => actions.exportBoards(includeSources)}><InterfaceIcon name="export" />Export {boards.length + indexPages.length} pages…</button>
+            </div>
+            <div className="simple-page-list">
+              {boards.map((board, boardIndex) => (
+                <article className="simple-page-wrap" key={`board-${boardIndex}`}>
+                  <header><strong>Board {String(boardIndex + 1).padStart(2, "0")}</strong><span>{board.map((candidate) => String(included.indexOf(candidate) + 1).padStart(2, "0")).join(" · ")} · 5152 × 2160 export</span></header>
+                  <div className="simple-board" aria-label={`Board ${boardIndex + 1}`}>
+                    {Array.from({ length: 4 }, (_, slot) => {
+                      const candidate = board[slot];
+                      const palette = SIMPLE_QUADRANTS[slot];
+                      return (
+                        <div className="simple-quadrant" key={slot} style={{ "--quadrant-bg": palette.background, "--quadrant-ink": palette.text } as CSSProperties}>
+                          {candidate ? (
+                            <>
+                              <SimpleCandidateCopy session={session} candidate={candidate} fontStates={fontStates} stressTest={stressTest} className="simple-quadrant-copy" fit="board" policy={fitPolicy} />
+                              <span>{String(included.indexOf(candidate) + 1).padStart(2, "0")} · {sourceForCandidate(session.document, candidate).hint.fileName}</span>
+                            </>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </article>
+              ))}
+              {indexPages.map((page, pageIndex) => (
+                <article className="simple-page-wrap" key={`index-${pageIndex}`}>
+                  <header><strong>Index {pageIndex + 1} / {indexPages.length}</strong><span>{page.length} fonts · 5152 × 2160 export</span></header>
+                  <div className="simple-index-board" aria-label={`Index page ${pageIndex + 1}`}>
+                    {page.map((candidate) => {
+                      const face = faceForCandidate(session.document, candidate);
+                      return (
+                        <div className="simple-index-cell" key={candidate.id}>
+                          <span>{String(included.indexOf(candidate) + 1).padStart(2, "0")} · {face.family}</span>
+                          <SimpleCandidateCopy session={session} candidate={candidate} fontStates={fontStates} stressTest={stressTest} className="simple-index-copy" fit="index" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="simple-font-section" aria-labelledby="simple-fonts-heading">
+            <div className="simple-section-heading">
+              <div><p className="section-kicker">02 · Fonts</p><h2 id="simple-fonts-heading">Tune only when you need to.</h2></div>
+              <div className="simple-section-actions">
+                {showFontControls ? <button type="button" className="quiet-button" onClick={() => setAll("keep")}>Include all</button> : null}
+                {showFontControls ? <button type="button" className="quiet-button" onClick={() => setAll("reject")}>Skip all</button> : null}
+                <button type="button" className="quiet-button has-icon" aria-expanded={showFontControls} onClick={() => setShowFontControls((current) => !current)}><InterfaceIcon name="tune" />{showFontControls ? "Done tuning" : `Tune ${candidates.length} fonts`}</button>
+              </div>
+            </div>
+            {showFontControls ? (
+              <div className="simple-font-grid">
+                {candidates.map((candidate, candidateIndex) => {
+                  const face = faceForCandidate(session.document, candidate);
+                  const source = sourceForCandidate(session.document, candidate);
+                  const skipped = candidate.reviewState === "reject";
+                  return (
+                    <article
+                      className={`simple-font-card ${skipped ? "is-skipped" : ""}`}
+                      key={candidate.id}
+                      draggable
+                      onDragStart={() => setDraggedCandidateId(candidate.id)}
+                      onDragEnd={() => setDraggedCandidateId(undefined)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => {
+                        if (!draggedCandidateId || draggedCandidateId === candidate.id) return;
+                        dispatch({ type: "move-candidate", candidateId: draggedCandidateId, toIndex: candidateIndex });
+                        setDraggedCandidateId(undefined);
+                      }}
+                    >
+                      <header>
+                        <span className="simple-font-number">{String(candidateIndex + 1).padStart(2, "0")}</span>
+                        <span><strong>{face.family}</strong><small>{source.hint.fileName} · {candidate.label}</small></span>
+                        <span className="simple-drag-label">Drag to reorder</span>
+                      </header>
+                      <button type="button" className="simple-font-preview" onClick={() => openCandidatePreview(candidate.id)} aria-label={`Preview ${face.family} full size`}>
+                        <SimpleCandidateCopy session={session} candidate={candidate} fontStates={fontStates} stressTest={stressTest} className="simple-card-copy" fit="card" />
+                        <span>Preview full size</span>
+                      </button>
+                      <div className="simple-casing" role="group" aria-label={`Casing for ${face.family}`}>
+                        {TEXT_CASINGS.map((casing) => (
+                          <button
+                            type="button"
+                            key={casing}
+                            className={candidate.casing === casing ? "is-active" : ""}
+                            aria-pressed={candidate.casing === casing}
+                            onClick={() => dispatch({ type: "edit-candidate", candidateId: candidate.id, patch: { casing } })}
+                          >{simpleCasingLabels[casing]}</button>
+                        ))}
+                      </div>
+                      {face.axes.length ? (
+                        <div className="simple-axes">
+                          {face.axes.map((axis) => {
+                            const value = candidate.axes.find((item) => item.tag === axis.tag)?.value ?? axis.defaultValue;
+                            return (
+                              <label key={axis.tag}>
+                                <span><strong>{axis.tag}</strong><output>{Math.round(value)}</output></span>
+                                <input type="range" min={axis.minimum} max={axis.maximum} step={(axis.maximum - axis.minimum) / 200 || 1} value={value} onChange={(event) => dispatch({ type: "set-axis", candidateId: candidate.id, tag: axis.tag, value: Number(event.target.value) })} />
+                              </label>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                      <footer>
+                        <div className="simple-decision" role="group" aria-label={`Board inclusion for ${face.family}`}>
+                          <button type="button" className={!skipped ? "is-active" : ""} aria-pressed={!skipped} onClick={() => dispatch({ type: "set-review-state", candidateIds: [candidate.id], reviewState: "keep" })}>Include</button>
+                          <button type="button" className={skipped ? "is-active is-reject" : ""} aria-pressed={skipped} onClick={() => dispatch({ type: "set-review-state", candidateIds: [candidate.id], reviewState: "reject" })}>Skip</button>
+                        </div>
+                        <div className="simple-order" role="group" aria-label={`Order ${face.family}`}>
+                          <button type="button" disabled={candidateIndex === 0} onClick={() => dispatch({ type: "move-candidate", candidateId: candidate.id, toIndex: candidateIndex - 1 })}>Earlier</button>
+                          <button type="button" disabled={candidateIndex === candidates.length - 1} onClick={() => dispatch({ type: "move-candidate", candidateId: candidate.id, toIndex: candidateIndex + 1 })}>Later</button>
+                          <button type="button" className="remove-font" onClick={() => dispatch({ type: "remove-candidate", candidateId: candidate.id })}>Remove</button>
+                        </div>
+                      </footer>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <button type="button" className="simple-font-summary" onClick={() => setShowFontControls(true)}>
+                <span>{String(candidates.length).padStart(2, "0")}</span>
+                <span><strong>{included.length} included · {candidates.length - included.length} skipped</strong><small>Casing, variable axes, order, and inclusion are tucked away until you ask.</small></span>
+                <span>Open controls →</span>
+              </button>
+            )}
+          </section>
+        </>
+      )}
+
+      {previewCandidate ? (
+        <div className="simple-preview-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeCandidatePreview(); }}>
+          <section ref={previewDialogRef} className="simple-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="simple-preview-heading" tabIndex={-1}>
+            <header><span><strong id="simple-preview-heading">{faceForCandidate(session.document, previewCandidate).family}</strong><small>{sourceForCandidate(session.document, previewCandidate).hint.fileName}</small></span><button ref={previewCloseRef} type="button" className="quiet-button" onClick={closeCandidatePreview}>Close</button></header>
+            <SimpleCandidateCopy session={session} candidate={previewCandidate} fontStates={fontStates} stressTest={stressTest} className="simple-focus-copy" fit="focus" />
+          </section>
+        </div>
+      ) : null}
+
+      {showInstalledCatalog ? (
+        <div className="simple-catalog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) { setSelectedInstalledFamilyKey(undefined); setShowInstalledCatalog(false); } }}>
+          <section ref={installedDialogRef} className="simple-catalog-dialog" role="dialog" aria-modal="true" aria-labelledby="simple-catalog-heading">
+            <header>
+              <div><p className="section-kicker">Local font library</p><h2 id="simple-catalog-heading">Choose installed fonts.</h2><p>{catalog.total} matches · {catalog.indexed} indexed{catalog.truncated ? " · 10,000 limit" : ""}</p></div>
+              <button type="button" className="quiet-button" onClick={() => { setSelectedInstalledFamilyKey(undefined); setShowInstalledCatalog(false); }}>Close</button>
+            </header>
+            <form className="simple-catalog-search" onSubmit={(event) => { event.preventDefault(); setSelectedInstalledFamilyKey(undefined); actions.scanInstalled(installedSearch, false, 0, "simple"); }}>
+              <label><span className="sr-only">Search installed fonts</span><input autoFocus type="search" value={installedSearch} onChange={(event) => setInstalledSearch(event.target.value)} placeholder="Search family or style" /></label>
+              <button type="submit" className="primary-button">Search</button>
+              <button type="button" className="quiet-button" onClick={() => { setSelectedInstalledFamilyKey(undefined); actions.scanInstalled(installedSearch, true, 0, "simple"); }}>Rebuild</button>
+              {catalogBusy ? <button type="button" className="quiet-button" onClick={actions.cancelCatalog}>Cancel scan</button> : null}
+            </form>
+            <div className={`simple-catalog-results ${selectedInstalledGroup ? "is-family-detail" : ""}`} aria-label="Installed fonts">
+              {selectedInstalledGroup ? (() => {
+                const available = selectedInstalledGroup.items.filter((item) => !studySourceIds.has(item.source.id));
+                const styleCount = selectedInstalledGroup.items.reduce((count, item) => count + item.faces.length, 0);
+                return (
+                  <section className="simple-catalog-family-detail" aria-labelledby="simple-catalog-family-heading">
+                    <header>
+                      <button ref={installedFamilyBackRef} type="button" className="quiet-button" onClick={returnToInstalledFamilies}>← All families</button>
+                      <div><p className="section-kicker">Choose styles</p><h3 id="simple-catalog-family-heading">{selectedInstalledGroup.label}</h3><p>{styleCount} {styleCount === 1 ? "style" : "styles"}</p></div>
+                      <button type="button" className="primary-button" disabled={!available.length} onClick={() => actions.addCatalogSources(available.map((item) => item.source.id))}>{available.length ? `Add family · ${available.length}` : "Family added"}</button>
+                    </header>
+                    <div className="simple-catalog-style-grid">
+                      {selectedInstalledGroup.items.map((item) => {
+                        const added = studySourceIds.has(item.source.id);
+                        const styles = item.faces.map((face) => face.style).join(" · ");
+                        return <section key={item.source.id}><span><strong>{item.source.displayName}</strong><small>{styles || item.source.hint.format}</small></span><button type="button" disabled={added} onClick={() => actions.addCatalogSources([item.source.id])}>{added ? "Added" : "Add"}</button></section>;
+                      })}
+                    </div>
+                  </section>
+                );
+              })() : installedGroups.map((group) => {
+                const available = group.items.filter((item) => !studySourceIds.has(item.source.id));
+                const styleCount = group.items.reduce((count, item) => count + item.faces.length, 0);
+                return (
+                  <article className="simple-catalog-family" key={group.key}>
+                    <header><span><strong>{group.label}</strong><small>{styleCount} {styleCount === 1 ? "style" : "styles"}</small></span><div><button type="button" className="quiet-button" data-family-key={group.key} onClick={() => setSelectedInstalledFamilyKey(group.key)}>Choose styles</button><button type="button" className="quiet-button" disabled={!available.length} onClick={() => actions.addCatalogSources(available.map((item) => item.source.id))}>{available.length ? `Add family · ${available.length}` : "Added"}</button></div></header>
+                  </article>
+                );
+              })}
+              {!catalogBusy && !installedGroups.length ? <p className="simple-catalog-empty">No installed fonts match. Try a broader family or style name.</p> : null}
+            </div>
+            <footer>
+              <button type="button" className="quiet-button" disabled={catalog.cursor === 0} onClick={() => { setSelectedInstalledFamilyKey(undefined); actions.scanInstalled(catalog.query, false, Math.max(0, catalog.cursor - 80), "simple"); }}>Previous</button>
+              <span>{catalog.total ? `${catalog.cursor + 1}–${Math.min(catalog.cursor + catalog.imports.length, catalog.total)} of ${catalog.total}` : "0 results"}</span>
+              <button type="button" className="quiet-button" disabled={catalog.nextCursor === undefined} onClick={() => { setSelectedInstalledFamilyKey(undefined); actions.scanInstalled(catalog.query, false, catalog.nextCursor, "simple"); }}>Next</button>
+            </footer>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -151,6 +729,8 @@ interface NavigatorProps {
 
 export function Navigator({ session, dispatch, actions, mode, onModeChange, catalog, catalogBusy }: NavigatorProps) {
   const [catalogSearch, setCatalogSearch] = useState(catalog.query);
+  const [selectedCatalogFamilyKey, setSelectedCatalogFamilyKey] = useState<string>();
+  const catalogFamilyBackRef = useRef<HTMLButtonElement>(null);
   const deferredSearch = useDeferredValue(session.workspace.search.trim().toLocaleLowerCase());
   const visibleCandidates = useMemo(() => {
     const reviewFilter = session.workspace.reviewFilter;
@@ -169,7 +749,33 @@ export function Navigator({ session, dispatch, actions, mode, onModeChange, cata
   const catalogGroups = useMemo(() => {
     return groupByFamily(catalog.imports, (imported) => imported.faces[0]?.family ?? imported.source.displayName);
   }, [catalog.imports]);
+  const selectedCatalogGroup = catalogGroups.find((group) => group.key === selectedCatalogFamilyKey);
   const studySourceIds = useMemo(() => new Set(session.document.sources.map((source) => source.id)), [session.document.sources]);
+
+  const returnToCatalogFamilies = () => {
+    const familyKey = selectedCatalogFamilyKey;
+    setSelectedCatalogFamilyKey(undefined);
+    requestAnimationFrame(() => {
+      [...document.querySelectorAll<HTMLButtonElement>(".catalog-family-card [data-family-key]")]
+        .find((button) => button.dataset.familyKey === familyKey)
+        ?.focus();
+    });
+  };
+
+  useEffect(() => {
+    if (mode !== "catalog" || !selectedCatalogFamilyKey) return;
+    const focusTimer = setTimeout(() => catalogFamilyBackRef.current?.focus(), 0);
+    const closeDetail = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      returnToCatalogFamilies();
+    };
+    window.addEventListener("keydown", closeDetail);
+    return () => {
+      clearTimeout(focusTimer);
+      window.removeEventListener("keydown", closeDetail);
+    };
+  }, [mode, selectedCatalogFamilyKey]);
 
   return (
     <aside className="catalog" aria-label="Study navigation">
@@ -223,28 +829,38 @@ export function Navigator({ session, dispatch, actions, mode, onModeChange, cata
 
       {mode === "catalog" ? (
         <div className="installed-catalog">
-          <form className="catalog-tools catalog-search" onSubmit={(event) => { event.preventDefault(); actions.scanInstalled(catalogSearch); }}>
+          <form className="catalog-tools catalog-search" onSubmit={(event) => { event.preventDefault(); setSelectedCatalogFamilyKey(undefined); actions.scanInstalled(catalogSearch); }}>
             <label><span className="sr-only">Search installed fonts</span><input type="search" value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder="Search installed fonts" /></label>
-            <div><button type="submit" className="quiet-button">Search</button><button type="button" className="text-button" onClick={() => actions.scanInstalled(catalogSearch, true)}>Rebuild</button>{catalogBusy ? <button type="button" className="text-button" onClick={actions.cancelCatalog}>Cancel</button> : null}</div>
+            <div><button type="submit" className="quiet-button">Search</button><button type="button" className="text-button" onClick={() => { setSelectedCatalogFamilyKey(undefined); actions.scanInstalled(catalogSearch, true); }}>Rebuild</button>{catalogBusy ? <button type="button" className="text-button" onClick={actions.cancelCatalog}>Cancel</button> : null}</div>
           </form>
           <p className="catalog-summary" role="status">{catalog.total} {catalog.total === 1 ? "match" : "matches"} · {catalog.indexed} indexed{catalog.truncated ? " · 10,000 limit" : ""}</p>
           <div className="catalog-results" aria-label="Installed font Catalog">
-            {catalogGroups.map((group) => {
+            {selectedCatalogGroup ? (() => {
+              const family = selectedCatalogGroup.label;
+              const imports = selectedCatalogGroup.items;
+              const available = imports.filter((item) => !studySourceIds.has(item.source.id));
+              const styleCount = imports.reduce((count, item) => count + item.faces.length, 0);
+              return <section className="catalog-family-detail" aria-label={`${family} installed family styles`}>
+                <header><button ref={catalogFamilyBackRef} type="button" className="quiet-button" onClick={returnToCatalogFamilies}>← All families</button><span><strong>{family}</strong><small>{styleCount} {styleCount === 1 ? "style" : "styles"}</small></span><button type="button" className="primary-button" aria-label={`Add ${family} family to Study`} disabled={!available.length} onClick={() => actions.addCatalogSources(available.map((item) => item.source.id))}>{available.length ? `Add family · ${styleCount}` : "Family added"}</button></header>
+                <div className="catalog-style-list">{imports.map((item) => {
+                  const added = studySourceIds.has(item.source.id);
+                  const styles = item.faces.map((face) => face.style).join(" · ");
+                  return <article className="catalog-source" key={item.source.id}><span><strong>{item.source.displayName}</strong><small>{styles || item.source.hint.format}{item.faces.some((face) => face.axes.length) ? " · Variable" : " · Static"}</small></span><button type="button" disabled={added} aria-label={`${added ? "In Study" : "Add"} ${item.source.displayName}`} onClick={() => actions.addCatalogSources([item.source.id])}>{added ? "Added" : "Add"}</button></article>;
+                })}</div>
+              </section>;
+            })() : catalogGroups.map((group) => {
               const family = group.label;
               const imports = group.items;
               const available = imports.filter((item) => !studySourceIds.has(item.source.id));
-              return <section className="catalog-family" aria-label={`${family} installed family`} key={group.key}>
-                <div className="catalog-family-heading"><span><strong>{family}</strong><small>{imports.reduce((count, item) => count + item.faces.length, 0)} Faces · {group.confidence === "exact-metadata" ? "exact metadata" : "normalized metadata"}</small></span><button type="button" className="quiet-button" aria-label={`Add ${family} family to Study`} disabled={!available.length} onClick={() => actions.addCatalogSources(available.map((item) => item.source.id))}>Add family</button></div>
-                {imports.map((item) => {
-                  const added = studySourceIds.has(item.source.id);
-                  const styles = item.faces.map((face) => face.style).slice(0, 3).join(" · ");
-                  return <article className="catalog-source" key={item.source.id}><span><strong>{item.source.displayName}</strong><small>{styles || item.source.hint.format}{item.faces.some((face) => face.axes.length) ? " · Variable" : " · Static"}</small></span><button type="button" disabled={added} aria-label={`${added ? "In Study" : "Add"} ${item.source.displayName}`} onClick={() => actions.addCatalogSources([item.source.id])}>{added ? "Added" : "Add"}</button></article>;
-                })}
+              const styleCount = imports.reduce((count, item) => count + item.faces.length, 0);
+              return <section className="catalog-family-card" aria-label={`${family} installed family`} key={group.key}>
+                <span><strong>{family}</strong><small>{styleCount} {styleCount === 1 ? "style" : "styles"}</small></span>
+                <div><button type="button" className="quiet-button" data-family-key={group.key} onClick={() => setSelectedCatalogFamilyKey(group.key)}>Choose styles</button><button type="button" className="quiet-button" aria-label={`Add ${family} family to Study`} disabled={!available.length} onClick={() => actions.addCatalogSources(available.map((item) => item.source.id))}>{available.length ? `Add family · ${styleCount}` : "Added"}</button></div>
               </section>;
             })}
             {!catalog.indexed ? <p className="empty-note">Open the Host-local Catalog to index installed fonts.</p> : catalogGroups.length === 0 ? <p className="empty-note">No installed fonts match this search.</p> : null}
           </div>
-          <div className="catalog-pagination"><button type="button" className="quiet-button" disabled={catalog.cursor === 0} onClick={() => actions.scanInstalled(catalog.query, false, Math.max(0, catalog.cursor - 80))}>Previous</button><span>{catalog.total ? `${catalog.cursor + 1}–${Math.min(catalog.cursor + catalog.imports.length, catalog.total)} of ${catalog.total}` : "0 results"}</span><button type="button" className="quiet-button" disabled={catalog.nextCursor === undefined} onClick={() => actions.scanInstalled(catalog.query, false, catalog.nextCursor)}>Next</button></div>
+          <div className="catalog-pagination"><button type="button" className="quiet-button" disabled={catalog.cursor === 0} onClick={() => { setSelectedCatalogFamilyKey(undefined); actions.scanInstalled(catalog.query, false, Math.max(0, catalog.cursor - 80)); }}>Previous</button><span>{catalog.total ? `${catalog.cursor + 1}–${Math.min(catalog.cursor + catalog.imports.length, catalog.total)} of ${catalog.total}` : "0 results"}</span><button type="button" className="quiet-button" disabled={catalog.nextCursor === undefined} onClick={() => { setSelectedCatalogFamilyKey(undefined); actions.scanInstalled(catalog.query, false, catalog.nextCursor); }}>Next</button></div>
         </div>
       ) : null}
 
@@ -314,6 +930,8 @@ interface WorkspaceProps {
   readonly headingRef: RefObject<HTMLHeadingElement | null>;
   readonly actions: AppActions;
   readonly capabilities?: HostCapabilities;
+  readonly comparisonPolicy: FitPolicy;
+  readonly onComparisonPolicyChange: (policy: FitPolicy) => void;
 }
 
 function ReviewWorkspace({ session, dispatch, fontStates, headingRef }: WorkspaceProps) {
@@ -361,7 +979,7 @@ function ReviewWorkspace({ session, dispatch, fontStates, headingRef }: Workspac
                   <span className="specimen-card-meta"><strong>{candidateFace.family}</strong><small>{candidate.label}</small></span>
                 </button>
                 <div className="card-actions" role="group" aria-label={`Review ${candidateFace.family} ${candidate.label}`}>
-                  {REVIEW_STATES.map((reviewState) => <button type="button" key={reviewState} className={candidate.reviewState === reviewState ? "is-active" : ""} aria-label={`${reviewLabels[reviewState]} ${candidateFace.family} ${candidate.label}`} aria-pressed={candidate.reviewState === reviewState} onClick={() => dispatch({ type: "set-review-state", candidateIds: [candidate.id], reviewState })}>{reviewGlyphs[reviewState]}</button>)}
+                  {REVIEW_STATES.map((reviewState) => <button type="button" key={reviewState} className={candidate.reviewState === reviewState ? "is-active" : ""} aria-label={`${reviewLabels[reviewState]} ${candidateFace.family} ${candidate.label}`} aria-pressed={candidate.reviewState === reviewState} onClick={() => dispatch({ type: "set-review-state", candidateIds: [candidate.id], reviewState })}><span aria-hidden="true">{reviewGlyphs[reviewState]}</span><small>{reviewLabels[reviewState]}</small></button>)}
                 </div>
               </article>
             );
@@ -393,20 +1011,17 @@ function ReviewWorkspace({ session, dispatch, fontStates, headingRef }: Workspac
   );
 }
 
-function fittedSize(recipe: Recipe, copy: string): number {
-  if (!copy.trim()) return recipe.size;
-  const longestLine = Math.max(...copy.split("\n").map((line) => line.length));
-  return Math.max(12, Math.min(recipe.size, 780 / Math.max(6, longestLine * 0.52)));
-}
-
-function CompareWorkspace({ session, dispatch, fontStates, headingRef }: WorkspaceProps) {
+function CompareWorkspace({ session, dispatch, fontStates, headingRef, comparisonPolicy: policy, onComparisonPolicyChange }: WorkspaceProps) {
   const recipe = activeRecipe(session);
   const activeSet = session.workspace.activeComparisonId
     ? session.document.comparisonSets.find((set) => set.id === session.workspace.activeComparisonId)
     : undefined;
-  const [policy, setPolicy] = useState<FitPolicy>(activeSet?.policy ?? "nominal");
   const [blind, setBlind] = useState(activeSet?.blind ?? false);
   const [revealed, setRevealed] = useState(activeSet?.revealed ?? false);
+  useEffect(() => {
+    setBlind(activeSet?.blind ?? false);
+    setRevealed(activeSet?.revealed ?? false);
+  }, [activeSet?.blind, activeSet?.id, activeSet?.revealed]);
   const candidates = session.workspace.trayIds.map((id) => session.document.candidates.find((candidate) => candidate.id === id)).filter((candidate): candidate is Candidate => Boolean(candidate));
   const copy = session.workspace.copyOverride ?? recipe.copy;
   const move = (index: number, delta: number) => {
@@ -436,7 +1051,7 @@ function CompareWorkspace({ session, dispatch, fontStates, headingRef }: Workspa
       <div className="workspace-heading-row"><div><p className="section-kicker">Decision surface · {candidates.length}/4</p><h1 id="workspace-heading" ref={headingRef} tabIndex={-1}>{activeSet?.name ?? "Unsaved comparison"}</h1></div><button type="button" className="quiet-button" onClick={save} disabled={candidates.length < 2}>Save set</button></div>
       <div className="compare-toolbar">
         <div className="policy-control" role="radiogroup" aria-label="Comparison policy">
-          {FIT_POLICIES.map((item) => <label key={item}><input type="radio" name="fit-policy" value={item} checked={policy === item} onChange={() => setPolicy(item)} /><span><strong>{policyLabels[item].label}</strong><small>{policyLabels[item].detail}</small></span></label>)}
+          {FIT_POLICIES.map((item) => <label key={item}><input type="radio" name="fit-policy" value={item} checked={policy === item} onChange={() => onComparisonPolicyChange(item)} /><span><strong>{policyLabels[item].label}</strong><small>{policyLabels[item].detail}</small></span></label>)}
         </div>
         <label className="blind-toggle"><input type="checkbox" checked={blind} onChange={(event) => { setBlind(event.target.checked); setRevealed(false); }} />Blind comparison</label>
         {blind ? <button type="button" className="quiet-button" onClick={() => setRevealed(true)} disabled={revealed}>{revealed ? "Revealed" : "Reveal identity"}</button> : null}
@@ -446,12 +1061,11 @@ function CompareWorkspace({ session, dispatch, fontStates, headingRef }: Workspa
           {candidates.map((candidate, index) => {
             const face = faceForCandidate(session.document, candidate);
             const hidden = blind && !revealed;
-            const size = policy === "fit" ? fittedSize(recipe, copy) : recipe.size;
             return (
               <article className="compare-card" key={candidate.id}>
                 <div className="compare-meta"><strong>{hidden ? `Candidate ${String.fromCharCode(65 + index)}` : face.family}</strong><span>{hidden ? "Identity hidden" : candidate.label}</span></div>
-                <Specimen className="compare-copy" session={session} candidate={candidate} recipe={recipe} fontStates={fontStates} fittedSize={size} label={`${hidden ? `Candidate ${String.fromCharCode(65 + index)}` : `${face.family} ${candidate.label}`}. ${policyLabels[policy].label}. ${Math.round(size)} pixels.`} />
-                <div className="compare-footer"><span>{Math.round(size)} px · {policyLabels[policy].label}</span><span className="reorder-buttons"><button type="button" aria-label={`Move ${hidden ? `Candidate ${String.fromCharCode(65 + index)}` : `${face.family} ${candidate.label}`} left`} onClick={() => move(index, -1)} disabled={index === 0}>←</button><button type="button" aria-label={`Move ${hidden ? `Candidate ${String.fromCharCode(65 + index)}` : `${face.family} ${candidate.label}`} right`} onClick={() => move(index, 1)} disabled={index === candidates.length - 1}>→</button><button type="button" aria-label={`Remove ${hidden ? `Candidate ${String.fromCharCode(65 + index)}` : `${face.family} ${candidate.label}`} from comparison`} onClick={() => dispatch({ type: "toggle-tray", candidateId: candidate.id })}>Remove</button></span></div>
+                {policy === "nominal" ? <Specimen className="compare-copy" session={session} candidate={candidate} recipe={recipe} fontStates={fontStates} fittedSize={recipe.size} label={`${hidden ? `Candidate ${String.fromCharCode(65 + index)}` : `${face.family} ${candidate.label}`}. ${policyLabels[policy].label}.`} /> : <SimpleCandidateCopy className="compare-copy" session={session} candidate={candidate} fontStates={fontStates} stressTest={false} fit="compare" policy={policy} label={`${hidden ? `Candidate ${String.fromCharCode(65 + index)}` : `${face.family} ${candidate.label}`}. ${policyLabels[policy].label}.`} />}
+                <div className="compare-footer"><span>{policyLabels[policy].label}</span><span className="reorder-buttons"><button type="button" aria-label={`Move ${hidden ? `Candidate ${String.fromCharCode(65 + index)}` : `${face.family} ${candidate.label}`} left`} onClick={() => move(index, -1)} disabled={index === 0}>←</button><button type="button" aria-label={`Move ${hidden ? `Candidate ${String.fromCharCode(65 + index)}` : `${face.family} ${candidate.label}`} right`} onClick={() => move(index, 1)} disabled={index === candidates.length - 1}>→</button><button type="button" aria-label={`Remove ${hidden ? `Candidate ${String.fromCharCode(65 + index)}` : `${face.family} ${candidate.label}`} from comparison`} onClick={() => dispatch({ type: "toggle-tray", candidateId: candidate.id })}>Remove</button></span></div>
               </article>
             );
           })}
@@ -552,7 +1166,7 @@ export function Inspector({ session, dispatch, fontStates, actions, blindIdentit
       {face.namedInstances.length ? <label className="field-label"><span>Named instance</span><select value="" onChange={(event) => { const instance = face.namedInstances.find((item) => item.name === event.target.value); instance?.coordinates.forEach((axis) => dispatch({ type: "set-axis", candidateId: candidate.id, tag: axis.tag, value: axis.value })); }}><option value="">Custom</option>{face.namedInstances.map((instance) => <option key={instance.name}>{instance.name}</option>)}</select></label> : null}
       {face.axes.map((axis) => { const value = candidate.axes.find((item) => item.tag === axis.tag)?.value ?? axis.defaultValue; return <label className="axis-control" key={axis.tag}><span><strong>{axis.name}</strong><code>{axis.tag}</code><output>{Math.round(value * 100) / 100}</output></span><input type="range" min={axis.minimum} max={axis.maximum} step={(axis.maximum - axis.minimum) / 200 || 1} value={value} onChange={(event) => dispatch({ type: "set-axis", candidateId: candidate.id, tag: axis.tag, value: Number(event.target.value) })} /><small>{axis.minimum} · default {axis.defaultValue} · {axis.maximum}</small></label>; })}
       {face.features.length ? <fieldset className="feature-list"><legend>OpenType features</legend>{face.features.map((feature) => { const enabled = candidate.features.find((item) => item.tag === feature.tag)?.enabled ?? feature.defaultEnabled; return <label key={feature.tag}><input type="checkbox" checked={enabled} onChange={(event) => dispatch({ type: "set-feature", candidateId: candidate.id, tag: feature.tag, enabled: event.target.checked })} /><span>{feature.name}<code>{feature.tag}</code></span></label>; })}</fieldset> : null}
-      <label className="field-label"><span>Casing</span><select value={candidate.casing} onChange={(event) => dispatch({ type: "edit-candidate", candidateId: candidate.id, patch: { casing: event.target.value as Candidate["casing"] } })}><option value="exact">Exact</option><option value="uppercase">UPPERCASE</option><option value="lowercase">lowercase</option><option value="title">Title Case</option></select></label>
+      <label className="field-label"><span>Casing</span><select value={candidate.casing} onChange={(event) => dispatch({ type: "edit-candidate", candidateId: candidate.id, patch: { casing: event.target.value as Candidate["casing"] } })}><option value="exact">Exact</option><option value="uppercase">UPPERCASE</option><option value="lowercase">lowercase</option><option value="title">Title Case</option><option value="ap-title">AP Title Case</option></select></label>
       <label className="field-label"><span>Tags</span><input value={tags} onChange={(event) => setTags(event.target.value)} onBlur={() => dispatch({ type: "edit-candidate", candidateId: candidate.id, patch: { tags: tags.split(",") } })} placeholder="quiet, editorial" /></label>
       <label className="field-label"><span>Notes</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} onBlur={() => dispatch({ type: "edit-candidate", candidateId: candidate.id, patch: { notes } })} rows={3} /></label>
       <label className="field-label"><span>Rationale</span><textarea value={rationale} onChange={(event) => setRationale(event.target.value)} onBlur={() => dispatch({ type: "edit-candidate", candidateId: candidate.id, patch: { rationale } })} rows={3} /></label>

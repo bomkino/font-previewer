@@ -8,10 +8,11 @@
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
+- Current candidate: `v0.1.0-rc.3`
 - Latest published prerelease: `v0.1.0-rc.2`
-- Current source: the exact source named by that release's `SOURCE_SHA`
+- Current source: ahead of the latest published prerelease; exact release identity awaits main/CI/publication
 - RC, hardening, and pre-Mac implementation: merged into `main`
-- Active product: shared Studio plus macOS AppKit/WKWebView Host and Linux Electron Host
+- Active product: shared Simple + Studio Study plus macOS AppKit/WKWebView Host and Linux Electron Host
 - Preserved reference: root `macos/` SwiftUI/CoreText application
 - Permanent automated gate: `.github/workflows/verify.yml`
 - Public stable release: not claimed
@@ -24,6 +25,6 @@
 - hostile cross-format font containment beyond current automated fixtures;
 - induced WKWebView content-process termination;
 - optional Developer ID signing/notarisation only if a future paid distribution path is deliberately adopted;
-- explicit authorization for any future public release after `v0.1.0-rc.2`.
+- explicit authorization for any future public release after the owner-authorized `v0.1.0-rc.3` task.
 
 Historical status before canonicalisation is preserved at [`../archive/2026-08-27/PROGRAMME_STATUS_PRE_MAIN.md`](../archive/2026-08-27/PROGRAMME_STATUS_PRE_MAIN.md). Old ticket and handover documents remain evidence, not current merge or release instructions.

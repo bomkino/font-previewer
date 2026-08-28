@@ -35,7 +35,7 @@ export type FitPolicy = (typeof FIT_POLICIES)[number];
 export const RECIPE_PACKS = ["film-tv", "advertising", "business", "blank"] as const;
 export type RecipePack = (typeof RECIPE_PACKS)[number];
 
-export const TEXT_CASINGS = ["exact", "uppercase", "lowercase", "title"] as const;
+export const TEXT_CASINGS = ["exact", "uppercase", "lowercase", "title", "ap-title"] as const;
 export type TextCasing = (typeof TEXT_CASINGS)[number];
 
 export const TEXT_DIRECTIONS = ["auto", "ltr", "rtl"] as const;
@@ -247,6 +247,8 @@ export type StudyCommand =
   | { readonly type: "select-candidate"; readonly candidateId?: string }
   | { readonly type: "select-next-unreviewed" }
   | { readonly type: "set-review-state"; readonly candidateIds: readonly string[]; readonly reviewState: ReviewState }
+  | { readonly type: "move-candidate"; readonly candidateId: string; readonly toIndex: number }
+  | { readonly type: "remove-candidate"; readonly candidateId: string }
   | { readonly type: "set-copy-override"; readonly copy?: string }
   | { readonly type: "select-recipe"; readonly recipeId: string }
   | { readonly type: "toggle-tray"; readonly candidateId: string }
@@ -879,6 +881,58 @@ export function applyStudyCommand(session: StudySession, command: StudyCommand):
         ),
       });
     }
+    case "move-candidate": {
+      const currentIndex = document.candidates.findIndex((candidate) => candidate.id === command.candidateId);
+      if (currentIndex < 0) throw new DomainError(`Candidate does not exist: ${command.candidateId}`);
+      if (!Number.isInteger(command.toIndex)) throw new DomainError("Candidate order index must be an integer");
+      const targetIndex = Math.min(document.candidates.length - 1, Math.max(0, command.toIndex));
+      if (targetIndex === currentIndex) return session;
+      const candidates = [...document.candidates];
+      const [candidate] = candidates.splice(currentIndex, 1);
+      candidates.splice(targetIndex, 0, candidate);
+      return updateDocument(session, { candidates });
+    }
+    case "remove-candidate": {
+      const currentIndex = document.candidates.findIndex((candidate) => candidate.id === command.candidateId);
+      const current = candidateById(document, command.candidateId);
+      const candidates = document.candidates.filter((candidate) => candidate.id !== current.id);
+      const faceRetained = candidates.some((candidate) => candidate.faceId === current.faceId);
+      const faces = faceRetained ? document.faces : document.faces.filter((face) => face.id !== current.faceId);
+      const removedFace = document.faces.find((face) => face.id === current.faceId);
+      const sourceRetained = !removedFace || faces.some((face) => face.sourceId === removedFace.sourceId);
+      const sources = sourceRetained
+        ? document.sources
+        : document.sources.filter((source) => source.id !== removedFace.sourceId);
+      const comparisonSets = document.comparisonSets
+        .map((comparison) => ({
+          ...comparison,
+          candidateIds: comparison.candidateIds.filter((candidateId) => candidateId !== current.id),
+        }))
+        .filter((comparison) => comparison.candidateIds.length >= 2);
+      const comparisonIds = new Set(comparisonSets.map((comparison) => comparison.id));
+      const typographySystems = document.typographySystems.map((system) => ({
+        ...system,
+        fontUses: system.fontUses.filter((fontUse) =>
+          fontUse.originatingCandidateId !== current.id && (faceRetained || fontUse.faceId !== current.faceId),
+        ),
+      }));
+      const updated = updateDocument(session, { candidates, faces, sources, comparisonSets, typographySystems });
+      const selected = candidates[Math.min(currentIndex, Math.max(0, candidates.length - 1))];
+      return {
+        ...updated,
+        bindings: sourceRetained || !removedFace
+          ? updated.bindings
+          : updated.bindings.filter((binding) => binding.sourceId !== removedFace.sourceId),
+        workspace: {
+          ...updated.workspace,
+          selectedCandidateId: workspace.selectedCandidateId === current.id ? selected?.id : workspace.selectedCandidateId,
+          trayIds: workspace.trayIds.filter((candidateId) => candidateId !== current.id),
+          activeComparisonId: workspace.activeComparisonId && comparisonIds.has(workspace.activeComparisonId)
+            ? workspace.activeComparisonId
+            : undefined,
+        },
+      };
+    }
     case "set-copy-override":
       return updateWorkspace(session, { copyOverride: command.copy?.slice(0, MAX_COPY_LENGTH) });
     case "select-recipe":
@@ -1436,7 +1490,20 @@ export function transformedCopy(copy: string, casing: TextCasing): string {
     case "lowercase":
       return copy.toLocaleLowerCase();
     case "title":
-      return copy.replace(/\b\p{L}/gu, (letter) => letter.toLocaleUpperCase());
+      return copy.toLocaleLowerCase().replace(/\b\p{L}/gu, (letter) => letter.toLocaleUpperCase());
+    case "ap-title": {
+      const minorWords = new Set(["a", "an", "and", "at", "but", "by", "for", "in", "nor", "of", "on", "or", "so", "the", "to", "up", "yet"]);
+      const tokens = copy.split(/(\s+)/u);
+      const wordIndices = tokens.flatMap((token, index) => token.trim() ? [index] : []);
+      const first = wordIndices[0];
+      const last = wordIndices.at(-1);
+      return tokens.map((token, index) => {
+        if (!token.trim()) return token;
+        const lower = token.toLocaleLowerCase();
+        if (index !== first && index !== last && minorWords.has(lower)) return lower;
+        return lower.replace(/^\p{L}/u, (letter) => letter.toLocaleUpperCase());
+      }).join("");
+    }
     case "exact":
       return copy;
   }

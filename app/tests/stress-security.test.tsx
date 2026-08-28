@@ -44,6 +44,7 @@ const actions: AppActions = {
   openStudy: noOp,
   saveStudy: noOp,
   exportHandoff: noOp,
+  exportBoards: noOp,
   relinkSource: noOp,
   revealSource: noOp,
   newStudy: noOp,
@@ -69,6 +70,8 @@ test("100-card Review surface remains path-free and structurally complete", (con
       fontStates={new Map()}
       headingRef={{ current: null }}
       actions={actions}
+      comparisonPolicy="fit"
+      onComparisonPolicyChange={noOp}
     />,
   );
 

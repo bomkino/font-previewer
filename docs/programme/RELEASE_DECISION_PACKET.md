@@ -4,10 +4,10 @@
 
 - `main` is canonical and contains the merged RC, hardening, and pre-Mac implementation.
 - Source version remains `0.1.0`.
-- The current prerelease tag is `v0.1.0-rc.2`.
-- The prior `v0.1.0-rc.1` remains fixed to `6ae51f5618387e1e4e39f4816f797da35aaee57b` with its original assets.
+- The current release candidate is `v0.1.0-rc.3`; the latest already-published prerelease is `v0.1.0-rc.2`.
+- Published `v0.1.0-rc.1` and `v0.1.0-rc.2` remain immutable with their original assets.
 - No stable release is approved or claimed.
-- The owner explicitly authorized exact-green-main publication of `v0.1.0-rc.2`; that authorization does not extend to later releases.
+- The owner explicitly authorized exact-green-main publication of `v0.1.0-rc.3` in this task; that authorization does not extend to later releases.
 
 The prior owner decision that authorized the first prerelease while work remained isolated on an RC branch is preserved unchanged at [`../archive/2026-08-27/RELEASE_DECISION_PACKET_PRE_MAIN.md`](../archive/2026-08-27/RELEASE_DECISION_PACKET_PRE_MAIN.md). Its branch instructions are historical and do not override current `main`.
 
@@ -15,7 +15,7 @@ The prior owner decision that authorized the first prerelease while work remaine
 
 | Area | Current decision |
 |---|---|
-| UI/renderer | Shared semantic Studio; WKWebView/CoreText on Mac and Chromium on Linux; no raster-parity claim |
+| UI/renderer | Shared Simple + Studio session; WKWebView/CoreText on Mac and Chromium on Linux; no raster-parity claim |
 | Formats | Full preview for OTF/TTF/WOFF/WOFF2; metadata-only TTC/OTC/DFONT |
 | Linux variables | Axes and named instances required; parsed in a bounded child process |
 | Durability | Host recovery mirror plus explicit Save |

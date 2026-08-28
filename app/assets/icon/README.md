@@ -10,6 +10,6 @@ The icon is one pitch.dog editorial visual poem: a coral loupe passes over one l
 
 The candidate was generated on 2026-08-28 from the project-specific `pitchdog-illustration` visual law using owner-authorized pitch.dog reference art. The master was inspected at full size and at 256, 64, 32, and 16 px. Responsive files are deterministic crops/resizes of the same promoted pixels, stripped to opaque sRGB.
 
-Status: agent-checked and promoted for `v0.1.0-rc.2`; not described as separately owner-accepted. The generated source remains preserved outside the public package. No reference image, private path, prompt, generation ID, EXIF, or restricted source material is embedded in these assets.
+Status: agent-checked, introduced in `v0.1.0-rc.2`, and retained for the `v0.1.0-rc.3` interface rebuild; not described as separately owner-accepted. The generated source remains preserved outside the public package. No reference image, private path, prompt, generation ID, EXIF, or restricted source material is embedded in these assets.
 
 Alt text when the illustration itself carries meaning: “A coral magnifying glass changes a lowercase a from sans to serif inside the lens.” In the application titlebar it is decorative because the adjacent text names Font Previewer.

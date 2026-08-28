@@ -1,17 +1,31 @@
 # Font Previewer application
 
-This directory contains the active shared Studio and the two desktop Hosts. The root `macos/` directory is a preserved native reference, not this application.
+This directory contains the active shared Simple + Studio renderer and the two desktop Hosts. The root `macos/` directory is a preserved native reference, not this application.
 
 ## Layout
 
-- `src/` — React/TypeScript Studio, Study v4 domain, Family Groups, runtime font registry, and HostBridge protocol.
+- `src/` — React/TypeScript Simple + Studio views, shared Study v4 domain, four-up renderer, Family Groups, runtime font registry, and HostBridge protocol.
 - `electron/` — sandboxed Linux Host, bounded font inspection, transactional Handoff, storage, preload, and displayed evidence runner.
 - `macos/FontPreviewerHost.swift` — AppKit/WKWebView Host with CoreText discovery, native menus/panels, persistence, export, and displayed evidence runner.
 - `tests/` — public-seam domain, protocol, Catalog, grouping, migration, recovery, Handoff, accessibility, and Host tests.
 - `scripts/` — deterministic test/build cleanup, version checks, SBOM generation, package audits, Linux packaging, and macOS assembly.
 - `assets/icon/` and `public/` — the source icon pair and mechanically derived native/browser icon family.
 
-Source version is `0.1.0`. The current public prerelease is `v0.1.0-rc.2`.
+Source version is `0.1.0`. The release target is `v0.1.0-rc.3`; the latest already-published prerelease is `v0.1.0-rc.2`.
+
+## Product paths
+
+Simple is the default front door:
+
+1. add local font files/folders or open the installed-font Catalog;
+2. choose a family, individual source/style, or the whole family;
+3. see four fonts per board immediately;
+4. edit copy, stress characters, casing, axes, order, inclusion, and sizing;
+5. export verified 5,152 × 2,160 boards and optional index pages.
+
+Studio reads the same Study and adds Review, saved Compare sets, blind comparison, System Roles, and full Handoff controls. Switching modes does not duplicate or translate font decisions.
+
+The titlebar scale control changes the complete interface from 80–140% in 10% steps. `Cmd/Ctrl +`, `Cmd/Ctrl -`, and `Cmd/Ctrl 0` increase, decrease, and reset it.
 
 ## Prerequisites
 
