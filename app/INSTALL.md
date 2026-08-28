@@ -2,7 +2,7 @@
 
 Font Previewer is a local desktop app. It has no account, updater, analytics, cloud processing, or required network connection.
 
-The latest public package set is [`v0.1.0-rc.3`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.3), built from exact source `0e1d5c1c3ef1e6d6455c8bafcfb72fb8d203e1fe`. Current source prepares `v0.1.0-rc.4`, but it is not a public package until the release page and checksums exist. CI artifacts remain exact-SHA evidence, not substitutes for release assets.
+The latest public package set is [`v0.1.0-rc.4`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.4), built from exact source `b0950402316253cc9cb7bf7a6ec86ea5f669184f`. Its public tag, `SOURCE_SHA`, and `SHA256SUMS` agree. CI artifacts remain exact-SHA evidence, not substitutes for release assets.
 
 ## Verify downloads
 

@@ -8,9 +8,9 @@
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Current candidate: `v0.1.0-rc.4`, not yet published
-- Latest published prerelease: `v0.1.0-rc.3`
-- Exact latest-published source: `0e1d5c1c3ef1e6d6455c8bafcfb72fb8d203e1fe`; current source adds Simple Body Copy and therefore is a new product candidate
+- Current candidate: none designated
+- Latest published prerelease: `v0.1.0-rc.4`
+- Exact latest-published source: `b0950402316253cc9cb7bf7a6ec86ea5f669184f`; the tag and public `SOURCE_SHA` agree
 - RC, hardening, and pre-Mac implementation: merged into `main`
 - Active product: shared Simple + Studio Study plus macOS AppKit/WKWebView Host and Linux Electron Host
 - Preserved reference: root `macos/` SwiftUI/CoreText application
@@ -25,7 +25,6 @@
 - hostile cross-format font containment beyond current automated fixtures;
 - induced WKWebView content-process termination;
 - optional Developer ID signing/notarisation only if a future paid distribution path is deliberately adopted;
-- exact-head cross-platform verification, dry-run assembly, publication, and public checksum readback for the owner-authorized `v0.1.0-rc.4` candidate;
 - new explicit authorization for any public release after `v0.1.0-rc.4`.
 
 Historical status before canonicalisation is preserved at [`../archive/2026-08-27/PROGRAMME_STATUS_PRE_MAIN.md`](../archive/2026-08-27/PROGRAMME_STATUS_PRE_MAIN.md). Old ticket and handover documents remain evidence, not current merge or release instructions.

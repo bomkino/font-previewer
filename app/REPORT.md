@@ -4,11 +4,11 @@
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Current release posture: `v0.1.0-rc.4` Body Copy candidate; latest published prerelease remains `v0.1.0-rc.3` at `0e1d5c1c3ef1e6d6455c8bafcfb72fb8d203e1fe`
-- Prior prereleases: immutable `v0.1.0-rc.2` and `v0.1.0-rc.1`
+- Current release posture: published `v0.1.0-rc.4` at exact source `b0950402316253cc9cb7bf7a6ec86ea5f669184f`
+- Prior prereleases: immutable `v0.1.0-rc.3`, `v0.1.0-rc.2`, and `v0.1.0-rc.1`
 - Stable release: not approved or claimed
 
-The RC, hardening, and pre-Mac implementation are represented on `main`. PRs #1, #2, and #3 are merged. No current product implementation remains intentionally based on those old branch names.
+The RC, hardening, and pre-Mac implementation are represented on `main`. Body Copy and its release-blocking scale/recovery repairs reached `main` through PRs #11, #12, and #13. No current product implementation remains intentionally based on old branch names.
 
 The detailed autonomous hardening report that originally described an isolated, unmerged branch is preserved unchanged at [`../docs/archive/2026-08-27/APP_REPORT_RC_EVIDENCE.md`](../docs/archive/2026-08-27/APP_REPORT_RC_EVIDENCE.md). It is historical evidence, not current repository status.
 
@@ -51,7 +51,7 @@ Current workflow evidence is recorded in [`../docs/maintenance/REPOSITORY_STATE.
 - verified source-SHA manifests, checksums, package contents, notices, SBOM, and release notes;
 - an explicit publication boolean and exact tag confirmation before any GitHub release write.
 
-The default path creates a downloadable dry-run bundle. It refuses existing tags and releases. The owner-authorized `v0.1.0-rc.3` publication completed through verification run `33140669879`, dry run `33140942047`, and publication run `33141048696`. The owner separately authorized `v0.1.0-rc.4`; that authority remains conditional on exact-head verification and the guarded dry-run-first release path.
+The default path creates a downloadable dry-run bundle. It refuses existing tags and releases. The owner-authorized `v0.1.0-rc.4` publication completed through verification run `33151448579`, dry run `33151866338`, and publication run `33151987068`. That one-use authority has been exercised; any later tag requires new authorization.
 
 ## Remaining human and physical gates
 
