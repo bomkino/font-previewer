@@ -545,6 +545,7 @@ export default function App() {
       setHostName(response.capabilities.host);
       if (response.recovery) {
         const recovered = createSession(response.recovery.document, response.recovery.bindings, response.recovery.workspace, response.recovery.revision);
+        pendingWorkspaceFocusRef.current = true;
         historyDispatch({
           type: "replace",
           session: {
@@ -555,13 +556,14 @@ export default function App() {
         setRecoveryAvailable(true);
         setShowWelcome(false);
         setNotice(response.recovery.revision > response.recovery.intentionallySavedRevision ? "Recovered unsaved work." : "Recovered last Study state.");
+        requestWorkspaceFocus();
       }
       const probe = await host.request({ type: "probe", serial: 1 });
       if (active && probe.type === "probe-result") setHostName(probe.host);
       if (active) setLaunchReady(true);
     });
     return () => { active = false; };
-  }, [host, runTask]);
+  }, [host, requestWorkspaceFocus, runTask]);
 
   useEffect(() => host.onMenuCommand(handleMenu), [handleMenu, host]);
 
