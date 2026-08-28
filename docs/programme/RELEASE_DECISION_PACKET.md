@@ -4,10 +4,10 @@
 
 - `main` is canonical and contains the merged RC, hardening, and pre-Mac implementation.
 - Source version remains `0.1.0`.
-- The current release candidate is `v0.1.0-rc.3`; the latest already-published prerelease is `v0.1.0-rc.2`.
-- Published `v0.1.0-rc.1` and `v0.1.0-rc.2` remain immutable with their original assets.
+- `v0.1.0-rc.3` is published from exact source `0e1d5c1c3ef1e6d6455c8bafcfb72fb8d203e1fe`.
+- Published `v0.1.0-rc.1`, `v0.1.0-rc.2`, and `v0.1.0-rc.3` remain immutable with their original assets.
 - No stable release is approved or claimed.
-- The owner explicitly authorized exact-green-main publication of `v0.1.0-rc.3` in this task; that authorization does not extend to later releases.
+- The owner-authorized rc.3 publication completed through exact-main verification `33140669879`, dry run `33140942047`, and publication `33141048696`; that authorization does not extend to later releases.
 
 The prior owner decision that authorized the first prerelease while work remained isolated on an RC branch is preserved unchanged at [`../archive/2026-08-27/RELEASE_DECISION_PACKET_PRE_MAIN.md`](../archive/2026-08-27/RELEASE_DECISION_PACKET_PRE_MAIN.md). Its branch instructions are historical and do not override current `main`.
 

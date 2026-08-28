@@ -6,7 +6,7 @@ Deliver one trustworthy local typography-decision product on Mac and Linux. A de
 
 ## Current reality
 
-The `v0.1.0-rc.3` candidate adds a default Simple view and rebuilds Studio over one shared session inside narrow AppKit/WKWebView and Electron Hosts. Local displayed AppKit/WKWebView evidence passes; exact-head cross-platform GitHub verification remains required before publication.
+Published `v0.1.0-rc.3` adds a default Simple view and rebuilds Studio over one shared session inside narrow AppKit/WKWebView and Electron Hosts. Exact-source cross-platform verification, dry-run assembly, publication, and public checksum readback have passed; the remaining gates apply to stable v1.0 and stronger support claims.
 
 The root `macos/` application remains a preserved CoreText oracle. It is not the active product because its historical model stores paths in the Study and collapses concepts that Study v4 keeps distinct.
 
@@ -17,7 +17,7 @@ The root `macos/` application remains a preserved CoreText oracle. It is not the
 3. The release-candidate vertical slice replaced prototype recovery/import/Handoff seams with Host-owned durable implementations.
 4. The installed Catalog is now Host-local, bounded, searchable, paginated, and explicit-add; Family Groups preserve Candidate identity.
 5. CI now builds, launches, exercises, packages, and retains evidence for both Hosts.
-6. The current candidate restores the owner-requested Simple journey, keeps Studio available, and shares the decisions that materially belong to the Study. Human/reference gates remain before a supported stable v1.0.
+6. The published prerelease restores the owner-requested Simple journey, keeps Studio available, and shares the decisions that materially belong to the Study. Human/reference gates remain before a supported stable v1.0.
 
 ## Accepted V1 direction
 

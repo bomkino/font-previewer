@@ -4,8 +4,8 @@
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Current release posture: `v0.1.0-rc.3` release candidate; latest published prerelease is `v0.1.0-rc.2`
-- Prior prerelease: `v0.1.0-rc.1` at `6ae51f5618387e1e4e39f4816f797da35aaee57b`
+- Current release posture: published `v0.1.0-rc.3` prerelease at `0e1d5c1c3ef1e6d6455c8bafcfb72fb8d203e1fe`
+- Prior prereleases: immutable `v0.1.0-rc.2` and `v0.1.0-rc.1`
 - Stable release: not approved or claimed
 
 The RC, hardening, and pre-Mac implementation are represented on `main`. PRs #1, #2, and #3 are merged. No current product implementation remains intentionally based on those old branch names.
@@ -51,7 +51,7 @@ Current workflow evidence is recorded in [`../docs/maintenance/REPOSITORY_STATE.
 - verified source-SHA manifests, checksums, package contents, notices, SBOM, and release notes;
 - an explicit publication boolean and exact tag confirmation before any GitHub release write.
 
-The default path creates a downloadable dry-run bundle. It refuses existing tags and releases. Publication requires the repository owner's explicit release instruction; that authorization has been supplied for the `v0.1.0-rc.3` candidate in this task.
+The default path creates a downloadable dry-run bundle. It refuses existing tags and releases. The owner-authorized `v0.1.0-rc.3` publication completed through verification run `33140669879`, dry run `33140942047`, and publication run `33141048696`. That authorization is spent and does not apply to any later release.
 
 ## Remaining human and physical gates
 

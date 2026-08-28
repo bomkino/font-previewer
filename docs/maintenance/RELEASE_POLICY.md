@@ -4,12 +4,13 @@
 
 Published tags and releases are immutable historical records. Do not move a published tag, overwrite a release, replace its assets, or rewrite its source history.
 
-The latest published Font Previewer release is `v0.1.0-rc.2`. Its `SOURCE_SHA` asset and tag identify the immutable release source. The next candidate is `v0.1.0-rc.3`; it does not become published merely because its source or notes exist. The prior `v0.1.0-rc.1` remains fixed to commit `6ae51f5618387e1e4e39f4816f797da35aaee57b`.
+The latest published Font Previewer release is `v0.1.0-rc.3`. Its tag and `SOURCE_SHA` asset identify immutable release source `0e1d5c1c3ef1e6d6455c8bafcfb72fb8d203e1fe`. The prior `v0.1.0-rc.2` and `v0.1.0-rc.1` releases remain fixed with their original assets and source history.
 
 ## Version model
 
 - Application source and package version: `0.1.0`.
-- Current candidate: `v0.1.0-rc.3`.
+- Latest published prerelease: `v0.1.0-rc.3`.
+- Next candidate: none designated.
 - Stable `v1.0.0`: prohibited until the documented human, physical, typography, accessibility, containment, reconstruction, and distribution decisions close.
 
 Every version change must reconcile `app/package.json`, `app/package-lock.json`, macOS bundle metadata, Linux package names/metadata, displayed version, SBOM, README, installation docs, changelog, tests, CI, and release notes. `npm run version:check` is the first gate.

@@ -8,9 +8,9 @@
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Current candidate: `v0.1.0-rc.3`
-- Latest published prerelease: `v0.1.0-rc.2`
-- Current source: ahead of the latest published prerelease; exact release identity awaits main/CI/publication
+- Current candidate: none designated
+- Latest published prerelease: `v0.1.0-rc.3`
+- Exact release source: `0e1d5c1c3ef1e6d6455c8bafcfb72fb8d203e1fe`; subsequent source change is documentation-only release readback
 - RC, hardening, and pre-Mac implementation: merged into `main`
 - Active product: shared Simple + Studio Study plus macOS AppKit/WKWebView Host and Linux Electron Host
 - Preserved reference: root `macos/` SwiftUI/CoreText application

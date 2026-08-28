@@ -1,5 +1,7 @@
 # Font Previewer repository cleanup — 2026-08-27
 
+> Historical cleanup receipt. Its release status records the repository at that checkpoint; current truth lives in [`REPOSITORY_STATE.md`](REPOSITORY_STATE.md).
+
 ## Final result
 
 Repository canonicalisation is complete for product integration, current documentation, permanent verification, and release preparation.

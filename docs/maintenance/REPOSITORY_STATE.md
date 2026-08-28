@@ -11,28 +11,29 @@ Font Previewer is a local typography decision tool. The active product is one sh
 - Canonical branch: `main`
 - Default branch: `main`
 - Source version: `0.1.0`
-- Current source posture: `v0.1.0-rc.3` release candidate, not yet published
-- Latest published release: `v0.1.0-rc.2`
-- Intended candidate source: the exact future `main` commit accepted by the full verification workflow
-- Exact latest-published source: the commit named by the immutable `v0.1.0-rc.2` tag and `SOURCE_SHA` release asset
-- Prior published release: `v0.1.0-rc.1` at `6ae51f5618387e1e4e39f4816f797da35aaee57b`
+- Current source posture: documentation-only release readback atop published `v0.1.0-rc.3`; product source remains the tagged commit
+- Latest published release: [`v0.1.0-rc.3`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.3)
+- Exact latest-published source: `0e1d5c1c3ef1e6d6455c8bafcfb72fb8d203e1fe`, confirmed by both tag and public `SOURCE_SHA`
+- Prior published releases: immutable `v0.1.0-rc.2` and `v0.1.0-rc.1`
 - Stable release: none
 
 The RC, hardening, pre-Mac product work, canonicalisation, and Mac finalisation all reached `main` through reviewed pull requests. Published tags and releases remain immutable; exact source-to-package correspondence is carried by the release tag, workflow run, artifact names, checksums, and `SOURCE_SHA`.
 
-## Current candidate evidence
+## Current published evidence
 
 - The complete local public-seam suite passes: 43 tests, 40 passed and three Linux-only tests skipped on macOS.
 - The native AppKit/WKWebView evidence journey passes Simple and Studio at 80–140% scale, with minimum measured controls of 44 px at 80%, no title/candidate truncation in the asserted states, and no horizontal overflow.
 - The native journey proves installed family/style browsing, four-up board containment, four distinct colour quadrants, stress characters, AP Title, variable-axis controls, modal focus trapping/return, and shared candidate-count and comparison-policy state across Simple and Studio.
 - The native transaction fault proves failed Handoff staging is removed and the prior export remains byte-identical.
-- Exact-head GitHub verification and release publication remain separate pending gates. Local evidence is not substituted for them.
+- Exact-source GitHub verification run [`33140669879`](https://github.com/bomkino/font-previewer/actions/runs/33140669879) passed both Hosts and packages on `main`.
+- Guarded dry run [`33140942047`](https://github.com/bomkino/font-previewer/actions/runs/33140942047) and publication run [`33141048696`](https://github.com/bomkino/font-previewer/actions/runs/33141048696) assembled and published the non-overwriting prerelease.
+- A fresh public download of all nine assets passed the published `SHA256SUMS`; the release tag and `SOURCE_SHA` both resolve to `0e1d5c1c3ef1e6d6455c8bafcfb72fb8d203e1fe`.
 
 Run IDs, conclusions, artifacts, and the source SHA remain available in GitHub Actions and the immutable release rather than being copied into a self-referential source file.
 
 ## Current GitHub maintenance state
 
-- Open release pull requests: none at this review point; the candidate must still reach `main` through the branch policy.
+- Open release pull requests: none after publication and release-truth merge.
 - Open stable-v1 gates: issues [#5](https://github.com/bomkino/font-previewer/issues/5), [#6](https://github.com/bomkino/font-previewer/issues/6), and [#7](https://github.com/bomkino/font-previewer/issues/7).
 - `main` is the only permanent branch. Temporary candidate branches must be deleted after their useful patch reaches `main`.
 - Merged working branches delete automatically. `main` rejects force-push and deletion, including for administrators.
@@ -78,7 +79,7 @@ These gates prohibit stable `v1.0.0`, broad support claims, attended accessibili
 
 ## Release posture
 
-`v0.1.0-rc.2` remains the latest public prerelease. `v0.1.0-rc.3` is the current candidate. `.github/workflows/release.yml` remains manual, exact-SHA guarded, exact-run guarded, non-overwriting, and dry-run first. No later release occurs automatically on a push, PR, tag, or successful verification run.
+`v0.1.0-rc.3` is the latest public prerelease. `.github/workflows/release.yml` remains manual, exact-SHA guarded, exact-run guarded, non-overwriting, and dry-run first. No later release occurs automatically on a push, PR, tag, or successful verification run; the rc.3 authorization does not extend to a future tag.
 
 ## Current documents
 
