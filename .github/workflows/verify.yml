@@ -119,7 +119,10 @@ jobs:
             .semanticAudit.roleHelpSeparated == true and
             .reloadRecovery.after.activeElement == "workspace-heading" and
             .reloadRecovery.after.reviewState == "Keep" and
+            .reloadRecovery.after.stage == .reloadRecovery.before.stage and
             .rendererCrashRecovery.forced == true and
+            .rendererCrashRecovery.boot.stage == .rendererCrashRecovery.before.stage and
+            .rendererCrashRecovery.boot.activeElement == "workspace-heading" and
             .rendererCrashRecovery.after.activeElement == "workspace-heading" and
             .rendererCrashRecovery.after.reviewState == "Keep" and
             .transactionalHandoff.fileCount >= 2

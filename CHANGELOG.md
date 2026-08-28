@@ -20,6 +20,7 @@
 
 - Validated renderer-produced board PNG structure, CRCs, dimensions, decoded size, and scanline filters in both desktop Hosts before transactional commit.
 - Added native macOS evidence for Simple/Studio state travel, family/style dialogs, 80–140% scaling, minimum 44 px controls, long-copy containment, locked line breaks, stress characters, no truncation, contextual Studio chrome, and modal focus return.
+- Made workspace-only changes such as stage, selection, tray, search, and scene recover independently; serialized Electron recovery writes and rejected obsolete renderer checkpoints before they can overwrite newer state.
 - Preserved failed-export cleanup, prior-export byte identity, path-free Study data, opaque font capabilities, and explicit Source-copy permission.
 
 ### Not claimed

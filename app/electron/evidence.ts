@@ -52,6 +52,7 @@ async function inspectWorkspace(window: BrowserWindow): Promise<Record<string, u
       reviewState: selected?.querySelector('.review-glyph')?.getAttribute('aria-label') ?? null,
       stage: document.querySelector('.stage-nav [aria-current="step"]')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
       durability: document.querySelector('.document-title > span:last-child')?.textContent?.trim() ?? null,
+      recoveryCheckpoint: document.querySelector('.app-shell')?.dataset.recoveryCheckpoint ?? null,
       activeElement: document.activeElement?.id || document.activeElement?.tagName || null,
       host: document.querySelector('.host-probe')?.textContent?.trim() ?? null,
       candidates: document.querySelectorAll('.candidate-row').length,
@@ -343,14 +344,19 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   await waitFor(options.window, "Handoff preflight", `document.querySelector('.handoff-workspace') && !document.querySelector('.handoff-workspace .primary-button')?.disabled`);
   trace.handoff = await inspectWorkspace(options.window);
   await capture(options.window, join(output, "04-handoff.png"));
+  await clickStage(options.window, "Review");
+  await waitFor(options.window, "Review semantics", `document.querySelector('.candidate-row[aria-current="true"] .review-glyph')?.getAttribute('aria-label') === 'Keep'`);
   trace.semanticAudit = await semanticAudit(options.window);
   trace.securityAudit = await securityAudit(options.window);
   trace.installedCatalog = await installedCatalogAudit(options.window);
   await capture(options.window, join(output, "06-catalog.png"));
+  await clickStage(options.window, "Handoff");
+  await waitFor(options.window, "restored Handoff preflight", `document.querySelector('.handoff-workspace') && !document.querySelector('.handoff-workspace .primary-button')?.disabled`);
 
-  await waitFor(options.window, "durable recovery", `document.querySelector('.document-title > span:last-child')?.textContent?.includes('recovery ready')`, 20_000);
+  await waitFor(options.window, "durable recovery", `document.querySelector('.app-shell')?.dataset.recoveryCheckpoint === 'ready'`, 20_000);
   if (options.verifyDurability) trace.durabilityArtifact = await options.verifyDurability();
   if (options.exportHandoff) trace.transactionalHandoff = await options.exportHandoff();
+  await waitFor(options.window, "post-export workspace recovery", `document.querySelector('.app-shell')?.dataset.recoveryCheckpoint === 'ready'`, 20_000);
 
   const beforeCrash = await inspectWorkspace(options.window);
   await writeFile(join(output, "renderer-crash-before.json"), `${JSON.stringify(beforeCrash, null, 2)}\n`, { mode: 0o600 });
@@ -360,9 +366,18 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   const crashDetails = await withTimeout("forced renderer termination", crashGone, 20_000);
   await writeFile(join(output, "renderer-crash-gone.json"), `${JSON.stringify(crashDetails, null, 2)}\n`, { mode: 0o600 });
   await withTimeout("forced renderer crash recovery", crashReloaded, 20_000);
-  await waitFor(options.window, "recovered Studio after renderer crash", `document.querySelector('#workspace-heading') && document.activeElement?.id === 'workspace-heading' && document.querySelector('.candidate-row[aria-current="true"] .review-glyph')?.getAttribute('aria-label') === 'Keep'`, 20_000);
+  await settle(options.window, 750);
+  const crashLoad = await inspectWorkspace(options.window);
+  await writeFile(join(output, "renderer-crash-load.json"), `${JSON.stringify(crashLoad, null, 2)}\n`, { mode: 0o600 });
+  await waitFor(options.window, "recovered workspace after renderer crash", `document.querySelector('#workspace-heading') && document.querySelector('.host-probe')?.textContent?.includes('electron') && document.activeElement?.id === 'workspace-heading'`, 20_000);
+  const crashBoot = await inspectWorkspace(options.window);
+  await writeFile(join(output, "renderer-crash-boot.json"), `${JSON.stringify(crashBoot, null, 2)}\n`, { mode: 0o600 });
+  if (crashBoot.stage !== beforeCrash.stage) throw new Error("Forced renderer crash did not restore the active stage.");
+  await clickStage(options.window, "Review");
+  await waitFor(options.window, "recovered Review decision after renderer crash", `document.activeElement?.id === 'workspace-heading' && document.querySelector('.candidate-row[aria-current="true"] .review-glyph')?.getAttribute('aria-label') === 'Keep'`, 20_000);
+  await waitFor(options.window, "post-crash recovery checkpoint", `document.querySelector('.app-shell')?.dataset.recoveryCheckpoint === 'ready'`, 20_000);
   const afterCrash = await inspectWorkspace(options.window);
-  trace.rendererCrashRecovery = { forced: true, details: crashDetails, before: beforeCrash, after: afterCrash };
+  trace.rendererCrashRecovery = { forced: true, details: crashDetails, before: beforeCrash, boot: crashBoot, after: afterCrash };
 
   const beforeReload = await inspectWorkspace(options.window);
   const loaded = new Promise<void>((resolveLoaded) => options.window.webContents.once("did-finish-load", () => resolveLoaded()));
@@ -373,6 +388,7 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   await writeFile(join(output, "reload-boot.json"), `${JSON.stringify(trace.reloadBoot, null, 2)}\n`, { mode: 0o600 });
   await waitFor(options.window, "recovered Studio", `document.querySelector('#workspace-heading') && document.querySelector('.host-probe')?.textContent?.includes('electron') && document.activeElement?.id === 'workspace-heading'`, 20_000);
   const afterReload = await inspectWorkspace(options.window);
+  if (afterReload.stage !== beforeReload.stage) throw new Error("Reload did not restore the active stage.");
   trace.reloadRecovery = { before: beforeReload, after: afterReload };
   await capture(options.window, join(output, "05-recovered.png"));
 

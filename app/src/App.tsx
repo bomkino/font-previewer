@@ -209,13 +209,18 @@ export default function App() {
   const [catalog, setCatalog] = useState<InstalledCatalogView>(EMPTY_CATALOG);
   const [simpleCatalogOpenRequest, setSimpleCatalogOpenRequest] = useState(0);
   const [titleDraft, setTitleDraft] = useState(session.document.title);
+  const recoveryCheckpointKey = useMemo(() => JSON.stringify([session.revision, session.workspace]), [session.revision, session.workspace]);
+  const [confirmedRecoveryCheckpointKey, setConfirmedRecoveryCheckpointKey] = useState<string>();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const pendingWorkspaceFocusRef = useRef(false);
+  const currentRecoveryCheckpointKeyRef = useRef(recoveryCheckpointKey);
+  const lastRecoveryCheckpointRef = useRef<string | undefined>(undefined);
   const newStudyDialogRef = useRef<HTMLElement>(null);
   const newStudyReturnFocusRef = useRef<HTMLElement | null>(null);
   const catalogRequestRef = useRef(0);
   const index = useStudyIndex(session.document);
   const fontStates = useFontRegistry(session);
+  currentRecoveryCheckpointKeyRef.current = recoveryCheckpointKey;
 
   useEffect(() => {
     try {
@@ -249,14 +254,22 @@ export default function App() {
 
   const requestWorkspaceFocus = useCallback(() => {
     pendingWorkspaceFocusRef.current = true;
-    requestAnimationFrame(() => {
+    const focusWorkspace = () => {
       if (!pendingWorkspaceFocusRef.current || !headingRef.current) return;
       pendingWorkspaceFocusRef.current = false;
       headingRef.current.closest<HTMLElement>(".workspace")?.scrollTo({ left: 0, top: 0 });
       document.documentElement.scrollTo({ left: 0, top: 0 });
       document.body.scrollTo({ left: 0, top: 0 });
       headingRef.current.focus({ preventScroll: true });
-    });
+    };
+    requestAnimationFrame(focusWorkspace);
+    for (const delay of [80, 240]) {
+      window.setTimeout(() => {
+        if (document.activeElement !== document.body && document.activeElement !== document.documentElement) return;
+        pendingWorkspaceFocusRef.current = true;
+        focusWorkspace();
+      }, delay);
+    }
   }, []);
 
   useLayoutEffect(() => {
@@ -613,15 +626,22 @@ export default function App() {
   }, [closeNewStudy, newStudyOpen]);
 
   useEffect(() => {
-    if (!launchReady || session.revision <= session.acknowledgedRevision) return;
+    if (!launchReady || lastRecoveryCheckpointRef.current === recoveryCheckpointKey) return;
     const timer = window.setTimeout(() => {
-      void mirror(session).catch((cause) => {
-        setRecoveryAvailable(false);
-        setError(cause instanceof Error ? cause.message : "Recovery checkpoint failed.");
-      });
+      if (currentRecoveryCheckpointKeyRef.current !== recoveryCheckpointKey) return;
+      lastRecoveryCheckpointRef.current = recoveryCheckpointKey;
+      void mirror(session)
+        .then(() => {
+          if (currentRecoveryCheckpointKeyRef.current === recoveryCheckpointKey) setConfirmedRecoveryCheckpointKey(recoveryCheckpointKey);
+        })
+        .catch((cause) => {
+          if (lastRecoveryCheckpointRef.current === recoveryCheckpointKey) lastRecoveryCheckpointRef.current = undefined;
+          setRecoveryAvailable(false);
+          setError(cause instanceof Error ? cause.message : "Recovery checkpoint failed.");
+        });
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [launchReady, mirror, session]);
+  }, [launchReady, mirror, recoveryCheckpointKey, session]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -706,7 +726,7 @@ export default function App() {
   };
 
   return (
-    <div className={`app-shell ${showWelcome ? "is-welcome" : ""} mode-${interfaceMode} stage-${session.workspace.stage}`} data-interface-mode={interfaceMode} data-ui-scale={Math.round(uiScale * 100)} style={shellStyle}>
+    <div className={`app-shell ${showWelcome ? "is-welcome" : ""} mode-${interfaceMode} stage-${session.workspace.stage}`} data-interface-mode={interfaceMode} data-recovery-checkpoint={confirmedRecoveryCheckpointKey === recoveryCheckpointKey ? "ready" : "pending"} data-ui-scale={Math.round(uiScale * 100)} style={shellStyle}>
       <a className="skip-link" href={showWelcome ? "#welcome-heading" : "#workspace-heading"}>Skip to main content</a>
       <header className="titlebar">
         <div className="brand-lockup"><img className="brand-mark" src="/font-previewer-icon-64.png" alt="" aria-hidden="true" /><div><strong>Font Previewer</strong><span>{interfaceMode === "simple" ? "Type Boards" : "Decision Studio"}</span></div></div>

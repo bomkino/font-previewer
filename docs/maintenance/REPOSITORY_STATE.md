@@ -56,7 +56,7 @@ Run IDs, conclusions, artifacts, and the source SHA remain available in GitHub A
 - Study migration and malformed document/protocol rejection.
 - Installed Catalog indexing, paging, cancellation, bounded workloads, and opaque preview capabilities.
 - Recovery, atomic Save, transactional Handoff, injected failure cleanup, and focus restoration.
-- Forced Electron renderer recovery; labelled WKWebView termination-callback simulation.
+- Workspace-only recovery checkpoints, serialized Electron recovery writes, forced Electron renderer recovery, and the labelled WKWebView termination-callback simulation.
 - Keyboard, semantic accessibility, forced-colours, and reduced-motion checks.
 - Linux X11 and Wayland/Ozone evidence.
 - Linux package reproducibility, install/remove, sandbox ownership, checksums, and residue audit.

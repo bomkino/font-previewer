@@ -80,7 +80,7 @@ The product claims semantic parity, not raster parity. WebKit/CoreText and Chrom
 
 ## Recovery and intentional Save
 
-After a semantic revision, the Studio mirrors the validated document/workspace to the Host. The Host atomically writes recovery and acknowledges the same monotonic revision. Stale revisions are rejected.
+After a semantic revision or workspace-only change, the Studio mirrors the validated document/workspace to the Host. Workspace checkpoints use the current semantic revision without pretending navigation changed the portable document. The renderer drops obsolete delayed checkpoints; the Electron Host serializes accepted writes; and the Host atomically commits recovery before acknowledging it. Lower semantic revisions are rejected.
 
 Save and Handoff first require the exact current revision to be mirrored. Intentional Save writes `.pitchfontstudy`; recovery remains a separate Host-owned file and never silently becomes the user’s saved document.
 
