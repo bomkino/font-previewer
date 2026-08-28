@@ -6,8 +6,10 @@
 - Source version remains `0.1.0`.
 - `v0.1.0-rc.3` is published from exact source `0e1d5c1c3ef1e6d6455c8bafcfb72fb8d203e1fe`.
 - Published `v0.1.0-rc.1`, `v0.1.0-rc.2`, and `v0.1.0-rc.3` remain immutable with their original assets.
+- `v0.1.0-rc.4` is the designated Body Copy candidate and is not yet published.
 - No stable release is approved or claimed.
-- The owner-authorized rc.3 publication completed through exact-main verification `33140669879`, dry run `33140942047`, and publication `33141048696`; that authorization does not extend to later releases.
+- The owner-authorized rc.3 publication completed through exact-main verification `33140669879`, dry run `33140942047`, and publication `33141048696`.
+- The owner explicitly authorized rc.4 publication after the Body Copy feature, complete testing, local application update, documentation, GitHub cleanup, and exact release safeguards finish. This is candidate-specific authority, not authority for stable v1 or a later tag.
 
 The prior owner decision that authorized the first prerelease while work remained isolated on an RC branch is preserved unchanged at [`../archive/2026-08-27/RELEASE_DECISION_PACKET_PRE_MAIN.md`](../archive/2026-08-27/RELEASE_DECISION_PACKET_PRE_MAIN.md). Its branch instructions are historical and do not override current `main`.
 
@@ -20,7 +22,7 @@ The prior owner decision that authorized the first prerelease while work remaine
 | Linux variables | Axes and named instances required; parsed in a bounded child process |
 | Durability | Host recovery mirror plus explicit Save |
 | Font containment | Sandboxed browser content process plus bounded metadata/parser children; broad hostile-corpus proof still required for stable V1 |
-| macOS distribution | GitHub ZIP, macOS 13+ arm64, hardened runtime, ad-hoc signature, no Developer ID/notarisation |
+| macOS distribution | GitHub ZIP, macOS 13+ arm64, hardened runtime, ad-hoc signature, no Developer ID/notarisation; use a checksum-verified per-app Privacy & Security exception if macOS blocks launch |
 | Linux distribution | GitHub `.deb` and portable tarball, x64, X11 and Wayland paths; no RPM or arm64 commitment |
 | Handoff Sources | Copy only through the explicit rights acknowledgement and selected policy; retain opt-out and licence warning |
 | Integrations | JSON/CSV handoff reference only; no live Figma integration |

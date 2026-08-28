@@ -24,7 +24,9 @@ interface ManifestEntry {
 interface SimpleExportManifest {
   readonly width: 5_152;
   readonly height: 2_160;
+  readonly pageMode: "boards" | "body";
   readonly boardCount: number;
+  readonly bodyCount: number;
   readonly indexCount: number;
   readonly fontCount: number;
   readonly includeIndex: boolean;
@@ -54,13 +56,13 @@ function pngCrc32(data: Buffer): number {
 }
 
 function pngBuffer(dataUrl: unknown): Buffer {
-  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/png;base64,")) throw new Error("Simple board renderer returned an invalid PNG payload.");
-  if (dataUrl.length > maximumPngDataUrlCharacters) throw new Error("Simple board PNG exceeded the export size limit.");
+  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/png;base64,")) throw new Error("Simple page renderer returned an invalid PNG payload.");
+  if (dataUrl.length > maximumPngDataUrlCharacters) throw new Error("Simple page PNG exceeded the export size limit.");
   const encoded = dataUrl.slice("data:image/png;base64,".length);
-  if (!encoded.length || encoded.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) throw new Error("Simple board renderer returned malformed base64 data.");
+  if (!encoded.length || encoded.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) throw new Error("Simple page renderer returned malformed base64 data.");
   const png = Buffer.from(encoded, "base64");
-  if (!png.length || png.length > maximumPngBytes) throw new Error("Simple board PNG exceeded the export size limit.");
-  if (!png.subarray(0, pngSignature.length).equals(pngSignature)) throw new Error("Simple board renderer returned a non-PNG file.");
+  if (!png.length || png.length > maximumPngBytes) throw new Error("Simple page PNG exceeded the export size limit.");
+  if (!png.subarray(0, pngSignature.length).equals(pngSignature)) throw new Error("Simple page renderer returned a non-PNG file.");
 
   let offset = pngSignature.length;
   let width = 0;
@@ -74,38 +76,38 @@ function pngBuffer(dataUrl: unknown): Buffer {
     const dataStart = offset + 8;
     const dataEnd = dataStart + length;
     const chunkEnd = dataEnd + 4;
-    if (chunkEnd > png.length) throw new Error("Simple board PNG contains a truncated chunk.");
+    if (chunkEnd > png.length) throw new Error("Simple page PNG contains a truncated chunk.");
     const type = png.toString("ascii", typeStart, dataStart);
     const expectedCrc = png.readUInt32BE(dataEnd);
-    if (pngCrc32(png.subarray(typeStart, dataEnd)) !== expectedCrc) throw new Error(`Simple board PNG failed ${type || "chunk"} integrity verification.`);
+    if (pngCrc32(png.subarray(typeStart, dataEnd)) !== expectedCrc) throw new Error(`Simple page PNG failed ${type || "chunk"} integrity verification.`);
     if (!sawHeader) {
-      if (type !== "IHDR" || length !== 13) throw new Error("Simple board PNG is missing its header.");
+      if (type !== "IHDR" || length !== 13) throw new Error("Simple page PNG is missing its header.");
       width = png.readUInt32BE(dataStart);
       height = png.readUInt32BE(dataStart + 4);
       if (png[dataStart + 8] !== 8 || png[dataStart + 9] !== 6 || png[dataStart + 10] !== 0 || png[dataStart + 11] !== 0 || png[dataStart + 12] !== 0) {
-        throw new Error("Simple board PNG uses an unexpected pixel format.");
+        throw new Error("Simple page PNG uses an unexpected pixel format.");
       }
       sawHeader = true;
     } else if (type === "IHDR") {
-      throw new Error("Simple board PNG contains a duplicate header.");
+      throw new Error("Simple page PNG contains a duplicate header.");
     }
     if (type === "IDAT") imageData.push(png.subarray(dataStart, dataEnd));
     if (type === "IEND") {
-      if (length !== 0 || chunkEnd !== png.length) throw new Error("Simple board PNG has an invalid end marker.");
+      if (length !== 0 || chunkEnd !== png.length) throw new Error("Simple page PNG has an invalid end marker.");
       sawEnd = true;
       break;
     }
     offset = chunkEnd;
   }
   if (!sawHeader || !sawEnd || !imageData.length || width !== simpleBoardWidth || height !== simpleBoardHeight) {
-    throw new Error(`Simple board PNG must decode to ${simpleBoardWidth} × ${simpleBoardHeight}.`);
+    throw new Error(`Simple page PNG must decode to ${simpleBoardWidth} × ${simpleBoardHeight}.`);
   }
   const scanlineBytes = simpleBoardWidth * 4 + 1;
   const expectedInflatedBytes = scanlineBytes * simpleBoardHeight;
   const pixels = inflateSync(Buffer.concat(imageData), { maxOutputLength: expectedInflatedBytes });
-  if (pixels.length !== expectedInflatedBytes) throw new Error("Simple board PNG contains an incomplete pixel surface.");
+  if (pixels.length !== expectedInflatedBytes) throw new Error("Simple page PNG contains an incomplete pixel surface.");
   for (let row = 0; row < simpleBoardHeight; row += 1) {
-    if (pixels[row * scanlineBytes]! > 4) throw new Error("Simple board PNG contains an invalid scanline filter.");
+    if (pixels[row * scanlineBytes]! > 4) throw new Error("Simple page PNG contains an invalid scanline filter.");
   }
   return png;
 }
@@ -127,19 +129,26 @@ async function simpleExportManifest(window: BrowserWindow, document: StudyDocume
   const height = integerField(value.height, "height");
   const fontCount = integerField(value.fontCount, "font count");
   const boardCount = integerField(value.boardCount, "board count");
+  const bodyCount = integerField(value.bodyCount, "body count");
   const indexCount = integerField(value.indexCount, "index count");
+  if (value.pageMode !== "boards" && value.pageMode !== "body") throw new Error("Simple export manifest has an invalid page mode.");
   if (value.includeIndex !== true && value.includeIndex !== false) throw new Error("Simple export manifest has an invalid index setting.");
-  if (width !== simpleBoardWidth || height !== simpleBoardHeight) throw new Error(`Simple boards must be ${simpleBoardWidth} × ${simpleBoardHeight}.`);
+  if (width !== simpleBoardWidth || height !== simpleBoardHeight) throw new Error(`Simple pages must be ${simpleBoardWidth} × ${simpleBoardHeight}.`);
   if (fontCount < 1 || fontCount > maximumSimpleFonts) throw new Error("Simple export font count is outside the Study limit.");
   if (fontCount !== document.candidates.filter((candidate) => candidate.reviewState !== "reject").length) throw new Error("Simple export font count does not match the mirrored Study.");
-  if (boardCount !== Math.ceil(fontCount / 4)) throw new Error("Simple export board count does not match its fonts.");
-  if (indexCount !== (value.includeIndex ? Math.ceil(fontCount / 12) : 0)) throw new Error("Simple export index count does not match its fonts.");
-  return { width: simpleBoardWidth, height: simpleBoardHeight, fontCount, boardCount, indexCount, includeIndex: value.includeIndex };
+  if (value.pageMode === "boards") {
+    if (boardCount !== Math.ceil(fontCount / 4) || bodyCount !== 0) throw new Error("Simple export board count does not match its fonts.");
+    if (indexCount !== (value.includeIndex ? Math.ceil(fontCount / 12) : 0)) throw new Error("Simple export index count does not match its fonts.");
+  } else if (boardCount !== 0 || indexCount !== 0 || bodyCount !== fontCount || value.includeIndex) {
+    throw new Error("Simple export Body Copy count does not match its fonts.");
+  }
+  return { width: simpleBoardWidth, height: simpleBoardHeight, pageMode: value.pageMode, fontCount, boardCount, bodyCount, indexCount, includeIndex: value.includeIndex };
 }
 
 async function renderSimplePages(window: BrowserWindow, stagingPath: string, manifest: SimpleExportManifest): Promise<void> {
   for (const [kind, count, directoryName, fileStem] of [
     ["board", manifest.boardCount, "Boards", "Board"],
+    ["body", manifest.bodyCount, "Body Copy", "Body"],
     ["index", manifest.indexCount, "Index", "Index"],
   ] as const) {
     if (!count) continue;

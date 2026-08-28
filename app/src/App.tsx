@@ -41,7 +41,12 @@ import {
   type NavigatorMode,
 } from "./components.js";
 import { CATALOG_PAGE_SIZE, type HostCapabilities, type MenuCommand } from "./protocol.js";
-import { createSimpleExportRuntime } from "./simple-boards.js";
+import {
+  DEFAULT_SIMPLE_BODY_COPY_SAMPLE_ID,
+  SIMPLE_BODY_COPY_SAMPLES,
+  createSimpleExportRuntime,
+  type SimplePageMode,
+} from "./simple-boards.js";
 import { InterfaceIcon } from "./icons.js";
 
 interface HistorySnapshot {
@@ -89,6 +94,25 @@ function storedUIScale(): number {
     return UI_SCALES.includes(stored as (typeof UI_SCALES)[number]) ? stored : 1.1;
   } catch {
     return 1.1;
+  }
+}
+
+function storedSimplePageMode(): SimplePageMode {
+  const requested = new URLSearchParams(globalThis.location?.search ?? "").get("page");
+  if (requested === "body" || requested === "boards") return requested;
+  try {
+    return globalThis.localStorage?.getItem("font-previewer-simple-page-mode") === "body" ? "body" : "boards";
+  } catch {
+    return "boards";
+  }
+}
+
+function storedBodySampleId(): string {
+  try {
+    const stored = globalThis.localStorage?.getItem("font-previewer-body-copy-sample");
+    return SIMPLE_BODY_COPY_SAMPLES.some((sample) => sample.id === stored) ? stored! : DEFAULT_SIMPLE_BODY_COPY_SAMPLE_ID;
+  } catch {
+    return DEFAULT_SIMPLE_BODY_COPY_SAMPLE_ID;
   }
 }
 
@@ -193,6 +217,8 @@ export default function App() {
   const [showWelcome, setShowWelcome] = useState(!fixture);
   const [interfaceMode, setInterfaceMode] = useState<InterfaceMode>(() => storedInterfaceMode(fixture));
   const [uiScale, setUIScale] = useState(storedUIScale);
+  const [simplePageMode, setSimplePageMode] = useState<SimplePageMode>(storedSimplePageMode);
+  const [bodySampleId, setBodySampleId] = useState(storedBodySampleId);
   const [stressTest, setStressTest] = useState(false);
   const [comparisonFitPolicy, setComparisonFitPolicy] = useState<FitPolicy>("fit");
   const [includeIndex, setIncludeIndex] = useState(true);
@@ -239,16 +265,32 @@ export default function App() {
   }, [uiScale]);
 
   useEffect(() => {
+    try {
+      globalThis.localStorage?.setItem("font-previewer-simple-page-mode", simplePageMode);
+    } catch {
+      // The page format remains active for this launch when preferences are unavailable.
+    }
+  }, [simplePageMode]);
+
+  useEffect(() => {
+    try {
+      globalThis.localStorage?.setItem("font-previewer-body-copy-sample", bodySampleId);
+    } catch {
+      // The selected reading sample remains active for this launch.
+    }
+  }, [bodySampleId]);
+
+  useEffect(() => {
     if (showWelcome || interfaceMode !== "simple") {
       delete window.__fontPreviewerSimpleExport;
       return;
     }
-    const runtime = createSimpleExportRuntime(session, stressTest, includeIndex, comparisonFitPolicy);
+    const runtime = createSimpleExportRuntime(session, stressTest, includeIndex, comparisonFitPolicy, simplePageMode, bodySampleId);
     window.__fontPreviewerSimpleExport = runtime;
     return () => {
       if (window.__fontPreviewerSimpleExport === runtime) delete window.__fontPreviewerSimpleExport;
     };
-  }, [comparisonFitPolicy, includeIndex, interfaceMode, session, showWelcome, stressTest]);
+  }, [bodySampleId, comparisonFitPolicy, includeIndex, interfaceMode, session, showWelcome, simplePageMode, stressTest]);
 
   useEffect(() => setTitleDraft(session.document.title), [session.document.id, session.document.title]);
 
@@ -726,10 +768,10 @@ export default function App() {
   };
 
   return (
-    <div className={`app-shell ${showWelcome ? "is-welcome" : ""} mode-${interfaceMode} stage-${session.workspace.stage}`} data-interface-mode={interfaceMode} data-recovery-checkpoint={confirmedRecoveryCheckpointKey === recoveryCheckpointKey ? "ready" : "pending"} data-ui-scale={Math.round(uiScale * 100)} style={shellStyle}>
+    <div className={`app-shell ${showWelcome ? "is-welcome" : ""} mode-${interfaceMode} stage-${session.workspace.stage}`} data-interface-mode={interfaceMode} data-simple-page-mode={simplePageMode} data-recovery-checkpoint={confirmedRecoveryCheckpointKey === recoveryCheckpointKey ? "ready" : "pending"} data-ui-scale={Math.round(uiScale * 100)} style={shellStyle}>
       <a className="skip-link" href={showWelcome ? "#welcome-heading" : "#workspace-heading"}>Skip to main content</a>
       <header className="titlebar">
-        <div className="brand-lockup"><img className="brand-mark" src="/font-previewer-icon-64.png" alt="" aria-hidden="true" /><div><strong>Font Previewer</strong><span>{interfaceMode === "simple" ? "Type Boards" : "Decision Studio"}</span></div></div>
+        <div className="brand-lockup"><img className="brand-mark" src="/font-previewer-icon-64.png" alt="" aria-hidden="true" /><div><strong>Font Previewer</strong><span>{interfaceMode === "simple" ? (simplePageMode === "body" ? "Reading Pages" : "Type Boards") : "Decision Studio"}</span></div></div>
         <div className="interface-switch" role="group" aria-label="Interface mode">
           <button type="button" className={interfaceMode === "simple" ? "is-active" : ""} aria-pressed={interfaceMode === "simple"} onClick={() => { setInterfaceMode("simple"); if (showWelcome && session.document.candidates.length) setShowWelcome(false); }}>Simple</button>
           <button type="button" className={interfaceMode === "studio" ? "is-active" : ""} aria-pressed={interfaceMode === "studio"} onClick={() => { setInterfaceMode("studio"); setShowWelcome(false); }}>Studio</button>
@@ -754,6 +796,10 @@ export default function App() {
             capabilities={capabilities}
             stressTest={stressTest}
             onStressTestChange={setStressTest}
+            pageMode={simplePageMode}
+            onPageModeChange={setSimplePageMode}
+            bodySampleId={bodySampleId}
+            onBodySampleChange={setBodySampleId}
             fitPolicy={comparisonFitPolicy}
             onFitPolicyChange={setComparisonFitPolicy}
             includeIndex={includeIndex}

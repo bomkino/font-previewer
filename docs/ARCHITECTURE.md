@@ -16,10 +16,10 @@ Simple and Studio render the same `StudySession`; they are not separate document
 
 - Adding local or installed Sources in either view runs the same bounded `ingest-sources` command and creates the same Faces and Candidates.
 - Copy, casing, variable axes, Candidate order, review/include decisions, tray membership, Comparison Sets, and Typography Systems remain shared semantic state.
-- The active Same size / Fit each / Lock line breaks choice is controlled once at the application boundary and passed into both Simple boards and Studio Compare. Saving a Comparison Set records that policy in the portable Study.
+- The active Same size / Fit each / Lock line breaks choice is controlled once at the application boundary and passed into Simple pages and Studio Compare. Body Copy additionally derives one shared fitted reading size for every included page. Saving a Comparison Set records the comparison policy in the portable Study.
 - Interface mode, 80–140% UI scale, temporary stress visibility, index-page inclusion, and an unsaved Source-copy checkbox are presentation/export preferences, not a second Study authority.
 
-Simple is the low-friction front door. Studio remains the deeper Review → Compare → System → Handoff workspace.
+Simple is the low-friction front door. It offers four-up **Boards** and one-font **Body Copy** reading pages over the same Candidates. Studio remains the deeper Review → Compare → System → Handoff workspace.
 
 ## Authority
 
@@ -96,7 +96,7 @@ The Host:
 6. atomically moves staging to a collision-safe final directory;
 7. removes staging on failure.
 
-When Simple is visible, the Studio exposes a bounded in-memory board-rendering capability to its Host. The Host validates the manifest against the mirrored Study, requests each 5,152 × 2,160 PNG, checks PNG structure and decoded dimensions, then includes `Boards/` and optional `Index/` files in the same transaction. The capability is absent outside Simple mode.
+When Simple is visible, the Studio exposes a bounded in-memory page-rendering capability to its Host. The manifest selects exactly one mutually exclusive format: four-up `Boards/` with optional `Index/`, or one-font `Body Copy/` pages. The Host validates candidate and page counts against the mirrored Study, requests each 5,152 × 2,160 PNG, checks PNG structure and decoded dimensions, and includes the files in the same transaction. Mixed or impossible manifests fail before commit. The capability is absent outside Simple mode.
 
 ## Host security
 

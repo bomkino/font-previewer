@@ -6,7 +6,7 @@ Deliver one trustworthy local typography-decision product on Mac and Linux. A de
 
 ## Current reality
 
-Published `v0.1.0-rc.3` adds a default Simple view and rebuilds Studio over one shared session inside narrow AppKit/WKWebView and Electron Hosts. Exact-source cross-platform verification, dry-run assembly, publication, and public checksum readback have passed; the remaining gates apply to stable v1.0 and stronger support claims.
+Published `v0.1.0-rc.3` added a default Simple view and rebuilt Studio over one shared session inside narrow AppKit/WKWebView and Electron Hosts. The current `v0.1.0-rc.4` candidate adds one-font Body Copy reading pages beside the original four-up Boards. Local public-seam and native Mac evidence pass; exact-head cross-platform verification, release assembly, publication, and public checksum readback remain ahead.
 
 The root `macos/` application remains a preserved CoreText oracle. It is not the active product because its historical model stores paths in the Study and collapses concepts that Study v4 keeps distinct.
 
@@ -30,7 +30,7 @@ One shared session with Simple and Studio views is the accepted V1 direction. It
 - Catalog/Study separation and actual installed-font loading;
 - displayed composition and web accessibility semantics;
 - Simple-to-Studio font/style and comparison-policy state travel;
-- 80–140% scaling, long-copy containment, and four-up board export;
+- 80–140% scaling, long-copy containment, four-up board export, and one-font Body Copy export;
 - Mac and Linux packaging.
 
 Interactive VoiceOver/Orca, attended native-quality review, real production-font review, and induced WebKit termination remain unverified and block a stable v1.0 quality claim, not the disclosed v0.1 prerelease.

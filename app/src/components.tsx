@@ -41,12 +41,19 @@ import { groupByFamily } from "./family-groups.js";
 import type { HostCapabilities } from "./protocol.js";
 import { InterfaceIcon } from "./icons.js";
 import {
+  DEFAULT_SIMPLE_BODY_COPY_SAMPLE_ID,
+  SIMPLE_BODY_COPY_LIMIT,
+  SIMPLE_BODY_COPY_SAMPLES,
   SIMPLE_INDEX_PAGE_SIZE,
   SIMPLE_QUADRANTS,
   SIMPLE_STRESS_COPY,
   chunked,
   includedCandidates,
+  simpleBodyCopyLabel,
+  simpleBodyCopySample,
+  simpleBodyDisplayCopy,
   simpleDisplayCopy,
+  type SimplePageMode,
 } from "./simple-boards.js";
 
 export const stageLabels: Record<Stage, string> = {
@@ -168,6 +175,10 @@ interface SimpleWorkspaceProps {
   readonly capabilities?: HostCapabilities;
   readonly stressTest: boolean;
   readonly onStressTestChange: (enabled: boolean) => void;
+  readonly pageMode: SimplePageMode;
+  readonly onPageModeChange: (mode: SimplePageMode) => void;
+  readonly bodySampleId: string;
+  readonly onBodySampleChange: (sampleId: string) => void;
   readonly fitPolicy: FitPolicy;
   readonly onFitPolicyChange: (policy: FitPolicy) => void;
   readonly includeIndex: boolean;
@@ -188,21 +199,23 @@ function SimpleCandidateCopy({
   fit,
   policy = "fit",
   label,
+  displayCopy,
 }: {
   readonly session: StudySession;
   readonly candidate: Candidate;
   readonly fontStates: ReadonlyMap<string, "loading" | "ready" | "failed" | "unavailable">;
   readonly stressTest: boolean;
   readonly className: string;
-  readonly fit: "card" | "board" | "index" | "focus" | "compare";
+  readonly fit: "card" | "board" | "body" | "index" | "focus" | "compare";
   readonly policy?: FitPolicy;
   readonly label?: string;
+  readonly displayCopy?: string;
 }) {
   const face = faceForCandidate(session.document, candidate);
   const recipe = activeRecipe(session);
   const state = fontStates.get(face.id);
   const elementRef = useRef<HTMLParagraphElement>(null);
-  const rawCopy = simpleDisplayCopy(session, candidate, stressTest);
+  const rawCopy = displayCopy ?? simpleDisplayCopy(session, candidate, stressTest);
   const copy = (fit === "board" || fit === "compare") && policy !== "locked-lines" ? rawCopy.replace(/\s*\r?\n\s*/gu, " ") : rawCopy;
   const axisKey = candidate.axes.map((axis) => `${axis.tag}:${axis.value}`).join(";");
 
@@ -214,6 +227,7 @@ function SimpleCandidateCopy({
     const configuration = {
       card: { minimum: 12, maximum: 84, width: 0.86, height: 0.68 },
       board: { minimum: 8, maximum: 72, width: 0.84, height: 0.58 },
+      body: { minimum: 9, maximum: 36, width: 0.94, height: 0.9 },
       index: { minimum: 7, maximum: 34, width: 0.82, height: 0.48 },
       compare: { minimum: 10, maximum: 96, width: 0.84, height: 0.64 },
     }[fit];
@@ -225,10 +239,10 @@ function SimpleCandidateCopy({
       if (bounds.width <= 0 || bounds.height <= 0) return;
       const maximumWidth = bounds.width * configuration.width;
       const maximumHeight = bounds.height * configuration.height;
-      const wrappingFit = fit === "compare" && policy === "fit";
+      const wrappingFit = fit === "body" || (fit === "compare" && policy === "fit");
       element.style.width = wrappingFit ? `${maximumWidth}px` : "max-content";
       element.style.maxWidth = wrappingFit ? `${maximumWidth}px` : "none";
-      element.style.whiteSpace = wrappingFit ? "normal" : "pre";
+      element.style.whiteSpace = fit === "body" ? "pre-wrap" : (wrappingFit ? "normal" : "pre");
       element.style.overflow = "visible";
       element.style.textOverflow = "clip";
       element.style.transform = "none";
@@ -249,8 +263,8 @@ function SimpleCandidateCopy({
       element.dataset.naturalFit = String(naturalSize);
       const fitted = element.getBoundingClientRect();
       if (fitted.width > maximumWidth) element.style.transform = `scaleX(${Math.max(0.1, maximumWidth / fitted.width)})`;
-      if ((fit === "board" || fit === "compare") && policy !== "fit") {
-        const group = element.closest(fit === "board" ? ".simple-board" : ".compare-grid");
+      if (fit === "body" || ((fit === "board" || fit === "compare") && policy !== "fit")) {
+        const group = element.closest(fit === "body" ? ".simple-body-page-list" : (fit === "board" ? ".simple-board" : ".compare-grid"));
         const members = group ? [...group.querySelectorAll<HTMLElement>(`.simple-fitted-${fit}`)] : [];
         const naturalSizes = members.map((member) => Number(member.dataset.naturalFit)).filter(Number.isFinite);
         if (members.length && naturalSizes.length === members.length) {
@@ -258,8 +272,9 @@ function SimpleCandidateCopy({
           members.forEach((member) => {
             member.style.fontSize = `${sharedSize}px`;
             member.style.transform = "none";
-            member.style.justifySelf = "center";
-            member.style.transformOrigin = "center center";
+            member.style.justifySelf = fit === "body" ? "start" : "center";
+            member.style.transformOrigin = fit === "body" ? "left top" : "center center";
+            if (fit === "body") return;
             const memberBounds = member.getBoundingClientRect();
             const parentBounds = member.parentElement?.getBoundingClientRect();
             const available = (parentBounds?.width ?? memberBounds.width) * configuration.width;
@@ -308,6 +323,10 @@ export function SimpleWorkspace({
   capabilities,
   stressTest,
   onStressTestChange,
+  pageMode,
+  onPageModeChange,
+  bodySampleId,
+  onBodySampleChange,
   fitPolicy,
   onFitPolicyChange,
   includeIndex,
@@ -336,6 +355,13 @@ export function SimpleWorkspace({
   const indexPages = useMemo(() => includeIndex ? chunked(included, SIMPLE_INDEX_PAGE_SIZE) : [], [includeIndex, included]);
   const recipe = activeRecipe(session);
   const copy = session.workspace.copyOverride ?? recipe.copy;
+  const bodySample = simpleBodyCopySample(bodySampleId);
+  const bodyCopy = session.workspace.copyOverride ?? bodySample.copy;
+  const bodyCopyLabel = simpleBodyCopyLabel(session, bodySampleId);
+  const bodyCopyEmpty = !bodyCopy.trim();
+  const bodyCopyTooLong = bodyCopy.length > SIMPLE_BODY_COPY_LIMIT;
+  const bodyCopyInvalid = bodyCopyEmpty || bodyCopyTooLong;
+  const pageCount = pageMode === "body" ? included.length : boards.length + indexPages.length;
   const previewCandidate = candidates.find((candidate) => candidate.id === previewCandidateId);
   const studySourceIds = useMemo(() => new Set(session.document.sources.map((source) => source.id)), [session.document.sources]);
   const installedGroups = useMemo(() => groupByFamily(catalog.imports, (item) => item.faces[0]?.family ?? item.source.displayName), [catalog.imports]);
@@ -450,18 +476,39 @@ export function SimpleWorkspace({
     if (candidates.length) dispatch({ type: "set-review-state", candidateIds: candidates.map((candidate) => candidate.id), reviewState });
   };
 
+  const changePageMode = (mode: SimplePageMode) => {
+    onPageModeChange(mode);
+    if (mode === "body" && pageMode !== "body" && session.workspace.copyOverride === undefined) {
+      dispatch({ type: "set-copy-override", copy: simpleBodyCopySample(bodySampleId || DEFAULT_SIMPLE_BODY_COPY_SAMPLE_ID).copy });
+    }
+  };
+
+  const chooseBodySample = (sampleId: string) => {
+    const sample = simpleBodyCopySample(sampleId);
+    onBodySampleChange(sample.id);
+    dispatch({ type: "set-copy-override", copy: sample.copy });
+  };
+
   return (
     <main className="simple-workspace" id="workspace" aria-labelledby="workspace-heading">
       <section className="simple-hero">
         <div>
           <p className="section-kicker">Simple mode</p>
           <h1 id="workspace-heading" ref={headingRef} tabIndex={-1}>
-            {candidates.length ? `${included.length} fonts. ${boards.length} ${boards.length === 1 ? "board" : "boards"}.` : "Add fonts. Get boards."}
+            {candidates.length
+              ? pageMode === "body"
+                ? `${included.length} fonts. ${included.length} reading ${included.length === 1 ? "page" : "pages"}.`
+                : `${included.length} fonts. ${boards.length} ${boards.length === 1 ? "board" : "boards"}.`
+              : pageMode === "body" ? "Add fonts. Read them." : "Add fonts. Get boards."}
           </h1>
-          <p>{candidates.length ? "Tune the fonts once. The four-up pages update immediately." : "Drop in a folder or choose font files. Nothing is installed or uploaded."}</p>
+          <p>{candidates.length
+            ? pageMode === "body"
+              ? "One generous reading page per font. Every page shares the same honest text size."
+              : "Tune the fonts once. The four-up pages update immediately."
+            : "Drop in a folder or choose font files. Nothing is installed or uploaded."}</p>
           {candidates.length ? (
             <nav className="simple-jump-links" aria-label="Simple sections">
-              <a href="#simple-pages-heading"><span>View</span><strong>{boards.length} {boards.length === 1 ? "board" : "boards"} ↓</strong></a>
+              <a href="#simple-pages-heading"><span>View</span><strong>{pageCount} {pageCount === 1 ? "page" : "pages"} ↓</strong></a>
               <a href="#simple-fonts-heading"><span>Tune</span><strong>{candidates.length} fonts ↓</strong></a>
             </nav>
           ) : null}
@@ -469,45 +516,99 @@ export function SimpleWorkspace({
         <div className="simple-hero-actions">
           <button id="simple-add-fonts" type="button" className="quiet-button has-icon" onClick={actions.importSources}><InterfaceIcon name="add" />Add Fonts…</button>
           {capabilities?.installedCatalog ? <button type="button" className="quiet-button has-icon" onClick={openInstalledCatalog}><InterfaceIcon name="library" />Installed Fonts…</button> : null}
-          <button type="button" className="primary-button has-icon" disabled={!included.length || !capabilities?.transactionalHandoff} onClick={() => actions.exportBoards(includeSources)}><InterfaceIcon name="export" />Export Boards…</button>
+          <button type="button" className="primary-button has-icon" disabled={!included.length || !capabilities?.transactionalHandoff || (pageMode === "body" && bodyCopyInvalid)} onClick={() => actions.exportBoards(includeSources)}><InterfaceIcon name="export" />{pageMode === "body" ? "Export Body Copy…" : "Export Boards…"}</button>
         </div>
       </section>
 
-      <section className="simple-compose" aria-label="Board copy and export options">
-        <label className="simple-copy-field">
-          <span>What should the fonts say?</span>
-          <textarea
-            value={copy}
-            onChange={(event) => dispatch({ type: "set-copy-override", copy: event.target.value })}
-            placeholder="Your Headline"
-            spellCheck={false}
-            rows={2}
-          />
-        </label>
-        <div className="simple-options">
-          <label title="Temporarily swaps your copy for characters, numerals, currency, and punctuation.">
-            <input type="checkbox" checked={stressTest} onChange={(event) => onStressTestChange(event.target.checked)} />
-            <span><strong>Stress test</strong><small>{SIMPLE_STRESS_COPY}</small></span>
-          </label>
-          <label>
-            <input type="checkbox" checked={includeIndex} onChange={(event) => onIncludeIndexChange(event.target.checked)} />
-            <span><strong>Index pages</strong><small>12 fonts per page</small></span>
-          </label>
-          <label title="Copies the original source font files into the export folder.">
-            <input type="checkbox" checked={includeSources} onChange={(event) => onIncludeSourcesChange(event.target.checked)} />
-            <span><strong>Copy source fonts</strong><small>I have permission to share them</small></span>
-          </label>
+      <section className="simple-page-mode" aria-labelledby="simple-page-mode-heading">
+        <div>
+          <p className="section-kicker">Choose the page</p>
+          <h2 id="simple-page-mode-heading">What are we making?</h2>
         </div>
-        <div className="simple-fit-policy" role="radiogroup" aria-labelledby="simple-fit-policy-heading">
-          <p id="simple-fit-policy-heading">Comparison sizing</p>
-          {FIT_POLICIES.map((policy) => (
-            <label key={policy}>
-              <input type="radio" name="simple-fit-policy" value={policy} checked={fitPolicy === policy} onChange={() => onFitPolicyChange(policy)} />
-              <span><strong>{policyLabels[policy].label}</strong><small>{policyLabels[policy].detail}</small></span>
-            </label>
-          ))}
+        <div className="simple-page-mode-choices" role="group" aria-label="Simple page format">
+          <button type="button" className={pageMode === "boards" ? "is-active" : ""} aria-pressed={pageMode === "boards"} onClick={() => changePageMode("boards")}>
+            <span aria-hidden="true">4×</span><strong>Boards</strong><small>Four fonts per page. Fast visual comparison.</small>
+          </button>
+          <button type="button" className={pageMode === "body" ? "is-active" : ""} aria-pressed={pageMode === "body"} onClick={() => changePageMode("body")}>
+            <span aria-hidden="true">¶</span><strong>Body Copy</strong><small>One font per page. Real reading texture.</small>
+          </button>
         </div>
       </section>
+
+      {pageMode === "boards" ? (
+        <section className="simple-compose" aria-label="Board copy and export options">
+          <label className="simple-copy-field">
+            <span>What should the fonts say?</span>
+            <textarea
+              value={copy}
+              onChange={(event) => dispatch({ type: "set-copy-override", copy: event.target.value })}
+              placeholder="Your Headline"
+              spellCheck={false}
+              rows={2}
+            />
+          </label>
+          <div className="simple-options">
+            <label title="Temporarily swaps your copy for characters, numerals, currency, and punctuation.">
+              <input type="checkbox" checked={stressTest} onChange={(event) => onStressTestChange(event.target.checked)} />
+              <span><strong>Stress test</strong><small>{SIMPLE_STRESS_COPY}</small></span>
+            </label>
+            <label>
+              <input type="checkbox" checked={includeIndex} onChange={(event) => onIncludeIndexChange(event.target.checked)} />
+              <span><strong>Index pages</strong><small>12 fonts per page</small></span>
+            </label>
+            <label title="Copies the original source font files into the export folder.">
+              <input type="checkbox" checked={includeSources} onChange={(event) => onIncludeSourcesChange(event.target.checked)} />
+              <span><strong>Copy source fonts</strong><small>I have permission to share them</small></span>
+            </label>
+          </div>
+          <div className="simple-fit-policy" role="radiogroup" aria-labelledby="simple-fit-policy-heading">
+            <p id="simple-fit-policy-heading">Comparison sizing</p>
+            {FIT_POLICIES.map((policy) => (
+              <label key={policy}>
+                <input type="radio" name="simple-fit-policy" value={policy} checked={fitPolicy === policy} onChange={() => onFitPolicyChange(policy)} />
+                <span><strong>{policyLabels[policy].label}</strong><small>{policyLabels[policy].detail}</small></span>
+              </label>
+            ))}
+          </div>
+        </section>
+      ) : (
+        <section className="simple-body-compose" aria-label="Body copy and export options">
+          <div className="simple-body-editor">
+            <div className="simple-body-editor-heading">
+              <label htmlFor="simple-body-copy">Reading copy</label>
+              <span id="simple-body-copy-count" className={bodyCopyTooLong ? "is-over" : ""}>{bodyCopy.length.toLocaleString("en-US")} / {SIMPLE_BODY_COPY_LIMIT.toLocaleString("en-US")}</span>
+            </div>
+            <textarea
+              id="simple-body-copy"
+              value={bodyCopy}
+              onChange={(event) => dispatch({ type: "set-copy-override", copy: event.target.value })}
+              aria-invalid={bodyCopyInvalid || undefined}
+              aria-describedby="simple-body-copy-note simple-body-copy-count"
+              spellCheck
+              rows={8}
+            />
+            <p id="simple-body-copy-note">Edit once here; the same copy, casing, font order, styles, and variable axes stay with the Study in Studio.</p>
+            {bodyCopyEmpty ? <p className="simple-body-copy-error" role="alert">Add some reading copy to export.</p> : bodyCopyTooLong ? <p className="simple-body-copy-error" role="alert">Shorten this by {(bodyCopy.length - SIMPLE_BODY_COPY_LIMIT).toLocaleString("en-US")} characters to export.</p> : null}
+          </div>
+          <div className="simple-body-sample-panel">
+            <div><p className="section-kicker">Starting copy</p><h3>Pick a texture.</h3></div>
+            <div className="simple-body-samples" role="group" aria-label="Body copy samples">
+              {SIMPLE_BODY_COPY_SAMPLES.map((sample, sampleIndex) => (
+                <button type="button" key={sample.id} className={bodyCopy === sample.copy ? "is-active" : ""} aria-pressed={bodyCopy === sample.copy} onClick={() => chooseBodySample(sample.id)}>
+                  <span>{String(sampleIndex + 1).padStart(2, "0")}</span><strong>{sample.label}</strong><small>{sample.detail}</small>
+                </button>
+              ))}
+            </div>
+            <div className="simple-body-export-options">
+              <div><strong>Matched reading size</strong><small>All pages use the same fitted size, so differences stay honest.</small></div>
+              <label title="Copies the original source font files into the export folder.">
+                <input type="checkbox" checked={includeSources} onChange={(event) => onIncludeSourcesChange(event.target.checked)} />
+                <span><strong>Copy source fonts</strong><small>I have permission to share them</small></span>
+              </label>
+            </div>
+          </div>
+        </section>
+      )}
 
       {!candidates.length ? (
         <button type="button" className="simple-empty-drop" onClick={actions.importSources}>
@@ -517,51 +618,87 @@ export function SimpleWorkspace({
         </button>
       ) : (
         <>
-          <section className="simple-pages-section" aria-labelledby="simple-pages-heading">
-            <div className="simple-section-heading">
-              <div><p className="section-kicker">01 · Boards</p><h2 id="simple-pages-heading">Your boards. Already made.</h2></div>
-              <button type="button" className="primary-button has-icon" disabled={!included.length || !capabilities?.transactionalHandoff} onClick={() => actions.exportBoards(includeSources)}><InterfaceIcon name="export" />Export {boards.length + indexPages.length} pages…</button>
-            </div>
-            <div className="simple-page-list">
-              {boards.map((board, boardIndex) => (
-                <article className="simple-page-wrap" key={`board-${boardIndex}`}>
-                  <header><strong>Board {String(boardIndex + 1).padStart(2, "0")}</strong><span>{board.map((candidate) => String(included.indexOf(candidate) + 1).padStart(2, "0")).join(" · ")} · 5152 × 2160 export</span></header>
-                  <div className="simple-board" aria-label={`Board ${boardIndex + 1}`}>
-                    {Array.from({ length: 4 }, (_, slot) => {
-                      const candidate = board[slot];
-                      const palette = SIMPLE_QUADRANTS[slot];
-                      return (
-                        <div className="simple-quadrant" key={slot} style={{ "--quadrant-bg": palette.background, "--quadrant-ink": palette.text } as CSSProperties}>
-                          {candidate ? (
-                            <>
-                              <SimpleCandidateCopy session={session} candidate={candidate} fontStates={fontStates} stressTest={stressTest} className="simple-quadrant-copy" fit="board" policy={fitPolicy} />
-                              <span>{String(included.indexOf(candidate) + 1).padStart(2, "0")} · {sourceForCandidate(session.document, candidate).hint.fileName}</span>
-                            </>
-                          ) : null}
+          {pageMode === "boards" ? (
+            <section className="simple-pages-section" aria-labelledby="simple-pages-heading">
+              <div className="simple-section-heading">
+                <div><p className="section-kicker">01 · Boards</p><h2 id="simple-pages-heading">Your boards. Already made.</h2></div>
+                <button type="button" className="primary-button has-icon" disabled={!included.length || !capabilities?.transactionalHandoff} onClick={() => actions.exportBoards(includeSources)}><InterfaceIcon name="export" />Export {boards.length + indexPages.length} pages…</button>
+              </div>
+              <div className="simple-page-list">
+                {boards.map((board, boardIndex) => (
+                  <article className="simple-page-wrap" key={`board-${boardIndex}`}>
+                    <header><strong>Board {String(boardIndex + 1).padStart(2, "0")}</strong><span>{board.map((candidate) => String(included.indexOf(candidate) + 1).padStart(2, "0")).join(" · ")} · 5152 × 2160 export</span></header>
+                    <div className="simple-board" aria-label={`Board ${boardIndex + 1}`}>
+                      {Array.from({ length: 4 }, (_, slot) => {
+                        const candidate = board[slot];
+                        const palette = SIMPLE_QUADRANTS[slot];
+                        return (
+                          <div className="simple-quadrant" key={slot} style={{ "--quadrant-bg": palette.background, "--quadrant-ink": palette.text } as CSSProperties}>
+                            {candidate ? (
+                              <>
+                                <SimpleCandidateCopy session={session} candidate={candidate} fontStates={fontStates} stressTest={stressTest} className="simple-quadrant-copy" fit="board" policy={fitPolicy} />
+                                <span>{String(included.indexOf(candidate) + 1).padStart(2, "0")} · {sourceForCandidate(session.document, candidate).hint.fileName}</span>
+                              </>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </article>
+                ))}
+                {indexPages.map((page, pageIndex) => (
+                  <article className="simple-page-wrap" key={`index-${pageIndex}`}>
+                    <header><strong>Index {pageIndex + 1} / {indexPages.length}</strong><span>{page.length} fonts · 5152 × 2160 export</span></header>
+                    <div className="simple-index-board" aria-label={`Index page ${pageIndex + 1}`}>
+                      {page.map((candidate) => {
+                        const face = faceForCandidate(session.document, candidate);
+                        return (
+                          <div className="simple-index-cell" key={candidate.id}>
+                            <span>{String(included.indexOf(candidate) + 1).padStart(2, "0")} · {face.family}</span>
+                            <SimpleCandidateCopy session={session} candidate={candidate} fontStates={fontStates} stressTest={stressTest} className="simple-index-copy" fit="index" />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : (
+            <section className="simple-pages-section" aria-labelledby="simple-pages-heading">
+              <div className="simple-section-heading">
+                <div><p className="section-kicker">01 · Body Copy</p><h2 id="simple-pages-heading">One font. One reading page.</h2></div>
+                <button type="button" className="primary-button has-icon" disabled={!included.length || !capabilities?.transactionalHandoff || bodyCopyInvalid} onClick={() => actions.exportBoards(includeSources)}><InterfaceIcon name="export" />Export {included.length} {included.length === 1 ? "page" : "pages"}…</button>
+              </div>
+              {included.length ? (
+                <div className="simple-body-page-list">
+                  {included.map((candidate, candidateIndex) => {
+                    const face = faceForCandidate(session.document, candidate);
+                    const source = sourceForCandidate(session.document, candidate);
+                    const state = fontStates.get(face.id);
+                    return (
+                      <article className="simple-page-wrap simple-body-page-wrap" key={`body-${candidate.id}`} data-candidate-id={candidate.id}>
+                        <header><strong>Reading Page {String(candidateIndex + 1).padStart(2, "0")}</strong><span>{face.family} · 5152 × 2160 export</span></header>
+                        <div className="simple-body-page" aria-label={`Body Copy page ${candidateIndex + 1}: ${face.family}`}>
+                          <div className="simple-body-page-topline"><span>Body Copy · {String(candidateIndex + 1).padStart(2, "0")} / {String(included.length).padStart(2, "0")}</span><span>{bodyCopyLabel} · 5152 × 2160</span></div>
+                          <div className="simple-body-page-meta">
+                            <h3 style={specimenStyle(session.document, candidate, recipe, state, { fittedSize: 112 })}>{face.family}</h3>
+                            <p>{candidate.label}</p>
+                            <p>{source.hint.fileName || face.style}</p>
+                            <small>Matched reading size<br />1.48 leading</small>
+                          </div>
+                          <div className="simple-body-reading">
+                            <SimpleCandidateCopy session={session} candidate={candidate} fontStates={fontStates} stressTest={false} className="simple-body-reading-copy" fit="body" displayCopy={simpleBodyDisplayCopy(session, candidate, bodySampleId)} label={`${face.family} body copy`} />
+                          </div>
+                          <p className="simple-body-page-footer">{session.document.title} · {face.style}</p>
                         </div>
-                      );
-                    })}
-                  </div>
-                </article>
-              ))}
-              {indexPages.map((page, pageIndex) => (
-                <article className="simple-page-wrap" key={`index-${pageIndex}`}>
-                  <header><strong>Index {pageIndex + 1} / {indexPages.length}</strong><span>{page.length} fonts · 5152 × 2160 export</span></header>
-                  <div className="simple-index-board" aria-label={`Index page ${pageIndex + 1}`}>
-                    {page.map((candidate) => {
-                      const face = faceForCandidate(session.document, candidate);
-                      return (
-                        <div className="simple-index-cell" key={candidate.id}>
-                          <span>{String(included.indexOf(candidate) + 1).padStart(2, "0")} · {face.family}</span>
-                          <SimpleCandidateCopy session={session} candidate={candidate} fontStates={fontStates} stressTest={stressTest} className="simple-index-copy" fit="index" />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : <p className="simple-pages-empty">Every font is skipped. Include at least one below to make a reading page.</p>}
+            </section>
+          )}
 
           <section className="simple-font-section" aria-labelledby="simple-fonts-heading">
             <div className="simple-section-heading">
@@ -626,7 +763,7 @@ export function SimpleWorkspace({
                         </div>
                       ) : null}
                       <footer>
-                        <div className="simple-decision" role="group" aria-label={`Board inclusion for ${face.family}`}>
+                        <div className="simple-decision" role="group" aria-label={`Page inclusion for ${face.family}`}>
                           <button type="button" className={!skipped ? "is-active" : ""} aria-pressed={!skipped} onClick={() => dispatch({ type: "set-review-state", candidateIds: [candidate.id], reviewState: "keep" })}>Include</button>
                           <button type="button" className={skipped ? "is-active is-reject" : ""} aria-pressed={skipped} onClick={() => dispatch({ type: "set-review-state", candidateIds: [candidate.id], reviewState: "reject" })}>Skip</button>
                         </div>

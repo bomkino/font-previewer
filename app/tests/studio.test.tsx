@@ -80,6 +80,33 @@ test("Simple mode restores the original font-to-four-up-board pipeline", () => {
   assert.doesNotMatch(html, /(?:file:\/\/|\/Users\/|\/home\/)/);
 });
 
+test("Simple Body Copy makes one complete reading page per included font", () => {
+  globalThis.location.search = "?fixture=1&mode=simple&page=body";
+  let html = "";
+  try {
+    html = renderToStaticMarkup(<App />);
+  } finally {
+    globalThis.location.search = "?fixture=1";
+  }
+  assert.match(html, /data-simple-page-mode="body"/);
+  assert.match(html, /Body Copy/);
+  assert.match(html, /Before the city wakes/);
+  assert.match(html, /The useful quiet/);
+  assert.match(html, /After the first rain/);
+  assert.match(html, /One font\. One reading page\./);
+  assert.match(html, /Matched reading size/);
+  assert.match(html, /Edit once here; the same copy, casing, font order, styles, and variable axes stay with the Study in Studio\./);
+  assert.match(html, /Good body type rarely asks to be admired\./);
+  assert.equal((html.match(/class="simple-page-wrap simple-body-page-wrap"/gu) ?? []).length, 20);
+  assert.equal((html.match(/class="simple-body-reading-copy simple-fitted-copy simple-fitted-body"/gu) ?? []).length, 20);
+  assert.equal((html.match(/5152 × 2160 export/gu) ?? []).length, 20);
+  assert.equal((html.match(/<main/g) ?? []).length, 1);
+  assert.equal((html.match(/<aside/g) ?? []).length, 0);
+  assert.equal((html.match(/<nav/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /Stress test/);
+  assert.doesNotMatch(html, /(?:file:\/\/|\/Users\/|\/home\/)/);
+});
+
 test("welcome skip link has a focusable destination", () => {
   globalThis.location.search = "";
   let html = "";

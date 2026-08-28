@@ -215,7 +215,9 @@ private struct InstalledCatalogEntry {
 private struct SimpleExportManifest {
     let width: Int
     let height: Int
+    let pageMode: String
     let boardCount: Int
+    let bodyCount: Int
     let indexCount: Int
     let fontCount: Int
     let includeIndex: Bool
@@ -834,7 +836,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
                 for source in document["sources"] as? [[String: Any]] ?? [] { guard let id = source["id"] as? String, let url = sourceBindings[id] else { continue }; let name = safeStem(source["displayName"] as? String ?? "Source") + "." + url.pathExtension; try manager.copyItem(at: url, to: uniqueURL(directory.appendingPathComponent(name))) }
             }
             let files = recursiveFiles(staging); var entries: [[String: Any]] = []
-            for file in files { let data = try Data(contentsOf: file); guard !data.isEmpty else { throw HostError.exportFailed("Empty output \(file.lastPathComponent)") }; entries.append(["path": relativePath(file, staging), "bytes": data.count, "sha256": sha256(data)]) }
+            for file in files { let data = try Data(contentsOf: file); guard !data.isEmpty else { throw HostError.exportFailed("Empty output \(file.lastPathComponent)") }; entries.append(["path": try relativePath(file, staging), "bytes": data.count, "sha256": sha256(data)]) }
             let manifest: [String: Any] = ["manifestVersion": 1, "generatedAt": ISO8601DateFormatter().string(from: Date()), "product": "Font Previewer", "studyId": document["id"] ?? "unknown", "schemaVersion": 4, "sourcesIncluded": preferences["includeSources"] as? Bool == true, "redistributionPermissionAcknowledged": preferences["includeSources"] as? Bool == true && permission, "files": entries]
             try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys]).write(to: staging.appendingPathComponent("manifest.json"), options: [.atomic])
             let checksums = entries.compactMap { entry -> String? in guard let hash = entry["sha256"] as? String, let path = entry["path"] as? String else { return nil }; return "\(hash)  \(path)" }.joined(separator: "\n") + "\n"
@@ -864,25 +866,31 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         let height = try integer("height")
         let fontCount = try integer("fontCount")
         let boardCount = try integer("boardCount")
+        let bodyCount = try integer("bodyCount")
         let indexCount = try integer("indexCount")
+        guard let pageMode = value["pageMode"] as? String, ["boards", "body"].contains(pageMode) else { throw HostError.exportFailed("Simple export manifest has an invalid page mode.") }
         guard let includeIndex = value["includeIndex"] as? Bool else { throw HostError.exportFailed("Simple export manifest has an invalid index setting.") }
-        guard width == 5_152, height == 2_160 else { throw HostError.exportFailed("Simple boards must be 5152 × 2160.") }
+        guard width == 5_152, height == 2_160 else { throw HostError.exportFailed("Simple pages must be 5152 × 2160.") }
         guard fontCount >= 1, fontCount <= 8_192 else { throw HostError.exportFailed("Simple export font count is outside the Study limit.") }
         let expectedFontCount = (document["candidates"] as? [[String: Any]] ?? []).filter { $0["reviewState"] as? String != "reject" }.count
         guard fontCount == expectedFontCount else { throw HostError.exportFailed("Simple export font count does not match the mirrored Study.") }
-        guard boardCount == Int(ceil(Double(fontCount) / 4.0)) else { throw HostError.exportFailed("Simple export board count does not match its fonts.") }
-        guard indexCount == (includeIndex ? Int(ceil(Double(fontCount) / 12.0)) : 0) else { throw HostError.exportFailed("Simple export index count does not match its fonts.") }
-        return SimpleExportManifest(width: width, height: height, boardCount: boardCount, indexCount: indexCount, fontCount: fontCount, includeIndex: includeIndex)
+        if pageMode == "boards" {
+            guard boardCount == Int(ceil(Double(fontCount) / 4.0)), bodyCount == 0 else { throw HostError.exportFailed("Simple export board count does not match its fonts.") }
+            guard indexCount == (includeIndex ? Int(ceil(Double(fontCount) / 12.0)) : 0) else { throw HostError.exportFailed("Simple export index count does not match its fonts.") }
+        } else {
+            guard boardCount == 0, indexCount == 0, bodyCount == fontCount, !includeIndex else { throw HostError.exportFailed("Simple export Body Copy count does not match its fonts.") }
+        }
+        return SimpleExportManifest(width: width, height: height, pageMode: pageMode, boardCount: boardCount, bodyCount: bodyCount, indexCount: indexCount, fontCount: fontCount, includeIndex: includeIndex)
     }
 
     private func simplePNG(_ raw: Any?) throws -> Data {
         let prefix = "data:image/png;base64,"
-        guard let dataURL = raw as? String, dataURL.hasPrefix(prefix), dataURL.count <= 128 * 1024 * 1024 else { throw HostError.exportFailed("Simple board renderer returned an invalid PNG payload.") }
+        guard let dataURL = raw as? String, dataURL.hasPrefix(prefix), dataURL.count <= 128 * 1024 * 1024 else { throw HostError.exportFailed("Simple page renderer returned an invalid PNG payload.") }
         let encoded = String(dataURL.dropFirst(prefix.count))
         guard !encoded.isEmpty, encoded.count.isMultiple(of: 4), encoded.range(of: #"^[A-Za-z0-9+/]+={0,2}$"#, options: .regularExpression) != nil,
               let data = Data(base64Encoded: encoded), data.count <= 96 * 1024 * 1024,
               let bitmap = NSBitmapImageRep(data: data), bitmap.pixelsWide == 5_152, bitmap.pixelsHigh == 2_160
-        else { throw HostError.exportFailed("Simple board PNG failed 5152 × 2160 decode verification.") }
+        else { throw HostError.exportFailed("Simple page PNG failed 5152 × 2160 decode verification.") }
         return data
     }
 
@@ -890,9 +898,10 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         let manager = FileManager.default
         let pageGroups: [(kind: String, count: Int, directory: String, stem: String)] = [
             ("board", manifest.boardCount, "Boards", "Board"),
+            ("body", manifest.bodyCount, "Body Copy", "Body"),
             ("index", manifest.indexCount, "Index", "Index"),
         ]
-        let total = manifest.boardCount + manifest.indexCount
+        let total = manifest.boardCount + manifest.bodyCount + manifest.indexCount
         var completed = 0
         for group in pageGroups where group.count > 0 {
             let directory = staging.appendingPathComponent(group.directory, isDirectory: true)
@@ -937,6 +946,41 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         ]
     }
 
+    fileprivate func verifySimpleBodyExport(in target: URL) async throws -> [String: Any] {
+        let manager = FileManager.default
+        guard let document = mirroredDocument else { throw HostError.exportFailed("No mirrored Study for Body Copy export evidence") }
+        try manager.createDirectory(at: target, withIntermediateDirectories: true)
+        let preferences: [String: Any] = ["profile": "internal", "outputs": ["summary", "json", "csv"], "includeSources": false]
+        let committed = try await exportHandoff(document, preferences, false, target)
+        let root = target.appendingPathComponent(committed.name, isDirectory: true)
+        let bodyDirectory = root.appendingPathComponent("Body Copy", isDirectory: true)
+        let pages = (try? manager.contentsOfDirectory(at: bodyDirectory, includingPropertiesForKeys: [.fileSizeKey], options: [.skipsHiddenFiles]))?
+            .filter { $0.pathExtension.lowercased() == "png" }
+            .sorted { $0.lastPathComponent < $1.lastPathComponent } ?? []
+        var decoded = true
+        var dimensions = Set<String>()
+        for page in pages {
+            let data = try Data(contentsOf: page)
+            guard let bitmap = NSBitmapImageRep(data: data) else { decoded = false; continue }
+            dimensions.insert("\(bitmap.pixelsWide)x\(bitmap.pixelsHigh)")
+        }
+        let expected = (document["candidates"] as? [[String: Any]] ?? []).filter { $0["reviewState"] as? String != "reject" }.count
+        let manifestData = try Data(contentsOf: root.appendingPathComponent("manifest.json"))
+        let manifest = try JSONSerialization.jsonObject(with: manifestData) as? [String: Any]
+        let files = manifest?["files"] as? [[String: Any]] ?? []
+        let bodyManifestCount = files.filter { ($0["path"] as? String)?.hasPrefix("Body Copy/Body_") == true }.count
+        return [
+            "pageCount": pages.count,
+            "expected": expected,
+            "decoded": decoded,
+            "dimensions": dimensions.sorted(),
+            "manifestBodyPages": bodyManifestCount,
+            "boardsAbsent": !manager.fileExists(atPath: root.appendingPathComponent("Boards").path),
+            "indexAbsent": !manager.fileExists(atPath: root.appendingPathComponent("Index").path),
+            "fileCount": committed.count,
+        ]
+    }
+
     fileprivate func evaluate(_ script: String) async throws -> Any? { try await withCheckedThrowingContinuation { continuation in webView.evaluateJavaScript(script) { value, error in if let error { continuation.resume(throwing: error) } else { continuation.resume(returning: value) } } } }
     fileprivate func evaluateAsync(_ expression: String) async throws -> Any? { try await withCheckedThrowingContinuation { continuation in webView.callAsyncJavaScript("return await (\(expression));", arguments: [:], in: nil, in: .page) { result in continuation.resume(with: result) } } }
     fileprivate func snapshot(to url: URL) async throws { let image: NSImage = try await withCheckedThrowingContinuation { continuation in webView.takeSnapshot(with: nil) { image, error in if let image { continuation.resume(returning: image) } else { continuation.resume(throwing: error ?? HostError.exportFailed("Snapshot failed")) } } }; guard let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff), let png = bitmap.representation(using: .png, properties: [:]) else { throw HostError.exportFailed("PNG encoding failed") }; try png.write(to: url, options: [.atomic]) }
@@ -948,7 +992,13 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     private func safeStem(_ value: String) -> String { let illegal = CharacterSet(charactersIn: "<>:\"/\\|?*").union(.controlCharacters); let cleaned = value.components(separatedBy: illegal).joined(separator: " ").split(whereSeparator: \.isWhitespace).joined(separator: " ").trimmingCharacters(in: CharacterSet(charactersIn: ". ")); return String((cleaned.isEmpty ? "Font Previewer" : cleaned).prefix(100)) }
     private func uniqueURL(_ requested: URL) -> URL { var result = requested; var suffix = 2; while FileManager.default.fileExists(atPath: result.path) { result = requested.deletingPathExtension().appendingPathExtension("\(suffix).\(requested.pathExtension)"); suffix += 1 }; return result }
     private func recursiveFiles(_ root: URL) -> [URL] { guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isRegularFileKey]) else { return [] }; return enumerator.compactMap { $0 as? URL }.filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }.sorted { $0.path < $1.path } }
-    private func relativePath(_ url: URL, _ root: URL) -> String { String(url.path.dropFirst(root.path.count + 1)) }
+    private func relativePath(_ url: URL, _ root: URL) throws -> String {
+        let rootPath = root.resolvingSymlinksInPath().standardizedFileURL.path
+        let filePath = url.resolvingSymlinksInPath().standardizedFileURL.path
+        let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+        guard filePath.hasPrefix(prefix), filePath.count > prefix.count else { throw HostError.exportFailed("Handoff output escaped its staging directory") }
+        return String(filePath.dropFirst(prefix.count))
+    }
     private func sha256(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
 
     private func emptyDocument() -> [String: Any] { let now = ISO8601DateFormatter().string(from: Date()); return ["schemaVersion": 4, "id": "study:\(UUID().uuidString.lowercased())", "title": "Untitled font study", "createdAt": now, "updatedAt": now, "sources": [], "faces": [], "candidates": [], "recipes": [["id": "recipe:blank", "pack": "blank", "name": "Custom specimen", "copy": "Type carries the argument before a word is read.", "language": "en", "direction": "auto", "casing": "exact", "sizePolicy": "fit", "size": 72, "lineHeight": 1.04, "tracking": -0.02, "alignment": "leading", "background": "split"]], "comparisonSets": [], "typographySystems": [["id": "system:primary", "name": "Primary system", "rationale": "", "fontUses": []]], "activeSystemId": "system:primary", "handoff": ["profile": "designer", "outputs": ["pdf", "summary", "json", "csv"], "includeSources": true]] }
@@ -1077,6 +1127,19 @@ private final class MacEvidenceRunner {
         let simpleLongCopy = simpleBoards?["longCopy"] as? [String: Any]
         let simpleLockedLines = simpleBoards?["lockedLines"] as? [String: Any]
         let simpleStress = simpleBoards?["stress"] as? [String: Any]
+        let simpleBody = (trace["simpleVisual"] as? [String: Any])?["bodyCopy"] as? [String: Any]
+        let simpleBodyExport = simpleBody?["export"] as? [String: Any]
+        let simpleBodyScale = simpleBody?["scale"] as? [String: Any]
+        let simpleBodyScalePass = [80, 140].allSatisfy { target in
+            guard let metrics = simpleBodyScale?[String(target)] as? [String: Any] else { return false }
+            return metrics["scale"] as? Int == target
+                && metrics["headerOverflow"] as? Bool == false
+                && metrics["workspaceOverflow"] as? Bool == false
+                && metrics["pageOverflow"] as? Bool == false
+                && metrics["editorOverflow"] as? Bool == false
+                && ((metrics["minTouchHeight"] as? Double) ?? 0) >= 44
+                && metrics["horizontalOverflow"] as? Bool == false
+        }
         let simpleTuning = (trace["simpleVisual"] as? [String: Any])?["tuning"] as? [String: Any]
         let simplePreview = simpleTuning?["preview"] as? [String: Any]
         let studioEvidence = trace["studioVisual"] as? [String: Any]
@@ -1125,6 +1188,25 @@ private final class MacEvidenceRunner {
                 && simpleStress?["copyright"] as? Bool == true
                 && simpleStress?["trademark"] as? Bool == true
                 && simpleStress?["numerals"] as? Bool == true),
+            ("simple body copy", simpleBody?["pageCount"] as? Int == simpleBody?["includedCount"] as? Int
+                && ((simpleBody?["pageCount"] as? Int) ?? 0) > 0
+                && simpleBody?["sampleCount"] as? Int == 3
+                && simpleBody?["fullText"] as? Bool == true
+                && simpleBody?["twoParagraphs"] as? Bool == true
+                && simpleBody?["sharedSize"] as? Bool == true
+                && simpleBody?["withinFrames"] as? Bool == true
+                && simpleBody?["noEllipsis"] as? Bool == true
+                && simpleBody?["metadataTruncation"] as? Int == 0
+                && ((simpleBody?["minTouchHeight"] as? Double) ?? 0) >= 44
+                && simpleBody?["horizontalOverflow"] as? Bool == false
+                && simpleBody?["studioShared"] as? Bool == true
+                && simpleBodyScalePass
+                && simpleBodyExport?["pageCount"] as? Int == simpleBodyExport?["expected"] as? Int
+                && simpleBodyExport?["pageCount"] as? Int == simpleBodyExport?["manifestBodyPages"] as? Int
+                && simpleBodyExport?["decoded"] as? Bool == true
+                && simpleBodyExport?["dimensions"] as? [String] == ["5152x2160"]
+                && simpleBodyExport?["boardsAbsent"] as? Bool == true
+                && simpleBodyExport?["indexAbsent"] as? Bool == true),
             ("simple tuning", simpleTuning?["cards"] as? Int == 24
                 && simpleTuning?["casingLabels"] as? String == "As is|UPPER|lower|Title|AP Title"
                 && simpleTuning?["apTitle"] as? Bool == true
@@ -1331,6 +1413,7 @@ private final class MacEvidenceRunner {
         try await host.snapshot(to: output.appendingPathComponent("07-simple.png"))
         let boards = try await simpleBoardAudit()
         let tuning = try await simpleTuningAudit()
+        let bodyCopy = try await simpleBodyAudit()
         var scale: [String: Any] = [:]
         for target in [80, 90, 100, 110, 120, 130, 140] {
             try await setInterfaceScale(target)
@@ -1396,7 +1479,7 @@ private final class MacEvidenceRunner {
         try await wait("Simple-to-Studio state cleanup") { try await self.bool("Number([...document.querySelectorAll('.catalog-switcher button')].find(item=>item.textContent?.trim().startsWith('Study'))?.querySelector('span')?.textContent??-1)===\(originalCount)") }
         var verifiedStateTravel = stateTravel
         verifiedStateTravel["restored"] = true
-        return ["boards": boards, "catalog": catalog, "detail": detail, "stateTravel": verifiedStateTravel, "scale": scale, "tuning": tuning]
+        return ["boards": boards, "bodyCopy": bodyCopy, "catalog": catalog, "detail": detail, "stateTravel": verifiedStateTravel, "scale": scale, "tuning": tuning]
     }
     private func simpleBoardAudit() async throws -> [String: Any] {
         _ = try await host.evaluateAsync(#"(async()=>{const field=document.querySelector('.simple-copy-field textarea');const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;setter.call(field,'THE UNREASONABLY LONG TITLE THAT MUST NEVER BE CUT OFF OR TURN INTO DOTS');field.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('input[name="simple-fit-policy"][value="fit"]')?.click();const deadline=performance.now()+10000;while(!([...document.querySelectorAll('.simple-quadrant-copy')].length===4&&[...document.querySelectorAll('.simple-quadrant-copy')].every(item=>item.dataset.naturalFit))&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,16));document.querySelector('.simple-pages-section')?.scrollIntoView({block:'start'});await new Promise(resolve=>setTimeout(resolve,32));return true})()"#)
@@ -1408,6 +1491,100 @@ private final class MacEvidenceRunner {
         let stress = try await host.evaluateAsync(#"(async()=>{const checkbox=[...document.querySelectorAll('.simple-options input[type="checkbox"]')].find(item=>item.closest('label')?.textContent?.includes('Stress test'));checkbox?.click();const deadline=performance.now()+10000;while(!document.querySelector('.simple-quadrant-copy')?.textContent?.includes('₹')&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,16));const text=document.querySelector('.simple-quadrant-copy')?.textContent??'';return {rupee:text.includes('₹'),copyright:text.includes('©'),trademark:text.includes('™'),numerals:text.includes('0123456789')}})()"#) as? [String: Any] ?? [:]
         _ = try await host.evaluateAsync(#"(async()=>{const field=document.querySelector('.simple-copy-field textarea');const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;setter.call(field,'A House With No Doors');field.dispatchEvent(new Event('input',{bubbles:true}));const checkbox=[...document.querySelectorAll('.simple-options input[type="checkbox"]')].find(item=>item.closest('label')?.textContent?.includes('Stress test'));if(checkbox?.checked)checkbox.click();document.querySelector('input[name="simple-fit-policy"][value="fit"]')?.click();document.querySelector('.simple-hero')?.scrollIntoView({block:'start'});await new Promise(resolve=>setTimeout(resolve,32));return true})()"#)
         return ["lockedLines": lockedLines, "longCopy": longCopy, "stress": stress]
+    }
+    private func simpleBodyAudit() async throws -> [String: Any] {
+        _ = try await host.evaluateAsync(#"""
+        (async () => {
+          [...document.querySelectorAll('.simple-page-mode-choices button')]
+            .find(item => item.textContent?.includes('Body Copy'))?.click();
+          const deadline = performance.now() + 10000;
+          while (!document.querySelector('.simple-body-page-list') && performance.now() < deadline) {
+            await new Promise(resolve => setTimeout(resolve, 25));
+          }
+          const second = [...document.querySelectorAll('.simple-body-samples button')][1];
+          second?.click();
+          while (
+            (!document.querySelector('.simple-body-reading-copy')?.textContent?.startsWith('The workshop is quiet')
+              || [...document.querySelectorAll('.simple-body-reading-copy')].some(item => !item.dataset.naturalFit))
+            && performance.now() < deadline
+          ) {
+            await new Promise(resolve => setTimeout(resolve, 25));
+          }
+          document.querySelector('.simple-body-compose')?.scrollIntoView({block: 'start'});
+          await new Promise(resolve => setTimeout(resolve, 64));
+          return true;
+        })()
+        """#)
+        try await host.snapshot(to: output.appendingPathComponent("17-simple-body-compose.png"))
+        var metrics = try await host.evaluate(#"""
+        (() => {
+          const pages = [...document.querySelectorAll('.simple-body-page-wrap')];
+          const copies = pages.map(page => page.querySelector('.simple-body-reading-copy'));
+          const frames = pages.map(page => page.querySelector('.simple-body-reading'));
+          const expected = document.querySelector('#simple-body-copy')?.value ?? '';
+          const sizes = copies.map(item => Number.parseFloat(getComputedStyle(item).fontSize));
+          const touch = [...document.querySelectorAll('.simple-page-mode-choices button,.simple-body-samples button')]
+            .map(item => item.getBoundingClientRect().height)
+            .filter(value => value > 0);
+          return {
+            pageCount: pages.length,
+            includedCount: Number(document.querySelector('.simple-body-page-topline span')?.textContent?.match(/\/\s*(\d+)/)?.[1] ?? -1),
+            sampleCount: document.querySelectorAll('.simple-body-samples button').length,
+            fullText: copies.every(item => item?.textContent === expected),
+            twoParagraphs: expected.includes('\n\n') && copies.every(item => item?.textContent?.includes('\n\n')),
+            sharedSize: sizes.length === pages.length && new Set(sizes.map(value => value.toFixed(3))).size === 1,
+            withinFrames: copies.every((item, index) => {
+              const copy = item?.getBoundingClientRect();
+              const frame = frames[index]?.getBoundingClientRect();
+              return Boolean(copy && frame && copy.left >= frame.left - 1 && copy.right <= frame.right + 1 && copy.top >= frame.top - 1 && copy.bottom <= frame.bottom + 1);
+            }),
+            noEllipsis: copies.every(item => getComputedStyle(item).textOverflow !== 'ellipsis'),
+            metadataTruncation: [...document.querySelectorAll('.simple-body-page-meta h3,.simple-body-page-meta p,.simple-body-page-wrap > header span')]
+              .filter(item => getComputedStyle(item).textOverflow === 'ellipsis').length,
+            minTouchHeight: Math.min(...touch),
+            horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+          };
+        })()
+        """#) as? [String: Any] ?? [:]
+        _ = try await host.evaluateAsync(#"(async()=>{document.querySelector('.simple-body-page-wrap')?.scrollIntoView({block:'start'});await new Promise(resolve=>setTimeout(resolve,64));return true})()"#)
+        try await host.snapshot(to: output.appendingPathComponent("18-simple-body-page.png"))
+        metrics["export"] = try await host.verifySimpleBodyExport(in: output.appendingPathComponent("body-handoff-target", isDirectory: true))
+        var scale: [String: Any] = [:]
+        for target in [80, 140] {
+            try await setInterfaceScale(target)
+            scale[String(target)] = try await simpleBodyScaleMetrics()
+        }
+        try await setInterfaceScale(100)
+        metrics["scale"] = scale
+        _ = try await host.evaluate("[...document.querySelectorAll('.interface-switch button')].find(item=>item.textContent?.trim()==='Studio')?.click(); true")
+        try await wait("Body Copy Studio sharing") { try await self.bool("document.querySelector('.stage-nav') && document.querySelector('.specimen-select p')?.textContent?.startsWith('The workshop is quiet in the useful way')") }
+        metrics["studioShared"] = true
+        _ = try await host.evaluate("[...document.querySelectorAll('.interface-switch button')].find(item=>item.textContent?.trim()==='Simple')?.click(); true")
+        try await wait("Body Copy Simple restore") { try await self.bool("document.querySelector('.simple-body-page-list')") }
+        _ = try await host.evaluateAsync(#"(async()=>{[...document.querySelectorAll('.simple-page-mode-choices button')].find(item=>item.textContent?.includes('Boards'))?.click();const deadline=performance.now()+10000;while(!document.querySelector('.simple-copy-field textarea')&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,25));const field=document.querySelector('.simple-copy-field textarea');const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;setter.call(field,'A House With No Doors');field.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('.simple-hero')?.scrollIntoView({block:'start'});await new Promise(resolve=>setTimeout(resolve,64));return true})()"#)
+        return metrics
+    }
+    private func simpleBodyScaleMetrics() async throws -> [String: Any] {
+        try await host.evaluate(#"""
+        (() => {
+          const shell = document.querySelector('.app-shell');
+          const title = document.querySelector('.titlebar');
+          const workspace = document.querySelector('.simple-workspace');
+          const editor = document.querySelector('.simple-body-editor textarea');
+          const pages = [...document.querySelectorAll('.simple-body-reading')];
+          const controls = [...document.querySelectorAll('.simple-page-mode-choices button,.simple-body-samples button,.simple-hero-actions button,.ui-scale-control button')]
+            .filter(item => { const rect = item.getBoundingClientRect(); return rect.width > 0 && rect.height > 0; });
+          return {
+            scale: Number(shell?.dataset.uiScale),
+            headerOverflow: title.scrollWidth > title.clientWidth,
+            workspaceOverflow: workspace.scrollWidth > workspace.clientWidth,
+            pageOverflow: pages.some(item => item.scrollWidth > item.clientWidth || item.scrollHeight > item.clientHeight),
+            editorOverflow: editor.scrollHeight > editor.clientHeight + 1,
+            minTouchHeight: Math.min(...controls.map(item => item.getBoundingClientRect().height)),
+            horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+          };
+        })()
+        """#) as? [String: Any] ?? [:]
     }
     private func simpleTuningAudit() async throws -> [String: Any] {
         _ = try await host.evaluateAsync(#"(async()=>{document.querySelector('.simple-section-actions button[aria-expanded]')?.click();const deadline=performance.now()+10000;while(!document.querySelector('.simple-font-card')&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,16));document.querySelector('.simple-font-section')?.scrollIntoView({block:'start'});await new Promise(resolve=>setTimeout(resolve,32));return true})()"#)

@@ -2,7 +2,7 @@
 
 Font Previewer is a local typography decision tool for pitch-deck work. One shared Study now has two views inside a native AppKit/WKWebView Host on macOS and a sandboxed Electron Host on Linux:
 
-- **Simple:** add font files, folders, or installed families; choose styles; see four-up boards immediately; tune; export.
+- **Simple:** add font files, folders, or installed families; choose styles; switch between four-up Boards and one-font Body Copy pages; tune; export.
 - **Studio:** **Review → Compare → System → Handoff** for deeper decisions and packaging.
 
 Simple and Studio are not separate projects. Fonts, styles, copy, casing, variable-axis values, order, include/skip decisions, and comparison sizing move between them through the same session. Its dark-first interface and coral-loupe mark share one idea: attention reveals character; the tool does not choose a winner for you.
@@ -15,9 +15,10 @@ It imports and inspects fonts, maintains portable `.pitchfontstudy` documents, c
 - Source version: `0.1.0`
 - Latest published release: [`v0.1.0-rc.3`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.3)
 - Exact release source: `0e1d5c1c3ef1e6d6455c8bafcfb72fb8d203e1fe`
+- Current source candidate: `v0.1.0-rc.4` (not yet published)
 - Public stable release: none
 
-Published `v0.1.0-rc.3` restores the original fast font-to-board journey, adds the family/style picker and high-resolution four-up export, makes interface scaling real, and rebuilds Studio around larger, calmer decision surfaces. Published `rc.1` and `rc.2` history remains intact.
+Published `v0.1.0-rc.3` restored the original fast font-to-board journey. The current `rc.4` candidate adds one-font Body Copy reading pages without removing four-up Boards or the deeper Studio. Published `rc.1` through `rc.3` history remains intact.
 
 The exact current repository state, automated evidence, and remaining human gates live in [`docs/maintenance/REPOSITORY_STATE.md`](docs/maintenance/REPOSITORY_STATE.md).
 
@@ -25,8 +26,9 @@ The exact current repository state, automated evidence, and remaining human gate
 
 - Simple mode: local file/folder upload or an installed-font picker with family-first style selection.
 - Immediate four-font comparison boards, optional 12-font index pages, four-colour quadrants, stress text, five casing modes including AP Title, variable-axis tuning, reordering, include/skip, and full-size previews.
+- One-font Body Copy pages with three authored reading samples, custom copy, one matched reading size across the set, and full-text previews.
 - Shared Simple/Studio state for imported styles, copy, casing, axes, ordering, decisions, and comparison sizing.
-- Transactional 5,152 × 2,160 PNG board export with manifest, checksums, Study JSON, CSV, summary, and optional explicitly authorised Source copies.
+- Transactional 5,152 × 2,160 PNG export for either `Boards/` plus optional `Index/`, or `Body Copy/`, with manifest, checksums, Study JSON, CSV, summary, and optional explicitly authorised Source copies.
 - Interface scaling from 80–140%, with keyboard shortcuts, at least 44 px measured touch targets, and no title/candidate ellipsis in the verified states.
 - Host-local file and folder import without font installation or upload.
 - A searchable, paginated installed-font Catalog bounded to 10,000 entries; browsing cannot mutate a Study.
