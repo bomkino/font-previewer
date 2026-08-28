@@ -246,7 +246,14 @@ export default function App() {
   const catalogRequestRef = useRef(0);
   const index = useStudyIndex(session.document);
   const fontStates = useFontRegistry(session);
-  currentRecoveryCheckpointKeyRef.current = recoveryCheckpointKey;
+  const previousRecoveryCheckpointKeyRef = useRef(recoveryCheckpointKey);
+  const recoveryCheckpointSequenceRef = useRef(0);
+  if (previousRecoveryCheckpointKeyRef.current !== recoveryCheckpointKey) {
+    previousRecoveryCheckpointKeyRef.current = recoveryCheckpointKey;
+    recoveryCheckpointSequenceRef.current += 1;
+  }
+  const recoveryCheckpointIdentity = `${recoveryCheckpointSequenceRef.current}:${recoveryCheckpointKey}`;
+  currentRecoveryCheckpointKeyRef.current = recoveryCheckpointIdentity;
 
   useEffect(() => {
     try {
@@ -668,22 +675,22 @@ export default function App() {
   }, [closeNewStudy, newStudyOpen]);
 
   useEffect(() => {
-    if (!launchReady || lastRecoveryCheckpointRef.current === recoveryCheckpointKey) return;
+    if (!launchReady || lastRecoveryCheckpointRef.current === recoveryCheckpointIdentity) return;
     const timer = window.setTimeout(() => {
-      if (currentRecoveryCheckpointKeyRef.current !== recoveryCheckpointKey) return;
-      lastRecoveryCheckpointRef.current = recoveryCheckpointKey;
+      if (currentRecoveryCheckpointKeyRef.current !== recoveryCheckpointIdentity) return;
+      lastRecoveryCheckpointRef.current = recoveryCheckpointIdentity;
       void mirror(session)
         .then(() => {
-          if (currentRecoveryCheckpointKeyRef.current === recoveryCheckpointKey) setConfirmedRecoveryCheckpointKey(recoveryCheckpointKey);
+          if (currentRecoveryCheckpointKeyRef.current === recoveryCheckpointIdentity) setConfirmedRecoveryCheckpointKey(recoveryCheckpointIdentity);
         })
         .catch((cause) => {
-          if (lastRecoveryCheckpointRef.current === recoveryCheckpointKey) lastRecoveryCheckpointRef.current = undefined;
+          if (lastRecoveryCheckpointRef.current === recoveryCheckpointIdentity) lastRecoveryCheckpointRef.current = undefined;
           setRecoveryAvailable(false);
           setError(cause instanceof Error ? cause.message : "Recovery checkpoint failed.");
         });
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [launchReady, mirror, recoveryCheckpointKey, session]);
+  }, [launchReady, mirror, recoveryCheckpointIdentity, session]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -768,7 +775,7 @@ export default function App() {
   };
 
   return (
-    <div className={`app-shell ${showWelcome ? "is-welcome" : ""} mode-${interfaceMode} stage-${session.workspace.stage}`} data-interface-mode={interfaceMode} data-simple-page-mode={simplePageMode} data-recovery-checkpoint={confirmedRecoveryCheckpointKey === recoveryCheckpointKey ? "ready" : "pending"} data-ui-scale={Math.round(uiScale * 100)} style={shellStyle}>
+    <div className={`app-shell ${showWelcome ? "is-welcome" : ""} mode-${interfaceMode} stage-${session.workspace.stage}`} data-interface-mode={interfaceMode} data-simple-page-mode={simplePageMode} data-recovery-checkpoint={confirmedRecoveryCheckpointKey === recoveryCheckpointIdentity ? "ready" : "pending"} data-ui-scale={Math.round(uiScale * 100)} style={shellStyle}>
       <a className="skip-link" href={showWelcome ? "#welcome-heading" : "#workspace-heading"}>Skip to main content</a>
       <header className="titlebar">
         <div className="brand-lockup"><img className="brand-mark" src="/font-previewer-icon-64.png" alt="" aria-hidden="true" /><div><strong>Font Previewer</strong><span>{interfaceMode === "simple" ? (simplePageMode === "body" ? "Reading Pages" : "Type Boards") : "Decision Studio"}</span></div></div>
