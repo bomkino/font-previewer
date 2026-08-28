@@ -406,6 +406,7 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   await waitFor(options.window, "durable recovery", `document.querySelector('.app-shell')?.dataset.recoveryCheckpoint === 'ready'`, 20_000);
   if (options.verifyDurability) trace.durabilityArtifact = await options.verifyDurability();
   if (options.exportHandoff) trace.transactionalHandoff = await options.exportHandoff();
+  await waitFor(options.window, "post-export Handoff restoration", `document.querySelector('.stage-nav [aria-current="step"]')?.textContent?.includes('Handoff') && document.querySelector('.handoff-workspace')`, 20_000);
   await waitFor(options.window, "post-export workspace recovery", `document.querySelector('.app-shell')?.dataset.recoveryCheckpoint === 'ready'`, 20_000);
 
   const beforeCrash = await inspectWorkspace(options.window);
