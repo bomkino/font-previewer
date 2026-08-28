@@ -19,6 +19,7 @@
 
 - Made both Hosts reject mixed, impossible, or count-mismatched Simple export manifests before writing a Handoff.
 - Canonicalized macOS export roots and output paths before deriving manifest and checksum entries, including destinations reached through `/var` and `/private/var` aliases.
+- Made text fitting scale-invariant by measuring untransformed layout pixels, and invalidated stale fit results whenever a specimen frame resizes.
 - Added public-seam coverage for Body Copy samples, limits, full-text rendering, exact page manifests, transactional export, mixed-manifest refusal, and shared Studio state.
 - Extended displayed macOS evidence to Body Copy composition, exact-size exports, Studio state travel, and overflow/touch-target checks at 80% and 140% interface scale; exact-head Linux evidence remains a release gate.
 

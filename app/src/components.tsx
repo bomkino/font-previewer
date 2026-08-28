@@ -235,10 +235,12 @@ function SimpleCandidateCopy({
     let cancelled = false;
     const fitCopy = () => {
       if (cancelled) return;
-      const bounds = container.getBoundingClientRect();
-      if (bounds.width <= 0 || bounds.height <= 0) return;
-      const maximumWidth = bounds.width * configuration.width;
-      const maximumHeight = bounds.height * configuration.height;
+      // UI scale transforms visual bounds; fitting must use untransformed layout pixels before writing CSS sizes.
+      const frameWidth = container.clientWidth;
+      const frameHeight = container.clientHeight;
+      if (frameWidth <= 0 || frameHeight <= 0) return;
+      const maximumWidth = frameWidth * configuration.width;
+      const maximumHeight = frameHeight * configuration.height;
       const wrappingFit = fit === "body" || (fit === "compare" && policy === "fit");
       element.style.width = wrappingFit ? `${maximumWidth}px` : "max-content";
       element.style.maxWidth = wrappingFit ? `${maximumWidth}px` : "none";
@@ -253,16 +255,15 @@ function SimpleCandidateCopy({
       for (let iteration = 0; iteration < 15; iteration += 1) {
         const size = (low + high) / 2;
         element.style.fontSize = `${size}px`;
-        const measured = element.getBoundingClientRect();
-        const widthFits = wrappingFit ? element.scrollWidth <= element.clientWidth + 1 : measured.width <= maximumWidth;
-        if (widthFits && measured.height <= maximumHeight) low = size;
+        const widthFits = wrappingFit ? element.scrollWidth <= element.clientWidth + 1 : element.scrollWidth <= maximumWidth;
+        if (widthFits && element.scrollHeight <= maximumHeight + 1) low = size;
         else high = size;
       }
       const naturalSize = Math.floor(low * 10) / 10;
       element.style.fontSize = `${naturalSize}px`;
       element.dataset.naturalFit = String(naturalSize);
-      const fitted = element.getBoundingClientRect();
-      if (fitted.width > maximumWidth) element.style.transform = `scaleX(${Math.max(0.1, maximumWidth / fitted.width)})`;
+      element.dataset.fitFrame = `${frameWidth}x${frameHeight}`;
+      if (element.scrollWidth > maximumWidth) element.style.transform = `scaleX(${Math.max(0.1, maximumWidth / element.scrollWidth)})`;
       if (fit === "body" || ((fit === "board" || fit === "compare") && policy !== "fit")) {
         const group = element.closest(fit === "body" ? ".simple-body-page-list" : (fit === "board" ? ".simple-board" : ".compare-grid"));
         const members = group ? [...group.querySelectorAll<HTMLElement>(`.simple-fitted-${fit}`)] : [];
@@ -275,15 +276,15 @@ function SimpleCandidateCopy({
             member.style.justifySelf = fit === "body" ? "start" : "center";
             member.style.transformOrigin = fit === "body" ? "left top" : "center center";
             if (fit === "body") return;
-            const memberBounds = member.getBoundingClientRect();
-            const parentBounds = member.parentElement?.getBoundingClientRect();
-            const available = (parentBounds?.width ?? memberBounds.width) * configuration.width;
-            if (memberBounds.width > available) member.style.transform = `scaleX(${Math.max(0.1, available / memberBounds.width)})`;
+            const available = (member.parentElement?.clientWidth ?? member.scrollWidth) * configuration.width;
+            if (member.scrollWidth > available) member.style.transform = `scaleX(${Math.max(0.1, available / member.scrollWidth)})`;
           });
         }
       }
     };
     const schedule = () => {
+      delete element.dataset.naturalFit;
+      delete element.dataset.fitFrame;
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(fitCopy);
     };

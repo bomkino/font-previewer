@@ -1552,6 +1552,7 @@ private final class MacEvidenceRunner {
         var scale: [String: Any] = [:]
         for target in [80, 140] {
             try await setInterfaceScale(target)
+            try await waitForSimpleBodyFit("Body Copy fit at \(target)%")
             scale[String(target)] = try await simpleBodyScaleMetrics()
         }
         try await setInterfaceScale(100)
@@ -1563,6 +1564,21 @@ private final class MacEvidenceRunner {
         try await wait("Body Copy Simple restore") { try await self.bool("document.querySelector('.simple-body-page-list')") }
         _ = try await host.evaluateAsync(#"(async()=>{[...document.querySelectorAll('.simple-page-mode-choices button')].find(item=>item.textContent?.includes('Boards'))?.click();const deadline=performance.now()+10000;while(!document.querySelector('.simple-copy-field textarea')&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,25));const field=document.querySelector('.simple-copy-field textarea');const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;setter.call(field,'A House With No Doors');field.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('.simple-hero')?.scrollIntoView({block:'start'});await new Promise(resolve=>setTimeout(resolve,64));return true})()"#)
         return metrics
+    }
+    private func waitForSimpleBodyFit(_ label: String) async throws {
+        try await wait(label) {
+            try await self.bool(#"""
+            (() => {
+              const copies = [...document.querySelectorAll('.simple-fitted-body')];
+              return copies.length > 0 && copies.every(item => {
+                const frame = item.parentElement;
+                return item.dataset.naturalFit
+                  && frame
+                  && item.dataset.fitFrame === `${frame.clientWidth}x${frame.clientHeight}`;
+              });
+            })()
+            """#)
+        }
     }
     private func simpleBodyScaleMetrics() async throws -> [String: Any] {
         try await host.evaluate(#"""
