@@ -13,12 +13,12 @@ It imports and inspects fonts, maintains portable `.pitchfontstudy` documents, c
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Latest published release: [`v0.1.0-rc.3`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.3)
-- Exact release source: `0e1d5c1c3ef1e6d6455c8bafcfb72fb8d203e1fe`
-- Current source candidate: `v0.1.0-rc.4` (not yet published)
+- Latest published release: [`v0.1.0-rc.4`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.4)
+- Exact release source: `b0950402316253cc9cb7bf7a6ec86ea5f669184f`
+- Current `main`: release source plus documentation-only release receipt
 - Public stable release: none
 
-Published `v0.1.0-rc.3` restored the original fast font-to-board journey. The current `rc.4` candidate adds one-font Body Copy reading pages without removing four-up Boards or the deeper Studio. Published `rc.1` through `rc.3` history remains intact.
+Published `v0.1.0-rc.4` adds one-font Body Copy reading pages without removing the original fast four-up Boards journey or the deeper Studio. Published `rc.1` through `rc.4` history remains intact.
 
 The exact current repository state, automated evidence, and remaining human gates live in [`docs/maintenance/REPOSITORY_STATE.md`](docs/maintenance/REPOSITORY_STATE.md).
 

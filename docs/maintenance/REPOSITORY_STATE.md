@@ -11,27 +11,26 @@ Font Previewer is a local typography decision tool. The active product is one sh
 - Canonical branch: `main`
 - Default branch: `main`
 - Source version: `0.1.0`
-- Current source posture: `v0.1.0-rc.4` product candidate adding Simple Body Copy; not yet published
-- Latest published release: [`v0.1.0-rc.3`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.3)
-- Exact latest-published source: `0e1d5c1c3ef1e6d6455c8bafcfb72fb8d203e1fe`, confirmed by both tag and public `SOURCE_SHA`
-- Prior published releases: immutable `v0.1.0-rc.2` and `v0.1.0-rc.1`
+- Current product posture: published `v0.1.0-rc.4` prerelease with Simple Boards, Body Copy, and Studio
+- Latest published release: [`v0.1.0-rc.4`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.4)
+- Exact latest-published source: `b0950402316253cc9cb7bf7a6ec86ea5f669184f`, confirmed by both tag and public `SOURCE_SHA`
+- Prior published releases: immutable `v0.1.0-rc.3`, `v0.1.0-rc.2`, and `v0.1.0-rc.1`
 - Stable release: none
 
 The RC, hardening, pre-Mac product work, canonicalisation, and Mac finalisation all reached `main` through reviewed pull requests. Published tags and releases remain immutable; exact source-to-package correspondence is carried by the release tag, workflow run, artifact names, checksums, and `SOURCE_SHA`.
 
-## Current candidate and published evidence
+## Current release evidence
 
-- The complete candidate public-seam suite passes locally: 49 tests discovered, 46 passed and three intentional Linux-only tests skipped on macOS.
-- The candidate native AppKit/WKWebView evidence journey passes Simple and Studio at 80–140% scale, with minimum measured controls above 44 px at 80%, no asserted editor/page/header/workspace overflow, no title/candidate truncation in the asserted states, and no horizontal overflow.
+- The complete release-source public-seam suite passes locally: 49 tests discovered, 46 passed and three intentional Linux-only tests skipped on macOS.
+- The release-source native AppKit/WKWebView evidence journey passes Simple and Studio at 80–140% scale, with minimum measured controls above 44 px at 80%, no asserted editor/page/header/workspace overflow, no title/candidate truncation in the asserted states, and no horizontal overflow.
 - The native journey proves installed family/style browsing, four-up board containment, one-font Body Copy composition and export, full text, one shared fitted reading size, four distinct colour quadrants, stress characters, AP Title, variable-axis controls, modal focus trapping/return, and shared copy/candidate/comparison-policy state across Simple and Studio.
 - Both Hosts now reject mixed or impossible Simple export manifests. The macOS Host also canonicalizes export roots and outputs before deriving relative manifest/checksum paths.
 - The native transaction fault proves failed Handoff staging is removed and the prior export remains byte-identical.
-- Exact-head Linux displayed and package evidence for the rc.4 candidate remains pending until the candidate reaches GitHub CI.
-- Exact-source GitHub verification run [`33140669879`](https://github.com/bomkino/font-previewer/actions/runs/33140669879) passed both Hosts and packages on `main`.
-- Guarded dry run [`33140942047`](https://github.com/bomkino/font-previewer/actions/runs/33140942047) and publication run [`33141048696`](https://github.com/bomkino/font-previewer/actions/runs/33141048696) assembled and published the non-overwriting prerelease.
-- A fresh public download of all nine assets passed the published `SHA256SUMS`; the release tag and `SOURCE_SHA` both resolve to `0e1d5c1c3ef1e6d6455c8bafcfb72fb8d203e1fe`.
+- Exact-source GitHub verification run [`33151448579`](https://github.com/bomkino/font-previewer/actions/runs/33151448579) passed both Hosts, Linux X11/Wayland, forced renderer recovery, package reproducibility, and installed/archive round trips on `main`.
+- Guarded dry run [`33151866338`](https://github.com/bomkino/font-previewer/actions/runs/33151866338) and publication run [`33151987068`](https://github.com/bomkino/font-previewer/actions/runs/33151987068) assembled and published the non-overwriting prerelease.
+- A fresh public download of all nine assets passed the published `SHA256SUMS`; the release tag and `SOURCE_SHA` both resolve to `b0950402316253cc9cb7bf7a6ec86ea5f669184f`.
 
-Run IDs, conclusions, artifacts, and the source SHA remain available in GitHub Actions and the immutable release rather than being copied into a self-referential source file.
+The exact IDs above point back to GitHub Actions; artifacts and the source SHA remain independently readable from the immutable release.
 
 ## Current GitHub maintenance state
 
@@ -81,7 +80,7 @@ These gates prohibit stable `v1.0.0`, broad support claims, attended accessibili
 
 ## Release posture
 
-`v0.1.0-rc.3` remains the latest public prerelease. The owner explicitly authorized preparation and publication of `v0.1.0-rc.4` after the requested Body Copy work, exact-head verification, local installation, documentation, and GitHub cleanup complete. `.github/workflows/release.yml` remains manual, exact-SHA guarded, exact-run guarded, non-overwriting, and dry-run first; no push, PR, tag, or successful verification run publishes automatically.
+`v0.1.0-rc.4` is the latest public prerelease. Its one-use publication authorization was exercised only after the Body Copy work, exact-head verification, local installation, documentation, and GitHub cleanup gates completed; a later tag requires new authorization. `.github/workflows/release.yml` remains manual, exact-SHA guarded, exact-run guarded, non-overwriting, and dry-run first; no push, PR, tag, or successful verification run publishes automatically.
 
 ## Current documents
 
