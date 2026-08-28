@@ -48,6 +48,7 @@ const requiredVersionedText = [
 for (const [text, expected, label] of requiredVersionedText) {
   assert.ok(text.includes(expected), `${label} drifted`);
 }
-assert.match(changelog, new RegExp(`^## ${escaped}-rc\\.2 — 2026-08-28$`, "m"));
+const releaseCandidate = changelog.match(/^## ([^\s]+) — \d{4}-\d{2}-\d{2}$/m)?.[1];
+assert.match(releaseCandidate ?? "", new RegExp(`^${escaped}-rc\\.\\d+$`), "top changelog entry must be a prerelease for the source version");
 
-process.stdout.write(`Font Previewer version surfaces agree: ${version}; release candidate v${version}-rc.2.\n`);
+process.stdout.write(`Font Previewer version surfaces agree: ${version}; release candidate v${releaseCandidate}.\n`);

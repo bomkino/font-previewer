@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A local typography decision Studio for reviewing, comparing, systemizing, and handing off fonts.",
+  "description": "A local font-to-board previewer with a deeper typography decision Studio.",
   "main": "dist-electron/electron/main.js",
   "scripts": {
     "build": "node scripts/clean-build.mjs && npm run check && npm run test && vite build && tsc -p tsconfig.electron.json && vite build --config vite.preload.config.ts && npm run audit:bundle",

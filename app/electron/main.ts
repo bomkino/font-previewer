@@ -601,9 +601,9 @@ async function handleHostRequest(event: IpcMainInvokeEvent, rawRequest: unknown)
       const exported = await exportTransactionalHandoff({
         window: mainWindow,
         document: request.document,
+        preferences: request.preferences,
         targetDirectory,
         sourcePaths: sourceBindings,
-        includeSources: request.preferences.includeSources,
         sourcePermissionAcknowledged: request.sourcePermissionAcknowledged,
       });
       return { type: "export-result", displayName: exported.displayName, exported: true, fileCount: exported.fileCount };
@@ -643,7 +643,7 @@ async function createWindow(): Promise<BrowserWindow> {
     minWidth: 960,
     minHeight: 640,
     show: false,
-    backgroundColor: "#151512",
+    backgroundColor: "#0b0b0f",
     icon: join(applicationRoot, "assets", "icon", "font-previewer-icon-512.png"),
     title: "Font Previewer",
     webPreferences: {
@@ -769,9 +769,9 @@ void app.whenReady().then(async () => {
         return exportTransactionalHandoff({
           window: firstWindow,
           document: mirrored.document,
+          preferences: mirrored.document.handoff,
           targetDirectory,
           sourcePaths: sourceBindings,
-          includeSources: false,
           sourcePermissionAcknowledged: false,
         });
       },

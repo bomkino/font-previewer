@@ -8,7 +8,7 @@ const inertHost: HostPort = {
   async request(request) {
     if (request.type === "get-launch-state") return {
       type: "launch-state",
-      capabilities: { host: "browser", platform: "browser", importFiles: true, importFolders: false, installedCatalog: false, nativeSave: false, transactionalHandoff: false, sourceRelink: false, sourceReveal: false, renderProfile: "Test", fullFormats: ["OTF"], metadataOnlyFormats: ["TTC"] },
+      capabilities: { host: "browser", platform: "browser", importFiles: true, importFolders: false, installedCatalog: true, nativeSave: false, transactionalHandoff: false, sourceRelink: false, sourceReveal: false, renderProfile: "Test", fullFormats: ["OTF"], metadataOnlyFormats: ["TTC"] },
       recentDocuments: [],
     };
     if (request.type === "probe") return { type: "probe-result", serial: request.serial, host: "browser" };
@@ -39,7 +39,7 @@ test("shared Studio renders the complete Review-to-Handoff product seam", () => 
   assert.match(html, /Compare/);
   assert.match(html, /System/);
   assert.match(html, /Handoff/);
-  assert.match(html, /Import/);
+  assert.match(html, /Add Fonts/);
   assert.match(html, /Contact Sheet/);
   assert.match(html, /Comparison tray/);
   assert.match(html, /Family Group/);
@@ -51,6 +51,32 @@ test("shared Studio renders the complete Review-to-Handoff product seam", () => 
   assert.equal((html.match(/<aside/g) ?? []).length, 2);
   assert.equal((html.match(/<nav/g) ?? []).length, 1);
   assert.equal((html.match(/<footer/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /(?:file:\/\/|\/Users\/|\/home\/)/);
+});
+
+test("Simple mode restores the original font-to-four-up-board pipeline", () => {
+  globalThis.location.search = "?fixture=1&mode=simple";
+  let html = "";
+  try {
+    html = renderToStaticMarkup(<App />);
+  } finally {
+    globalThis.location.search = "?fixture=1";
+  }
+  assert.match(html, /data-interface-mode="simple"/);
+  assert.match(html, /Stress test/);
+  assert.match(html, /aria-label="Simple sections"/);
+  assert.match(html, /Same size/);
+  assert.match(html, /Fit each/);
+  assert.match(html, /Lock line breaks/);
+  assert.match(html, /Tune 24 fonts/);
+  assert.match(html, /Your boards\. Already made\./);
+  assert.match(html, /Board 01/);
+  assert.match(html, /Index 1 \/ 2/);
+  assert.match(html, /5152 × 2160 export/);
+  assert.equal((html.match(/class="simple-font-card(?: |")/gu) ?? []).length, 0);
+  assert.equal((html.match(/<main/g) ?? []).length, 1);
+  assert.equal((html.match(/<aside/g) ?? []).length, 0);
+  assert.equal((html.match(/<nav/g) ?? []).length, 1);
   assert.doesNotMatch(html, /(?:file:\/\/|\/Users\/|\/home\/)/);
 });
 

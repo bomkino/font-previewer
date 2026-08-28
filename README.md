@@ -1,10 +1,11 @@
 # Font Previewer
 
-Font Previewer is a local typography decision tool for pitch-deck work. One shared Studio runs inside a native AppKit/WKWebView Host on macOS and a sandboxed Electron Host on Linux:
+Font Previewer is a local typography decision tool for pitch-deck work. One shared Study now has two views inside a native AppKit/WKWebView Host on macOS and a sandboxed Electron Host on Linux:
 
-**Review → Compare → System → Handoff**
+- **Simple:** add font files, folders, or installed families; choose styles; see four-up boards immediately; tune; export.
+- **Studio:** **Review → Compare → System → Handoff** for deeper decisions and packaging.
 
-Its dark-first Studio and coral-loupe mark share one idea: attention reveals character; the tool does not choose a winner for you.
+Simple and Studio are not separate projects. Fonts, styles, copy, casing, variable-axis values, order, include/skip decisions, and comparison sizing move between them through the same session. Its dark-first interface and coral-loupe mark share one idea: attention reveals character; the tool does not choose a winner for you.
 
 It imports and inspects fonts, maintains portable `.pitchfontstudy` documents, compares Candidates, assembles typography systems, and creates transactional Handoff packages. It does not install, transform, anonymise, slant, interpolate, or repackage fonts. Those are FontBlind concerns; the products share no implementation.
 
@@ -12,22 +13,27 @@ It imports and inspects fonts, maintains portable `.pitchfontstudy` documents, c
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Current source posture: `v0.1.0-rc.2` prerelease
+- Current source target: `v0.1.0-rc.3` prerelease candidate
 - Latest published release: [`v0.1.0-rc.2`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.2)
 - Public stable release: none
 
-The published `v0.1.0-rc.1` remains historically intact. `v0.1.0-rc.2` adds the canonical repository, Host hardening, active Mac packaging, exact-SHA release controls, and documentation repair accumulated after that first prerelease.
+`v0.1.0-rc.3` restores the original fast font-to-board journey, adds the family/style picker and high-resolution four-up export, makes interface scaling real, and rebuilds Studio around larger, calmer decision surfaces. Published `rc.1` and `rc.2` history remains intact.
 
 The exact current repository state, automated evidence, and remaining human gates live in [`docs/maintenance/REPOSITORY_STATE.md`](docs/maintenance/REPOSITORY_STATE.md).
 
 ## What works
 
+- Simple mode: local file/folder upload or an installed-font picker with family-first style selection.
+- Immediate four-font comparison boards, optional 12-font index pages, four-colour quadrants, stress text, five casing modes including AP Title, variable-axis tuning, reordering, include/skip, and full-size previews.
+- Shared Simple/Studio state for imported styles, copy, casing, axes, ordering, decisions, and comparison sizing.
+- Transactional 5,152 × 2,160 PNG board export with manifest, checksums, Study JSON, CSV, summary, and optional explicitly authorised Source copies.
+- Interface scaling from 80–140%, with keyboard shortcuts, at least 44 px measured touch targets, and no title/candidate ellipsis in the verified states.
 - Host-local file and folder import without font installation or upload.
 - A searchable, paginated installed-font Catalog bounded to 10,000 entries; browsing cannot mutate a Study.
 - Separate Source, local Binding, Face, Candidate, Recipe, Comparison Set, Font Use, Typography System, and Handoff entities.
 - Exact Face indices, Host-reported metadata, independent Candidate settings, casing, tags, notes, rationale, and review decisions.
 - Variable axes and named instances: CoreText on macOS; a bounded child parser on Linux.
-- Family Groups, duplicate Candidates, Contact Sheet, Focus, Waterfall, live two-to-four-font comparison, saved comparison sets, fit policies, deck scenes, Role assignment, and Handoff preflight.
+- Family Groups, duplicate Candidates, Contact Sheet, Focus, Waterfall, live two-to-four-font comparison, saved comparison sets, the same sizing policies used by Simple, deck scenes, Role assignment, and Handoff preflight.
 - Host-owned recovery distinct from intentional Save, with stale-revision rejection and focus restoration.
 - Transactional Handoff staging, checksums, privacy-safe manifests, and explicitly acknowledged Source copying.
 - Native menus and panels, source reveal/relink, semantic undo/redo, and a closed path-free HostBridge.

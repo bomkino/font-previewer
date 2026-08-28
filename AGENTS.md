@@ -4,8 +4,8 @@
 
 Maintain one local typography-decision product delivered through:
 
-- a macOS AppKit/WKWebView Host using the shared Studio;
-- a Linux Electron Host using the same Study semantics and Studio.
+- a macOS AppKit/WKWebView Host using the shared Simple + Studio renderer;
+- a Linux Electron Host using the same Study semantics and renderer.
 
 The root SwiftUI/CoreText application is preserved reference material, not the active package.
 
@@ -38,7 +38,9 @@ Read these before changing product or release claims:
 
 ## Product invariants
 
-- Review → Compare → System → Handoff.
+- Simple: Add → Boards → Tune → Export.
+- Studio: Review → Compare → System → Handoff.
+- Both views act on one Study session; never introduce synchronization or duplicate semantic state.
 - Inspect remains contextual.
 - No deck builder, font manager, taste score, cloud/account/analytics layer, or fake Figma integration.
 - No required network.

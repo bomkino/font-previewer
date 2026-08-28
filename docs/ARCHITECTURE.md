@@ -10,6 +10,17 @@ Font Previewer is one local product delivered by two desktop Hosts:
 
 No Host installs fonts, exposes arbitrary filesystem access to the Studio, or requires an account/network service.
 
+## Two views, one session
+
+Simple and Studio render the same `StudySession`; they are not separate document formats or synchronized copies.
+
+- Adding local or installed Sources in either view runs the same bounded `ingest-sources` command and creates the same Faces and Candidates.
+- Copy, casing, variable axes, Candidate order, review/include decisions, tray membership, Comparison Sets, and Typography Systems remain shared semantic state.
+- The active Same size / Fit each / Lock line breaks choice is controlled once at the application boundary and passed into both Simple boards and Studio Compare. Saving a Comparison Set records that policy in the portable Study.
+- Interface mode, 80–140% UI scale, temporary stress visibility, index-page inclusion, and an unsaved Source-copy checkbox are presentation/export preferences, not a second Study authority.
+
+Simple is the low-friction front door. Studio remains the deeper Review → Compare → System → Handoff workspace.
+
 ## Authority
 
 The Studio owns one mutable `StudySession`: portable document, workspace state, revision, acknowledged recovery revision, and intentionally saved revision. Semantic commands pass through one reducer and one bounded history.
@@ -84,6 +95,8 @@ The Host:
 5. hashes outputs and writes manifest/checksums;
 6. atomically moves staging to a collision-safe final directory;
 7. removes staging on failure.
+
+When Simple is visible, the Studio exposes a bounded in-memory board-rendering capability to its Host. The Host validates the manifest against the mirrored Study, requests each 5,152 × 2,160 PNG, checks PNG structure and decoded dimensions, then includes `Boards/` and optional `Index/` files in the same transaction. The capability is absent outside Simple mode.
 
 ## Host security
 

@@ -3,6 +3,7 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { deflateSync } from "node:zlib";
 import type { BrowserWindow } from "electron";
 import { exportTransactionalHandoff } from "../electron/handoff.js";
 import { atomicWrite } from "../electron/host-storage.js";
@@ -14,6 +15,42 @@ async function temporaryDirectory(context: test.TestContext): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), "font-previewer-durability-"));
   context.after(() => rm(directory, { recursive: true, force: true }));
   return directory;
+}
+
+function crc32(data: Buffer): number {
+  let crc = 0xffffffff;
+  for (const byte of data) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc & 1) ? (0xedb88320 ^ (crc >>> 1)) : (crc >>> 1);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type: string, data = Buffer.alloc(0)): Buffer {
+  const typeBytes = Buffer.from(type, "ascii");
+  const chunk = Buffer.alloc(12 + data.length);
+  chunk.writeUInt32BE(data.length, 0);
+  typeBytes.copy(chunk, 4);
+  data.copy(chunk, 8);
+  chunk.writeUInt32BE(crc32(Buffer.concat([typeBytes, data])), 8 + data.length);
+  return chunk;
+}
+
+function simpleBoardPng(): Buffer {
+  const width = 5_152;
+  const height = 2_160;
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8;
+  header[9] = 6;
+  const pixels = Buffer.alloc((width * 4 + 1) * height);
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk("IHDR", header),
+    pngChunk("IDAT", deflateSync(pixels, { level: 1 })),
+    pngChunk("IEND"),
+  ]);
 }
 
 test("atomic save preserves the intentional file and removes its sidecar when commit fails", async (context) => {
@@ -47,9 +84,9 @@ test("transactional Handoff leaves the prior export byte-identical and cleans fa
   const options = {
     window,
     document,
+    preferences: document.handoff,
     targetDirectory,
     sourcePaths: new Map<string, string>(),
-    includeSources: false,
     sourcePermissionAcknowledged: false,
   };
 
@@ -64,6 +101,41 @@ test("transactional Handoff leaves the prior export byte-identical and cleans fa
   assert.deepEqual(await readFile(priorManifestPath), priorManifest);
   assert.deepEqual(await readdir(targetDirectory), [committed.displayName]);
   assert.equal((await readdir(targetDirectory)).some((name) => name.includes(".staging-")), false);
+});
+
+test("Simple Handoff writes verified 5152 × 2160 board and index PNGs", async (context) => {
+  const targetDirectory = await temporaryDirectory(context);
+  const fixture = createFixtureSession();
+  const document = assertStudyDocument({
+    ...fixture.document,
+    title: "Simple Board Evidence",
+    candidates: fixture.document.candidates.map((candidate, index) => ({ ...candidate, reviewState: index === 0 ? "keep" : "reject" })),
+    handoff: { profile: "internal", outputs: ["summary", "json", "csv"], includeSources: false },
+  });
+  const png = simpleBoardPng();
+  const dataUrl = `data:image/png;base64,${png.toString("base64")}`;
+  const window = {
+    webContents: {
+      executeJavaScript: async (script: string) => {
+        if (script.includes("runtime.manifest")) return { width: 5_152, height: 2_160, boardCount: 1, indexCount: 1, fontCount: 1, includeIndex: true };
+        if (script.includes(".render(")) return dataUrl;
+        throw new Error(`Unexpected renderer script: ${script}`);
+      },
+    },
+  } as unknown as BrowserWindow;
+  const exported = await exportTransactionalHandoff({
+    window,
+    document,
+    preferences: document.handoff,
+    targetDirectory,
+    sourcePaths: new Map<string, string>(),
+    sourcePermissionAcknowledged: false,
+  });
+  const root = join(targetDirectory, exported.displayName);
+  assert.deepEqual(await readFile(join(root, "Boards", "Board_01.png")), png);
+  assert.deepEqual(await readFile(join(root, "Index", "Index_01.png")), png);
+  const manifest = JSON.parse(await readFile(join(root, "manifest.json"), "utf8")) as { files: { path: string }[] };
+  assert.deepEqual(manifest.files.map((entry) => entry.path), ["Boards/Board_01.png", "Index/Index_01.png", "README.md", "candidates.csv", "study.pitchfontstudy"]);
 });
 
 test("corrupt, future, and impossible recovery envelopes cannot replace valid state", () => {
@@ -104,9 +176,9 @@ test("interrupted Handoff rendering removes staging and commits nothing", async 
   await assert.rejects(exportTransactionalHandoff({
     window,
     document,
+    preferences: document.handoff,
     targetDirectory,
     sourcePaths: new Map<string, string>(),
-    includeSources: false,
     sourcePermissionAcknowledged: false,
   }), /injected renderer termination/);
   assert.deepEqual(await readdir(targetDirectory), []);

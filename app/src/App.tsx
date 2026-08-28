@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type Dispatch,
+  type CSSProperties,
 } from "react";
 import {
   STAGES,
@@ -15,6 +16,8 @@ import {
   createSession,
   isSemanticCommand,
   type RecipePack,
+  type FitPolicy,
+  type HandoffPreferences,
   type ImportedSource,
   type Stage,
   type StudyCommand,
@@ -28,6 +31,7 @@ import { getHostPort } from "./host-bridge.js";
 import {
   Inspector,
   Navigator,
+  SimpleWorkspace,
   Tray,
   Welcome,
   Workspace,
@@ -37,6 +41,8 @@ import {
   type NavigatorMode,
 } from "./components.js";
 import { CATALOG_PAGE_SIZE, type HostCapabilities, type MenuCommand } from "./protocol.js";
+import { createSimpleExportRuntime } from "./simple-boards.js";
+import { InterfaceIcon } from "./icons.js";
 
 interface HistorySnapshot {
   readonly document: StudyDocument;
@@ -57,6 +63,34 @@ type HistoryAction =
 
 const HISTORY_LIMIT = 100;
 const EMPTY_CATALOG: InstalledCatalogView = { query: "", cursor: 0, imports: [], indexed: 0, total: 0, rejected: 0, truncated: false };
+const UI_SCALES = [0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4] as const;
+const STAGE_DESCRIPTIONS: Readonly<Record<Stage, string>> = {
+  review: "Choose",
+  compare: "Pressure-test",
+  system: "Assign roles",
+  handoff: "Package",
+};
+type InterfaceMode = "simple" | "studio";
+
+function storedInterfaceMode(fixture: boolean): InterfaceMode {
+  const requested = new URLSearchParams(globalThis.location?.search ?? "").get("mode");
+  if (requested === "simple" || requested === "studio") return requested;
+  if (fixture) return "studio";
+  try {
+    return globalThis.localStorage?.getItem("font-previewer-interface-mode") === "studio" ? "studio" : "simple";
+  } catch {
+    return "simple";
+  }
+}
+
+function storedUIScale(): number {
+  try {
+    const stored = Number(globalThis.localStorage?.getItem("font-previewer-ui-scale"));
+    return UI_SCALES.includes(stored as (typeof UI_SCALES)[number]) ? stored : 1.1;
+  } catch {
+    return 1.1;
+  }
+}
 
 function importsWithinStudyLimits(document: StudyDocument, imports: readonly ImportedSource[]): ImportedSource[] {
   const existing = new Set(document.sources.map((source) => source.id));
@@ -157,6 +191,12 @@ export default function App() {
   const [capabilities, setCapabilities] = useState<HostCapabilities>();
   const [hostName, setHostName] = useState("connecting");
   const [showWelcome, setShowWelcome] = useState(!fixture);
+  const [interfaceMode, setInterfaceMode] = useState<InterfaceMode>(() => storedInterfaceMode(fixture));
+  const [uiScale, setUIScale] = useState(storedUIScale);
+  const [stressTest, setStressTest] = useState(false);
+  const [comparisonFitPolicy, setComparisonFitPolicy] = useState<FitPolicy>("fit");
+  const [includeIndex, setIncludeIndex] = useState(true);
+  const [includeSources, setIncludeSources] = useState(false);
   const [launchReady, setLaunchReady] = useState(false);
   const [recoveryAvailable, setRecoveryAvailable] = useState<boolean>();
   const [busyTask, setBusyTask] = useState<string>();
@@ -167,6 +207,7 @@ export default function App() {
   const [newStudyPack, setNewStudyPack] = useState<RecipePack>("film-tv");
   const [navigatorMode, setNavigatorMode] = useState<NavigatorMode>("study");
   const [catalog, setCatalog] = useState<InstalledCatalogView>(EMPTY_CATALOG);
+  const [simpleCatalogOpenRequest, setSimpleCatalogOpenRequest] = useState(0);
   const [titleDraft, setTitleDraft] = useState(session.document.title);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const pendingWorkspaceFocusRef = useRef(false);
@@ -176,6 +217,34 @@ export default function App() {
   const index = useStudyIndex(session.document);
   const fontStates = useFontRegistry(session);
 
+  useEffect(() => {
+    try {
+      globalThis.localStorage?.setItem("font-previewer-interface-mode", interfaceMode);
+    } catch {
+      // Local preference persistence is optional; the Study remains unaffected.
+    }
+  }, [interfaceMode]);
+
+  useEffect(() => {
+    try {
+      globalThis.localStorage?.setItem("font-previewer-ui-scale", String(uiScale));
+    } catch {
+      // UI scaling remains active for this launch when preferences are unavailable.
+    }
+  }, [uiScale]);
+
+  useEffect(() => {
+    if (showWelcome || interfaceMode !== "simple") {
+      delete window.__fontPreviewerSimpleExport;
+      return;
+    }
+    const runtime = createSimpleExportRuntime(session, stressTest, includeIndex, comparisonFitPolicy);
+    window.__fontPreviewerSimpleExport = runtime;
+    return () => {
+      if (window.__fontPreviewerSimpleExport === runtime) delete window.__fontPreviewerSimpleExport;
+    };
+  }, [comparisonFitPolicy, includeIndex, interfaceMode, session, showWelcome, stressTest]);
+
   useEffect(() => setTitleDraft(session.document.title), [session.document.id, session.document.title]);
 
   const requestWorkspaceFocus = useCallback(() => {
@@ -183,14 +252,20 @@ export default function App() {
     requestAnimationFrame(() => {
       if (!pendingWorkspaceFocusRef.current || !headingRef.current) return;
       pendingWorkspaceFocusRef.current = false;
-      headingRef.current.focus();
+      headingRef.current.closest<HTMLElement>(".workspace")?.scrollTo({ left: 0, top: 0 });
+      document.documentElement.scrollTo({ left: 0, top: 0 });
+      document.body.scrollTo({ left: 0, top: 0 });
+      headingRef.current.focus({ preventScroll: true });
     });
   }, []);
 
   useLayoutEffect(() => {
     if (!pendingWorkspaceFocusRef.current || !headingRef.current) return;
     pendingWorkspaceFocusRef.current = false;
-    headingRef.current.focus();
+    headingRef.current.closest<HTMLElement>(".workspace")?.scrollTo({ left: 0, top: 0 });
+    document.documentElement.scrollTo({ left: 0, top: 0 });
+    document.body.scrollTo({ left: 0, top: 0 });
+    headingRef.current.focus({ preventScroll: true });
   });
 
   const dispatch = useCallback<Dispatch<StudyCommand>>((command) => {
@@ -241,11 +316,18 @@ export default function App() {
     });
   }, [dispatch, host, runTask]);
 
-  const scanInstalled = useCallback((query = "", refresh = false, cursor = 0) => {
+  const scanInstalled = useCallback((query = "", refresh = false, cursor = 0, destination: "studio" | "simple" = "studio") => {
     const serial = catalogRequestRef.current + 1;
     catalogRequestRef.current = serial;
-    setNavigatorMode("catalog");
-    setShowWelcome(false);
+    if (destination === "studio") {
+      setNavigatorMode("catalog");
+      setInterfaceMode("studio");
+      setShowWelcome(false);
+    } else {
+      setInterfaceMode("simple");
+      setShowWelcome(false);
+      setSimpleCatalogOpenRequest((current) => current + 1);
+    }
     setBusyTask("Scanning installed fonts");
     setError("");
     void (async () => {
@@ -326,21 +408,33 @@ export default function App() {
     saveStudy(saveAs);
   }, [saveStudy]);
 
-  const exportHandoff = useCallback((sourcePermissionAcknowledged: boolean) => {
-    void runTask("Exporting Handoff", async () => {
+  const performExport = useCallback((label: string, preferences: HandoffPreferences, sourcePermissionAcknowledged: boolean) => {
+    void runTask(label, async () => {
       const current = sessionRef.current;
       await mirror(current);
       const response = await host.request({
         type: "export-handoff",
         document: current.document,
         revision: current.revision,
-        preferences: current.document.handoff,
+        preferences,
         sourcePermissionAcknowledged,
       });
       if (response.type !== "export-result") throw new Error("Host returned the wrong export response.");
       setNotice(response.exported ? `Exported ${response.displayName} · ${response.fileCount} files.` : "Export cancelled. No partial Handoff retained.");
     });
   }, [host, mirror, runTask]);
+
+  const exportHandoff = useCallback((sourcePermissionAcknowledged: boolean) => {
+    performExport("Exporting Handoff", sessionRef.current.document.handoff, sourcePermissionAcknowledged);
+  }, [performExport]);
+
+  const exportBoards = useCallback((copySources: boolean) => {
+    performExport("Exporting Boards", {
+      profile: "internal",
+      outputs: ["summary", "json", "csv"],
+      includeSources: copySources,
+    }, copySources);
+  }, [performExport]);
 
   const relinkSource = useCallback((sourceId: string) => {
     void runTask("Relinking Source", async () => {
@@ -390,18 +484,19 @@ export default function App() {
     openStudy,
     saveStudy,
     exportHandoff,
+    exportBoards,
     relinkSource,
     revealSource,
     newStudy,
     loadSample,
-  }), [addCatalogSources, cancelCatalog, exportHandoff, importSources, loadSample, newStudy, openStudy, relinkSource, revealSource, saveStudy, scanInstalled]);
+  }), [addCatalogSources, cancelCatalog, exportBoards, exportHandoff, importSources, loadSample, newStudy, openStudy, relinkSource, revealSource, saveStudy, scanInstalled]);
 
   const handleMenu = useCallback((command: MenuCommand) => {
     switch (command.type) {
       case "new-study": newStudy(); break;
       case "open-study": openStudy(); break;
       case "open-import": importSources(); break;
-      case "scan-installed": scanInstalled(); break;
+      case "scan-installed": scanInstalled("", false, 0, interfaceMode === "simple" ? "simple" : "studio"); break;
       case "save-study": saveAfterFocusedEdit(false); break;
       case "save-study-as": saveAfterFocusedEdit(true); break;
       case "export-handoff": {
@@ -416,7 +511,7 @@ export default function App() {
         break;
       }
       case "next-unreviewed": dispatch({ type: "select-next-unreviewed" }); break;
-      case "set-stage": dispatch({ type: "set-stage", stage: command.stage }); break;
+      case "set-stage": setInterfaceMode("studio"); dispatch({ type: "set-stage", stage: command.stage }); break;
       case "flush-recovery": {
         void (async () => {
           const activeElement = document.activeElement;
@@ -439,7 +534,7 @@ export default function App() {
       }
       case "reload-studio": void host.request({ type: "reload-studio" }); break;
     }
-  }, [dispatch, exportHandoff, host, importSources, mirror, newStudy, openStudy, saveAfterFocusedEdit, scanInstalled]);
+  }, [dispatch, exportHandoff, host, importSources, interfaceMode, mirror, newStudy, openStudy, saveAfterFocusedEdit, scanInstalled]);
 
   useEffect(() => {
     let active = true;
@@ -450,7 +545,6 @@ export default function App() {
       setHostName(response.capabilities.host);
       if (response.recovery) {
         const recovered = createSession(response.recovery.document, response.recovery.bindings, response.recovery.workspace, response.recovery.revision);
-        pendingWorkspaceFocusRef.current = true;
         historyDispatch({
           type: "replace",
           session: {
@@ -461,14 +555,13 @@ export default function App() {
         setRecoveryAvailable(true);
         setShowWelcome(false);
         setNotice(response.recovery.revision > response.recovery.intentionallySavedRevision ? "Recovered unsaved work." : "Recovered last Study state.");
-        requestWorkspaceFocus();
       }
       const probe = await host.request({ type: "probe", serial: 1 });
       if (active && probe.type === "probe-result") setHostName(probe.host);
       if (active) setLaunchReady(true);
     });
     return () => { active = false; };
-  }, [host, requestWorkspaceFocus, runTask]);
+  }, [host, runTask]);
 
   useEffect(() => host.onMenuCommand(handleMenu), [handleMenu, host]);
 
@@ -529,16 +622,21 @@ export default function App() {
   }, [launchReady, mirror, session]);
 
   useEffect(() => {
-    if (!launchReady || showWelcome || document.activeElement !== document.body) return;
-    const frame = requestAnimationFrame(() => {
-      if (document.activeElement === document.body) headingRef.current?.focus();
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [launchReady, session.document.id, showWelcome]);
-
-  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const primary = event.metaKey || event.ctrlKey;
+      if (primary && ["=", "+", "-", "0"].includes(event.key)) {
+        event.preventDefault();
+        if (event.key === "0") {
+          setUIScale(1);
+          return;
+        }
+        setUIScale((current) => {
+          const index = UI_SCALES.findIndex((scale) => scale === current);
+          const delta = event.key === "-" ? -1 : 1;
+          return UI_SCALES[Math.min(UI_SCALES.length - 1, Math.max(0, index + delta))] ?? current;
+        });
+        return;
+      }
       if (primary && event.key.toLocaleLowerCase() === "s") {
         event.preventDefault();
         saveAfterFocusedEdit(event.shiftKey);
@@ -551,6 +649,7 @@ export default function App() {
         return;
       }
       if (editableTarget(event.target) || interactiveTarget(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (interfaceMode !== "studio") return;
       const candidateId = sessionRef.current.workspace.selectedCandidateId;
       if (["0", "1", "2", "3"].includes(event.key) && candidateId) {
         const reviewState = ({ "0": "unreviewed", "1": "keep", "2": "maybe", "3": "reject" } as const)[event.key as "0" | "1" | "2" | "3"];
@@ -578,7 +677,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [dispatch, saveAfterFocusedEdit]);
+  }, [dispatch, interfaceMode, saveAfterFocusedEdit]);
 
   const setStage = (stage: Stage) => {
     pendingWorkspaceFocusRef.current = true;
@@ -588,24 +687,67 @@ export default function App() {
   const activeComparison = session.workspace.activeComparisonId
     ? session.document.comparisonSets.find((comparison) => comparison.id === session.workspace.activeComparisonId)
     : undefined;
+  useEffect(() => {
+    if (activeComparison) setComparisonFitPolicy(activeComparison.policy);
+  }, [activeComparison?.id, activeComparison?.policy]);
   const blindIdentityHidden = session.workspace.stage === "compare" && Boolean(activeComparison?.blind && !activeComparison.revealed);
+  const shellStyle = {
+    transform: `scale(${uiScale})`,
+    width: `${100 / uiScale}%`,
+    height: `${100 / uiScale}%`,
+  } as CSSProperties;
+  const changeScale = (delta: -1 | 1) => {
+    setUIScale((current) => {
+      const index = UI_SCALES.findIndex((scale) => scale === current);
+      return UI_SCALES[Math.min(UI_SCALES.length - 1, Math.max(0, index + delta))] ?? current;
+    });
+  };
 
   return (
-    <div className={`app-shell ${showWelcome ? "is-welcome" : ""}`}>
+    <div className={`app-shell ${showWelcome ? "is-welcome" : ""} mode-${interfaceMode} stage-${session.workspace.stage}`} data-interface-mode={interfaceMode} data-ui-scale={Math.round(uiScale * 100)} style={shellStyle}>
       <a className="skip-link" href={showWelcome ? "#welcome-heading" : "#workspace-heading"}>Skip to main content</a>
       <header className="titlebar">
-        <div className="brand-lockup"><img className="brand-mark" src="/font-previewer-icon-64.png" alt="" aria-hidden="true" /><div><strong>Font Previewer</strong><span>Decision Studio</span></div></div>
+        <div className="brand-lockup"><img className="brand-mark" src="/font-previewer-icon-64.png" alt="" aria-hidden="true" /><div><strong>Font Previewer</strong><span>{interfaceMode === "simple" ? "Type Boards" : "Decision Studio"}</span></div></div>
+        <div className="interface-switch" role="group" aria-label="Interface mode">
+          <button type="button" className={interfaceMode === "simple" ? "is-active" : ""} aria-pressed={interfaceMode === "simple"} onClick={() => { setInterfaceMode("simple"); if (showWelcome && session.document.candidates.length) setShowWelcome(false); }}>Simple</button>
+          <button type="button" className={interfaceMode === "studio" ? "is-active" : ""} aria-pressed={interfaceMode === "studio"} onClick={() => { setInterfaceMode("studio"); setShowWelcome(false); }}>Studio</button>
+        </div>
         <label className="document-title"><span className={`save-dot ${session.revision === session.intentionallySavedRevision ? "" : "is-unsaved"}`} aria-hidden="true">●</span><span className="sr-only">Study title</span><input value={titleDraft} onChange={(event) => setTitleDraft(event.target.value)} onBlur={() => dispatch({ type: "rename-study", title: titleDraft })} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} aria-label="Study title" /><span>{statusLabel(session, recoveryAvailable)}</span></label>
-        <div className="host-actions"><span className="host-probe">{hostName}</span><button type="button" className="quiet-button" onClick={openStudy}>Open</button><button id="import-fonts-button" type="button" className="quiet-button" onClick={importSources}>Import</button><button type="button" className="primary-button" onClick={() => saveStudy(false)}>Save</button></div>
+        <div className="ui-scale-control" role="group" aria-label="Interface scale">
+          <button type="button" aria-label="Decrease interface scale" disabled={uiScale === UI_SCALES[0]} onClick={() => changeScale(-1)}>−</button>
+          <button type="button" className="ui-scale-value" aria-label={`Reset interface scale. Current scale ${Math.round(uiScale * 100)} percent`} onClick={() => setUIScale(1)}>{Math.round(uiScale * 100)}%</button>
+          <button type="button" aria-label="Increase interface scale" disabled={uiScale === UI_SCALES.at(-1)} onClick={() => changeScale(1)}>+</button>
+        </div>
+        <div className="host-actions"><span className="host-probe">{hostName}</span><button type="button" className="quiet-button has-icon" onClick={openStudy}><InterfaceIcon name="folder" />Open</button><button id="import-fonts-button" type="button" className="quiet-button has-icon" onClick={importSources}><InterfaceIcon name="add" />Add Fonts</button><button type="button" className="primary-button has-icon" onClick={() => saveStudy(false)}><InterfaceIcon name="save" />Save</button></div>
       </header>
 
       {showWelcome ? <Welcome actions={actions} capabilities={capabilities} /> : (
-        <>
-          <nav className="stage-nav" aria-label="Workflow stages">{STAGES.map((stage, stageIndex) => <button type="button" key={stage} className={session.workspace.stage === stage ? "is-active" : ""} aria-current={session.workspace.stage === stage ? "step" : undefined} onClick={() => setStage(stage)}><span>{String(stageIndex + 1).padStart(2, "0")}</span>{stageLabels[stage]}</button>)}</nav>
-          <Navigator session={session} index={index} dispatch={dispatch} actions={actions} mode={navigatorMode} onModeChange={setNavigatorMode} catalog={catalog} catalogBusy={busyTask === "Scanning installed fonts"} />
-          <Workspace session={session} index={index} dispatch={dispatch} fontStates={fontStates} headingRef={headingRef} actions={actions} capabilities={capabilities} />
-          <Inspector key={session.workspace.selectedCandidateId ?? "none"} session={session} dispatch={dispatch} fontStates={fontStates} actions={actions} blindIdentityHidden={blindIdentityHidden} />
-          <Tray session={session} dispatch={dispatch} />
+        interfaceMode === "simple" ? (
+          <SimpleWorkspace
+            session={session}
+            dispatch={dispatch}
+            fontStates={fontStates}
+            headingRef={headingRef}
+            actions={actions}
+            capabilities={capabilities}
+            stressTest={stressTest}
+            onStressTestChange={setStressTest}
+            fitPolicy={comparisonFitPolicy}
+            onFitPolicyChange={setComparisonFitPolicy}
+            includeIndex={includeIndex}
+            onIncludeIndexChange={setIncludeIndex}
+            includeSources={includeSources}
+            onIncludeSourcesChange={setIncludeSources}
+            catalog={catalog}
+            catalogBusy={busyTask === "Scanning installed fonts"}
+            catalogOpenRequest={simpleCatalogOpenRequest}
+          />
+        ) : <>
+          <nav className="stage-nav" aria-label="Workflow stages">{STAGES.map((stage, stageIndex) => <button type="button" key={stage} className={session.workspace.stage === stage ? "is-active" : ""} aria-current={session.workspace.stage === stage ? "step" : undefined} onClick={() => setStage(stage)}><span className="stage-number">{String(stageIndex + 1).padStart(2, "0")}</span><span className="stage-copy"><strong>{stageLabels[stage]}</strong><small>{STAGE_DESCRIPTIONS[stage]}</small></span></button>)}</nav>
+          {session.workspace.stage !== "handoff" ? <Navigator session={session} index={index} dispatch={dispatch} actions={actions} mode={navigatorMode} onModeChange={setNavigatorMode} catalog={catalog} catalogBusy={busyTask === "Scanning installed fonts"} /> : null}
+          <Workspace session={session} index={index} dispatch={dispatch} fontStates={fontStates} headingRef={headingRef} actions={actions} capabilities={capabilities} comparisonPolicy={comparisonFitPolicy} onComparisonPolicyChange={setComparisonFitPolicy} />
+          {session.workspace.stage !== "handoff" ? <Inspector key={session.workspace.selectedCandidateId ?? "none"} session={session} dispatch={dispatch} fontStates={fontStates} actions={actions} blindIdentityHidden={blindIdentityHidden} /> : null}
+          {session.workspace.stage === "review" || session.workspace.stage === "compare" ? <Tray session={session} dispatch={dispatch} /> : null}
         </>
       )}
 

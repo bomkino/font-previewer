@@ -28,7 +28,7 @@ const css = await readFile(join(rendererRoot, "assets", cssFiles[0]), "utf8");
 for (const required of ["prefers-reduced-motion:reduce", "forced-colors:active"]) {
   if (!css.replaceAll(" ", "").includes(required)) throw new Error(`Built Studio is missing ${required}.`);
 }
-for (const required of ["color-scheme:dark", "background:#151512", "--paper:#1e1e1a"]) {
+for (const required of ["color-scheme:dark", "background:#0b0b0f", "--paper:#111116"]) {
   if (!css.replaceAll(" ", "").includes(required)) throw new Error(`Built Studio is missing dark default: ${required}.`);
 }
 process.stdout.write(`Audited built Studio: ${files.length + 9} files; CSP/locality/icons/dark-default/motion/forced-colors pass.\n`);

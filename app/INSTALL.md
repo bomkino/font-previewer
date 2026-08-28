@@ -2,7 +2,7 @@
 
 Font Previewer is a local desktop app. It has no account, updater, analytics, cloud processing, or required network connection.
 
-The latest published package set is the [`v0.1.0-rc.2`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.2) prerelease. CI artifacts remain exact-SHA evidence, not substitutes for release assets.
+The release target is `v0.1.0-rc.3`. Until it is published, the latest public package set remains [`v0.1.0-rc.2`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.2). CI artifacts remain exact-SHA evidence, not substitutes for release assets.
 
 ## Verify downloads
 
@@ -27,9 +27,9 @@ Do not install an asset whose checksum fails or whose release tag does not point
 1. Verify the macOS ZIP.
 2. Extract it and move **Font Previewer.app** to Applications if useful.
 3. The app is ad-hoc signed with hardened runtime. It is not Developer-ID signed or notarised.
-4. macOS may warn or block first launch. Control-click the app, choose **Open**, then confirm only after trusting the repository, tag, and checksum.
+4. Try to open the app once. If macOS blocks it, open **System Settings → Privacy & Security**, scroll to **Security**, click **Open Anyway**, then confirm. Apple keeps that button available for about an hour after the blocked launch: [Apple’s current instructions](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac).
 
-Do not disable Gatekeeper globally. No Developer ID signing, notarisation, stapling, or Gatekeeper acceptance is claimed.
+This creates an exception for Font Previewer; it does not require disabling Gatekeeper globally. Do this only after the checksum matches and you trust the GitHub repository and tag. No Developer ID signing, notarisation, stapling, or Gatekeeper acceptance is claimed.
 
 ## Ubuntu/Debian x64
 

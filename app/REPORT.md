@@ -4,7 +4,7 @@
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Current release posture: published `v0.1.0-rc.2` prerelease
+- Current release posture: `v0.1.0-rc.3` release candidate; latest published prerelease is `v0.1.0-rc.2`
 - Prior prerelease: `v0.1.0-rc.1` at `6ae51f5618387e1e4e39f4816f797da35aaee57b`
 - Stable release: not approved or claimed
 
@@ -18,7 +18,9 @@ Font Previewer is one local typography-decision product delivered through:
 
 - an AppKit/WKWebView/CoreText Host on macOS;
 - an Electron/Fontconfig Host on Linux;
-- one shared Review → Compare → System → Handoff Studio and Study v4 domain.
+- one shared Study v4 domain with a Simple add → boards → tune → export view and the deeper Review → Compare → System → Handoff Studio.
+
+Simple and Studio share imported fonts/styles, copy, casing, axes, candidate order, review/include decisions, and the active comparison sizing policy. Interface mode, interface scale, stress visibility, and unsaved export toggles remain local presentation preferences; saving a Comparison Set makes its policy portable Study data.
 
 The root `macos/` SwiftUI/CoreText application is a preserved reference, not an active package or second product.
 
@@ -29,6 +31,7 @@ Permanent application verification is defined by [`.github/workflows/verify.yml`
 - version consistency, strict TypeScript, public-seam tests, production builds, SBOM, and npm audit;
 - malformed protocol and Study inputs, migrations, installed Catalog, cancellation, recovery, and transactional Handoff;
 - accessibility semantics, forced-colours, reduced motion, focus restoration, and keyboard behavior;
+- family/style selection, Simple-to-Studio state travel, 80–140% interface scaling, minimum touch sizes, long-copy containment, four-up colour boards, stress characters, AP Title, and shared comparison sizing;
 - displayed Electron and WKWebView journeys;
 - forced Electron renderer recovery and the honestly labelled WKWebView termination-callback simulation;
 - Linux X11 and native Wayland/Ozone evidence;
@@ -48,7 +51,7 @@ Current workflow evidence is recorded in [`../docs/maintenance/REPOSITORY_STATE.
 - verified source-SHA manifests, checksums, package contents, notices, SBOM, and release notes;
 - an explicit publication boolean and exact tag confirmation before any GitHub release write.
 
-The default path creates a downloadable dry-run bundle. It refuses existing tags and releases. Publication requires the repository owner's explicit release instruction; that authorization was supplied for `v0.1.0-rc.2`.
+The default path creates a downloadable dry-run bundle. It refuses existing tags and releases. Publication requires the repository owner's explicit release instruction; that authorization has been supplied for the `v0.1.0-rc.3` candidate in this task.
 
 ## Remaining human and physical gates
 
