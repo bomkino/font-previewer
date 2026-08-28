@@ -4,7 +4,7 @@
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Current release posture: published `v0.1.0-rc.3` prerelease at `0e1d5c1c3ef1e6d6455c8bafcfb72fb8d203e1fe`
+- Current release posture: `v0.1.0-rc.4` Body Copy candidate; latest published prerelease remains `v0.1.0-rc.3` at `0e1d5c1c3ef1e6d6455c8bafcfb72fb8d203e1fe`
 - Prior prereleases: immutable `v0.1.0-rc.2` and `v0.1.0-rc.1`
 - Stable release: not approved or claimed
 
@@ -18,9 +18,9 @@ Font Previewer is one local typography-decision product delivered through:
 
 - an AppKit/WKWebView/CoreText Host on macOS;
 - an Electron/Fontconfig Host on Linux;
-- one shared Study v4 domain with a Simple add → boards → tune → export view and the deeper Review → Compare → System → Handoff Studio.
+- one shared Study v4 domain with a Simple add → Boards or Body Copy → tune → export view and the deeper Review → Compare → System → Handoff Studio.
 
-Simple and Studio share imported fonts/styles, copy, casing, axes, candidate order, review/include decisions, and the active comparison sizing policy. Interface mode, interface scale, stress visibility, and unsaved export toggles remain local presentation preferences; saving a Comparison Set makes its policy portable Study data.
+Simple and Studio share imported fonts/styles, live copy, casing, axes, candidate order, review/include decisions, and the active comparison sizing policy. Body Copy renders one full-text reading page per included font at one shared fitted size; Boards retains the original four-up comparison. Interface mode, page format, sample preference, interface scale, stress visibility, and unsaved export toggles remain local presentation preferences; saving a Comparison Set makes its policy portable Study data.
 
 The root `macos/` SwiftUI/CoreText application is a preserved reference, not an active package or second product.
 
@@ -31,7 +31,7 @@ Permanent application verification is defined by [`.github/workflows/verify.yml`
 - version consistency, strict TypeScript, public-seam tests, production builds, SBOM, and npm audit;
 - malformed protocol and Study inputs, migrations, installed Catalog, cancellation, recovery, and transactional Handoff;
 - accessibility semantics, forced-colours, reduced motion, focus restoration, and keyboard behavior;
-- family/style selection, Simple-to-Studio state travel, 80–140% interface scaling, minimum touch sizes, long-copy containment, four-up colour boards, stress characters, AP Title, and shared comparison sizing;
+- family/style selection, Simple-to-Studio state travel, 80–140% interface scaling, minimum touch sizes, long-copy containment, four-up colour boards, one-font Body Copy pages, full text, shared reading size, stress characters, AP Title, and shared comparison sizing;
 - displayed Electron and WKWebView journeys;
 - forced Electron renderer recovery and the honestly labelled WKWebView termination-callback simulation;
 - Linux X11 and native Wayland/Ozone evidence;
@@ -51,7 +51,7 @@ Current workflow evidence is recorded in [`../docs/maintenance/REPOSITORY_STATE.
 - verified source-SHA manifests, checksums, package contents, notices, SBOM, and release notes;
 - an explicit publication boolean and exact tag confirmation before any GitHub release write.
 
-The default path creates a downloadable dry-run bundle. It refuses existing tags and releases. The owner-authorized `v0.1.0-rc.3` publication completed through verification run `33140669879`, dry run `33140942047`, and publication run `33141048696`. That authorization is spent and does not apply to any later release.
+The default path creates a downloadable dry-run bundle. It refuses existing tags and releases. The owner-authorized `v0.1.0-rc.3` publication completed through verification run `33140669879`, dry run `33140942047`, and publication run `33141048696`. The owner separately authorized `v0.1.0-rc.4`; that authority remains conditional on exact-head verification and the guarded dry-run-first release path.
 
 ## Remaining human and physical gates
 

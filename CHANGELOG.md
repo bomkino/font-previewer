@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.1.0-rc.4 — 2026-08-28
+
+### Added
+
+- Added a second Simple page format, **Body Copy**, with one included font per 5,152 × 2,160 reading page instead of four fonts on one board.
+- Added three original two-paragraph reading samples, custom copy, live character guidance, and full-text page previews without ellipsis.
+- Applied one shared fitted reading size across every Body Copy page so families can be compared without accidental size bias.
+- Added first-class transactional `Body Copy/Body_XX.png` export on both desktop Hosts while preserving the original four-up Boards and optional index pages.
+
+### Changed
+
+- Made the Simple journey begin with one oversized **Boards / Body Copy** format choice while keeping font intake, styles, casing, axes, order, inclusion, sizing, and export in one legible flow.
+- Gave the Simple workspace a more spacious editorial composition, larger controls, stronger hierarchy, warmer reading surfaces, and less nested chrome.
+- Kept copy and font decisions live across Simple and Studio, so the deeper workspace remains available without making users rebuild a comparison.
+
+### Hardened
+
+- Made both Hosts reject mixed, impossible, or count-mismatched Simple export manifests before writing a Handoff.
+- Canonicalized macOS export roots and output paths before deriving manifest and checksum entries, including destinations reached through `/var` and `/private/var` aliases.
+- Added public-seam coverage for Body Copy samples, limits, full-text rendering, exact page manifests, transactional export, mixed-manifest refusal, and shared Studio state.
+- Extended displayed macOS evidence to Body Copy composition, exact-size exports, Studio state travel, and overflow/touch-target checks at 80% and 140% interface scale; exact-head Linux evidence remains a release gate.
+
+### Not claimed
+
+- Attended VoiceOver or Orca usability.
+- Human approval of every typeface, script, or reading-size relationship.
+- Independent clean-machine reconstruction or universal Mac/Linux behavior.
+- Developer ID signing, notarisation, stapling, or Gatekeeper acceptance.
+
 ## 0.1.0-rc.3 — 2026-08-28
 
 ### Added

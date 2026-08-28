@@ -39,7 +39,7 @@ The test runner removes compiled output before every run, plants a deliberately 
 - Discover and page the installed Catalog; prove opaque preview URLs, actual font loading, bounded results, cancellation acknowledgement, obsolete-result rejection, and no implicit Study mutation.
 - Save/recover and perform transactional Handoff.
 - Force Electron renderer termination and prove automatic reload, decision preservation, and focus restoration.
-- Capture six non-empty displayed states and verify evidence checksums.
+- Capture seven non-empty displayed states, including Simple Body Copy, and verify evidence checksums.
 - Launch the native Wayland/Ozone path under a headless compositor with `DISPLAY` absent and prove a rendered Studio state.
 - Build `.deb` and portable packages twice; require byte-identical checksum manifests.
 - Audit package inventory, local/private paths, credential markers, source maps, licences, notices, SBOM, and font binaries.
@@ -56,12 +56,13 @@ The test runner removes compiled output before every run, plants a deliberately 
 - Build the AppKit/WKWebView Host and embed the production Studio, licence, notices, SBOM, and installation guidance.
 - Enable hardened runtime, sign ad hoc, and verify the signature deeply and strictly.
 - Run the displayed Host, native menu/panel routes, installed Catalog, opaque font loading, cancellation, keyboard/focus/semantic checks, recovery, and transactional Handoff fault injection.
-- Exercise Simple file/folder and installed-family/style intake, four-up and index boards, long-copy containment, four colour quadrants, stress characters, five casing controls, variable axes, include/skip, and full-size preview.
+- Exercise Simple file/folder and installed-family/style intake, four-up and index boards, one-font Body Copy pages, authored and custom long copy, four colour quadrants, stress characters, five casing controls, variable axes, include/skip, and full-size preview.
+- Export Body Copy transactionally, decode every page at 5,152 × 2,160, prove full text and one shared fitted size, reject mixed manifests, and prove the copy remains available after switching to Studio.
 - Prove Simple-added Candidates and the active comparison sizing policy appear unchanged in Studio.
 - Exercise Studio Review, Compare, System, and Handoff with contextual panes, full-width Handoff, no title/candidate truncation, and no unwanted tray on System/Handoff.
 - Measure every 80–140% scale step; require no horizontal overflow and a minimum 44 px visible control at the smallest scale.
 - Label the termination-callback recovery exercise as a simulation; do not claim a real induced WebKit content-process crash.
-- Capture twenty non-empty displayed states spanning both modes, family/style dialogs, scale extremes, long copy, locked lines, tuning, and stage layouts.
+- Capture twenty-two non-empty displayed states spanning both modes, family/style dialogs, scale extremes, four-up Boards, Body Copy composition and pages, long copy, locked lines, tuning, and stage layouts.
 - Extract the packaged ZIP, reverify signature, run the package journey, and remove the extracted app.
 - Verify package ZIP checksum and add `SOURCE_SHA` to the exact-SHA artifact.
 

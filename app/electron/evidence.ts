@@ -277,6 +277,55 @@ async function installedCatalogAudit(window: BrowserWindow): Promise<Record<stri
   })()`, true), 60_000);
 }
 
+async function simpleBodyCopyAudit(window: BrowserWindow, output: string): Promise<Record<string, unknown>> {
+  await window.webContents.executeJavaScript(`(async () => {
+    [...document.querySelectorAll('.interface-switch button')].find((item) => item.textContent?.trim() === 'Simple')?.click();
+    const deadline = performance.now() + 10000;
+    while (!document.querySelector('.simple-page-mode-choices') && performance.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 25));
+    [...document.querySelectorAll('.simple-page-mode-choices button')].find((item) => item.textContent?.includes('Body Copy'))?.click();
+    while (!document.querySelector('.simple-body-page-list') && performance.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 25));
+    [...document.querySelectorAll('.simple-body-samples button')][1]?.click();
+    while (
+      (!document.querySelector('.simple-body-reading-copy')?.textContent?.startsWith('The workshop is quiet')
+        || [...document.querySelectorAll('.simple-body-reading-copy')].some((item) => !item.dataset.naturalFit))
+      && performance.now() < deadline
+    ) await new Promise((resolve) => setTimeout(resolve, 25));
+    document.querySelector('.simple-body-page-wrap')?.scrollIntoView({ block: 'start' });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+  })()`, true);
+  await capture(window, join(output, "07-simple-body-copy.png"));
+  const metrics = await withTimeout("Simple Body Copy audit", window.webContents.executeJavaScript(`(() => {
+    const pages = [...document.querySelectorAll('.simple-body-page-wrap')];
+    const copies = pages.map((page) => page.querySelector('.simple-body-reading-copy'));
+    const frames = pages.map((page) => page.querySelector('.simple-body-reading'));
+    const expected = document.querySelector('#simple-body-copy')?.value ?? '';
+    const sizes = copies.map((item) => Number.parseFloat(getComputedStyle(item).fontSize));
+    const manifest = window.__fontPreviewerSimpleExport?.manifest();
+    const touch = [...document.querySelectorAll('.simple-page-mode-choices button,.simple-body-samples button')]
+      .map((item) => item.getBoundingClientRect().height)
+      .filter((value) => value > 0);
+    return {
+      pageCount: pages.length,
+      sampleCount: document.querySelectorAll('.simple-body-samples button').length,
+      fullText: copies.every((item) => item?.textContent === expected),
+      twoParagraphs: expected.includes('\\n\\n') && copies.every((item) => item?.textContent?.includes('\\n\\n')),
+      sharedSize: sizes.length === pages.length && new Set(sizes.map((value) => value.toFixed(3))).size === 1,
+      withinFrames: copies.every((item, index) => {
+        const copy = item?.getBoundingClientRect();
+        const frame = frames[index]?.getBoundingClientRect();
+        return Boolean(copy && frame && copy.left >= frame.left - 1 && copy.right <= frame.right + 1 && copy.top >= frame.top - 1 && copy.bottom <= frame.bottom + 1);
+      }),
+      noEllipsis: copies.every((item) => getComputedStyle(item).textOverflow !== 'ellipsis'),
+      minTouchHeight: Math.min(...touch),
+      horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      manifest,
+    };
+  })()`, true)) as Record<string, unknown>;
+  await window.webContents.executeJavaScript(`[...document.querySelectorAll('.interface-switch button')].find((item) => item.textContent?.trim() === 'Studio')?.click()`, true);
+  await waitFor(window, "Body Copy shared with Studio", `document.querySelector('.stage-nav') && document.querySelector('.specimen-select p')?.textContent?.startsWith('The workshop is quiet in the useful way')`);
+  return { ...metrics, studioShared: true };
+}
+
 async function checksumEvidence(output: string): Promise<void> {
   const files = (await readdir(output, { recursive: true, withFileTypes: true }))
     .filter((entry) => entry.isFile() && entry.name !== "checksums.sha256")
@@ -347,6 +396,7 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   await clickStage(options.window, "Review");
   await waitFor(options.window, "Review semantics", `document.querySelector('.candidate-row[aria-current="true"] .review-glyph')?.getAttribute('aria-label') === 'Keep'`);
   trace.semanticAudit = await semanticAudit(options.window);
+  trace.simpleBodyCopy = await simpleBodyCopyAudit(options.window, output);
   trace.securityAudit = await securityAudit(options.window);
   trace.installedCatalog = await installedCatalogAudit(options.window);
   await capture(options.window, join(output, "06-catalog.png"));
@@ -409,10 +459,12 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   const security = trace.securityAudit as { invalidRequests?: number; rejected?: number; nodeUnavailable?: boolean };
   const keyboard = trace.keyboardAccessibility as Record<string, boolean>;
   const catalog = trace.installedCatalog as { count?: number; indexed?: number; pathLeak?: boolean; opaquePreviewUrls?: boolean; previewAvailable?: boolean; fontLoaded?: boolean; pageBounded?: boolean; studyUnchanged?: boolean; cancellation?: { acknowledged?: boolean; durationMs?: number; obsoleteResultCancelled?: boolean } };
+  const body = trace.simpleBodyCopy as { pageCount?: number; sampleCount?: number; fullText?: boolean; twoParagraphs?: boolean; sharedSize?: boolean; withinFrames?: boolean; noEllipsis?: boolean; minTouchHeight?: number; horizontalOverflow?: boolean; studioShared?: boolean; manifest?: { pageMode?: string; boardCount?: number; bodyCount?: number; indexCount?: number; fontCount?: number; includeIndex?: boolean } };
   if (audit.unnamed?.length || audit.duplicateIds?.length || audit.horizontalOverflow || !audit.roleHelpSeparated) throw new Error("Semantic accessibility or layout audit failed.");
   if (security.invalidRequests !== security.rejected || !security.nodeUnavailable) throw new Error("Host security audit failed.");
   if (!catalog.count || !catalog.indexed || catalog.pathLeak || !catalog.opaquePreviewUrls || !catalog.previewAvailable || !catalog.fontLoaded || !catalog.pageBounded || !catalog.studyUnchanged || !catalog.cancellation?.acknowledged || !catalog.cancellation.obsoleteResultCancelled || catalog.cancellation.durationMs === undefined || catalog.cancellation.durationMs > 100) throw new Error("Installed font catalog audit failed.");
   if (!keyboard.forwardWrap || !keyboard.backwardWrap || !keyboard.candidateUnchanged || !keyboard.trayUnchanged || !keyboard.returnFocus) throw new Error("Keyboard accessibility audit failed.");
+  if (!body.pageCount || body.pageCount !== body.manifest?.fontCount || body.pageCount !== body.manifest?.bodyCount || body.sampleCount !== 3 || !body.fullText || !body.twoParagraphs || !body.sharedSize || !body.withinFrames || !body.noEllipsis || (body.minTouchHeight ?? 0) < 44 || body.horizontalOverflow || !body.studioShared || body.manifest?.pageMode !== "body" || body.manifest.boardCount !== 0 || body.manifest.indexCount !== 0 || body.manifest.includeIndex !== false) throw new Error("Simple Body Copy audit failed.");
   if ((trace.rendererCrashRecovery as { after?: { activeElement?: string; reviewState?: string } }).after?.activeElement !== "workspace-heading" || (trace.rendererCrashRecovery as { after?: { activeElement?: string; reviewState?: string } }).after?.reviewState !== "Keep") throw new Error("Forced renderer crash recovery failed.");
   if (afterReload.activeElement !== "workspace-heading" || afterReload.reviewState !== "Keep") throw new Error("Reload recovery or focus restoration failed.");
   await checksumEvidence(output);

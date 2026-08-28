@@ -10,7 +10,7 @@ The latest published Font Previewer release is `v0.1.0-rc.3`. Its tag and `SOURC
 
 - Application source and package version: `0.1.0`.
 - Latest published prerelease: `v0.1.0-rc.3`.
-- Next candidate: none designated.
+- Designated candidate: `v0.1.0-rc.4`, not yet published.
 - Stable `v1.0.0`: prohibited until the documented human, physical, typography, accessibility, containment, reconstruction, and distribution decisions close.
 
 Every version change must reconcile `app/package.json`, `app/package-lock.json`, macOS bundle metadata, Linux package names/metadata, displayed version, SBOM, README, installation docs, changelog, tests, CI, and release notes. `npm run version:check` is the first gate.
@@ -41,7 +41,7 @@ A successful run on another commit is not transferable evidence.
 
 The default path creates and retains a dry-run bundle. Publication requires explicit `publish=true` and an exact tag confirmation. The workflow refuses an existing tag or release.
 
-No public release may be published without separate owner authorization, even when dry-run validation succeeds.
+No public release may be published without separate owner authorization, even when dry-run validation succeeds. The owner explicitly authorized `v0.1.0-rc.4` in the Body Copy completion request on 2026-08-28; that authorization is limited to this exact candidate and remains conditional on the gates above.
 
 ## Claim boundaries
 

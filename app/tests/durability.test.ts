@@ -117,7 +117,7 @@ test("Simple Handoff writes verified 5152 × 2160 board and index PNGs", async (
   const window = {
     webContents: {
       executeJavaScript: async (script: string) => {
-        if (script.includes("runtime.manifest")) return { width: 5_152, height: 2_160, boardCount: 1, indexCount: 1, fontCount: 1, includeIndex: true };
+        if (script.includes("runtime.manifest")) return { width: 5_152, height: 2_160, pageMode: "boards", boardCount: 1, bodyCount: 0, indexCount: 1, fontCount: 1, includeIndex: true };
         if (script.includes(".render(")) return dataUrl;
         throw new Error(`Unexpected renderer script: ${script}`);
       },
@@ -136,6 +136,73 @@ test("Simple Handoff writes verified 5152 × 2160 board and index PNGs", async (
   assert.deepEqual(await readFile(join(root, "Index", "Index_01.png")), png);
   const manifest = JSON.parse(await readFile(join(root, "manifest.json"), "utf8")) as { files: { path: string }[] };
   assert.deepEqual(manifest.files.map((entry) => entry.path), ["Boards/Board_01.png", "Index/Index_01.png", "README.md", "candidates.csv", "study.pitchfontstudy"]);
+});
+
+test("Simple Body Copy Handoff writes one verified page per included font", async (context) => {
+  const targetDirectory = await temporaryDirectory(context);
+  const fixture = createFixtureSession();
+  const document = assertStudyDocument({
+    ...fixture.document,
+    title: "Simple Body Copy Evidence",
+    candidates: fixture.document.candidates.map((candidate, index) => ({ ...candidate, reviewState: index < 2 ? "keep" : "reject" })),
+    handoff: { profile: "internal", outputs: ["summary", "json", "csv"], includeSources: false },
+  });
+  const png = simpleBoardPng();
+  const dataUrl = `data:image/png;base64,${png.toString("base64")}`;
+  const rendered: string[] = [];
+  const window = {
+    webContents: {
+      executeJavaScript: async (script: string) => {
+        if (script.includes("runtime.manifest")) return { width: 5_152, height: 2_160, pageMode: "body", boardCount: 0, bodyCount: 2, indexCount: 0, fontCount: 2, includeIndex: false };
+        if (script.includes(".render(")) {
+          rendered.push(script);
+          return dataUrl;
+        }
+        throw new Error(`Unexpected renderer script: ${script}`);
+      },
+    },
+  } as unknown as BrowserWindow;
+  const exported = await exportTransactionalHandoff({
+    window,
+    document,
+    preferences: document.handoff,
+    targetDirectory,
+    sourcePaths: new Map<string, string>(),
+    sourcePermissionAcknowledged: false,
+  });
+  const root = join(targetDirectory, exported.displayName);
+  assert.deepEqual(await readFile(join(root, "Body Copy", "Body_01.png")), png);
+  assert.deepEqual(await readFile(join(root, "Body Copy", "Body_02.png")), png);
+  assert.equal(rendered.length, 2);
+  assert.ok(rendered.every((script) => script.includes('render("body"')));
+  const manifest = JSON.parse(await readFile(join(root, "manifest.json"), "utf8")) as { files: { path: string }[] };
+  assert.deepEqual(manifest.files.map((entry) => entry.path), ["Body Copy/Body_01.png", "Body Copy/Body_02.png", "README.md", "candidates.csv", "study.pitchfontstudy"]);
+});
+
+test("Simple Handoff refuses a mixed or impossible Body Copy manifest", async (context) => {
+  const targetDirectory = await temporaryDirectory(context);
+  const fixture = createFixtureSession();
+  const document = assertStudyDocument({
+    ...fixture.document,
+    candidates: fixture.document.candidates.map((candidate, index) => ({ ...candidate, reviewState: index === 0 ? "keep" : "reject" })),
+  });
+  const window = {
+    webContents: {
+      executeJavaScript: async (script: string) => {
+        if (script.includes("runtime.manifest")) return { width: 5_152, height: 2_160, pageMode: "body", boardCount: 1, bodyCount: 1, indexCount: 0, fontCount: 1, includeIndex: false };
+        throw new Error(`Unexpected renderer script: ${script}`);
+      },
+    },
+  } as unknown as BrowserWindow;
+  await assert.rejects(exportTransactionalHandoff({
+    window,
+    document,
+    preferences: document.handoff,
+    targetDirectory,
+    sourcePaths: new Map<string, string>(),
+    sourcePermissionAcknowledged: false,
+  }), /Body Copy count does not match its fonts/);
+  assert.deepEqual(await readdir(targetDirectory), []);
 });
 
 test("corrupt, future, and impossible recovery envelopes cannot replace valid state", () => {
