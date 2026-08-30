@@ -5,6 +5,8 @@ import { ArrowLeft } from "@phosphor-icons/react/dist/icons/ArrowLeft";
 import { ArrowRight } from "@phosphor-icons/react/dist/icons/ArrowRight";
 import { ArrowUpRight } from "@phosphor-icons/react/dist/icons/ArrowUpRight";
 import { Books } from "@phosphor-icons/react/dist/icons/Books";
+import { CaretDown } from "@phosphor-icons/react/dist/icons/CaretDown";
+import { CaretRight } from "@phosphor-icons/react/dist/icons/CaretRight";
 import { Check } from "@phosphor-icons/react/dist/icons/Check";
 import { CheckCircle } from "@phosphor-icons/react/dist/icons/CheckCircle";
 import { Circle } from "@phosphor-icons/react/dist/icons/Circle";
@@ -30,6 +32,8 @@ export type InterfaceIconName =
   | "arrow-up-right"
   | "body-copy"
   | "boards"
+  | "caret-down"
+  | "caret-right"
   | "equal"
   | "export"
   | "folder"
@@ -55,6 +59,8 @@ const icons: Readonly<Record<InterfaceIconName, Icon>> = {
   "arrow-up-right": ArrowUpRight,
   "body-copy": Paragraph,
   boards: GridFour,
+  "caret-down": CaretDown,
+  "caret-right": CaretRight,
   equal: Equals,
   export: DownloadSimple,
   folder: FolderOpen,
@@ -78,6 +84,8 @@ const weights: Partial<Readonly<Record<InterfaceIconName, IconWeight>>> = {
   "arrow-left": "bold",
   "arrow-right": "bold",
   "arrow-up-right": "bold",
+  "caret-down": "bold",
+  "caret-right": "bold",
   equal: "bold",
   remove: "bold",
   "review-keep": "bold",

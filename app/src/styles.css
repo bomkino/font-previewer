@@ -980,7 +980,7 @@ kbd {
   margin-top: 18px;
 }
 
-.field-label > span {
+.field-label > span:not(.select-control) {
   display: block;
   margin-bottom: 7px;
   color: var(--ink-muted);
@@ -1862,10 +1862,14 @@ kbd {
   border-bottom: 1px solid var(--line);
 }
 
-.inspector-details summary {
+.inspector-disclosure-trigger {
+  width: 100%;
   padding: 12px 16px;
+  color: inherit;
+  background: transparent;
   font-size: 9px;
   font-weight: 700;
+  text-align: left;
   text-transform: uppercase;
 }
 
@@ -4044,8 +4048,8 @@ button:not(:disabled):active {
   margin-top: 24px;
 }
 
-.field-label > span,
-.inspector-details summary,
+.field-label > span:not(.select-control),
+.inspector-disclosure-trigger,
 .feature-list legend {
   font-size: 10px;
 }
@@ -4059,7 +4063,7 @@ button:not(:disabled):active {
 
 .axis-control,
 .feature-list,
-.inspector-details summary {
+.inspector-disclosure-trigger {
   padding: 16px;
 }
 
@@ -4866,8 +4870,8 @@ button:not(:disabled):active {
   margin-top: 28px;
 }
 
-.mode-studio .field-label > span,
-.mode-studio .inspector-details summary,
+.mode-studio .field-label > span:not(.select-control),
+.mode-studio .inspector-disclosure-trigger,
 .mode-studio .feature-list legend {
   margin-bottom: 9px;
   font-size: 11px;
@@ -4903,7 +4907,7 @@ button:not(:disabled):active {
 
 .mode-studio .axis-control,
 .mode-studio .feature-list,
-.mode-studio .inspector-details summary {
+.mode-studio .inspector-disclosure-trigger {
   padding: 20px 0;
 }
 
@@ -4917,7 +4921,7 @@ button:not(:disabled):active {
   min-height: 56px;
 }
 
-.mode-studio .inspector-details summary {
+.mode-studio .inspector-disclosure-trigger {
   min-height: 56px;
   margin: 0;
 }
@@ -5251,9 +5255,15 @@ summary {
 .primary-button,
 .quiet-button,
 .icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
   min-height: var(--control-height);
   padding-inline: var(--space-5);
   border-radius: var(--radius-control);
+  line-height: 1.2;
+  text-align: center;
 }
 
 .icon-button {
@@ -5272,6 +5282,173 @@ summary {
 .interface-icon {
   display: block;
   flex: 0 0 auto;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.button-label {
+  min-width: 0;
+}
+
+:is(.ui-scale-control button, .reorder-buttons button, .tray-remove, .error-banner button) {
+  display: inline-grid;
+  align-items: center;
+  justify-items: center;
+  line-height: 1;
+}
+
+.reorder-buttons {
+  flex: 0 0 auto;
+}
+
+.select-control {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: none;
+}
+
+.select-control select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding-right: 48px !important;
+  overflow: hidden;
+  appearance: none;
+  -webkit-appearance: none;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.select-control > .interface-icon {
+  position: absolute;
+  top: 50%;
+  right: var(--space-4);
+  color: var(--ink-muted);
+  transform: translateY(-50%);
+  transition: color 140ms var(--ease-ui-out);
+}
+
+.select-control:focus-within > .interface-icon {
+  color: var(--ink);
+}
+
+.workspace-heading-row .compact-select .select-control {
+  margin-top: var(--space-2);
+}
+
+.inspector-disclosure-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--control-height);
+  margin: 0;
+  color: var(--ink-muted);
+  background: transparent;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.mode-studio .inspector-disclosure-trigger {
+  padding: var(--space-5) 0;
+}
+
+.inspector-disclosure-trigger .interface-icon {
+  color: var(--ink-muted);
+  transform: rotate(0deg);
+  transform-origin: center;
+  transition: color 140ms var(--ease-ui-out), transform 180ms var(--ease-ui-out);
+}
+
+.inspector-details.is-open .inspector-disclosure-trigger {
+  color: var(--ink);
+}
+
+.inspector-details.is-open .inspector-disclosure-trigger .interface-icon {
+  color: var(--accent);
+  transform: rotate(90deg);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .inspector-disclosure-trigger:hover {
+    color: var(--ink);
+  }
+}
+
+.inspector-disclosure-trigger:not(:disabled):active {
+  transform: scale(0.995);
+}
+
+.inspector-details-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  min-width: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 180ms var(--ease-ui-out),
+    opacity 120ms var(--ease-ui-out),
+    visibility 0s linear 180ms;
+}
+
+.inspector-details-content > div {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  transform: translateY(-4px);
+  transition: transform 180ms var(--ease-ui-out);
+}
+
+.inspector-details.is-open .inspector-details-content {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    grid-template-rows 180ms var(--ease-ui-out),
+    opacity 140ms var(--ease-ui-out),
+    visibility 0s linear 0s;
+}
+
+.inspector-details.is-open .inspector-details-content > div {
+  transform: translateY(0);
+}
+
+.modal-backdrop,
+.simple-preview-backdrop,
+.simple-catalog-backdrop {
+  opacity: 1;
+  transition: opacity 160ms var(--ease-ui-out);
+}
+
+.new-study-dialog,
+.simple-preview-dialog,
+.simple-catalog-dialog {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transform-origin: center;
+  transition: opacity 180ms var(--ease-ui-out), transform 180ms var(--ease-ui-out);
+}
+
+@starting-style {
+  .modal-backdrop,
+  .simple-preview-backdrop,
+  .simple-catalog-backdrop {
+    opacity: 0;
+  }
+
+  .new-study-dialog,
+  .simple-preview-dialog,
+  .simple-catalog-dialog {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
 }
 
 .save-dot {

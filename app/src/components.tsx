@@ -2,11 +2,14 @@ import {
   memo,
   useDeferredValue,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
+  type ComponentPropsWithoutRef,
   type CSSProperties,
   type Dispatch,
+  type ReactNode,
   type RefObject,
 } from "react";
 import {
@@ -89,6 +92,31 @@ const reviewIconNames: Record<ReviewState, InterfaceIconName> = {
 
 function ReviewStateIcon({ state, size = 18 }: { readonly state: ReviewState; readonly size?: number }) {
   return <InterfaceIcon name={reviewIconNames[state]} size={size} />;
+}
+
+function SelectControl({ children, ...props }: ComponentPropsWithoutRef<"select">) {
+  return (
+    <span className="select-control">
+      <select {...props}>{children}</select>
+      <InterfaceIcon name="caret-down" size={18} />
+    </span>
+  );
+}
+
+function InspectorDisclosure({ title, children }: { readonly title: string; readonly children: ReactNode }) {
+  const contentId = useId();
+  const [open, setOpen] = useState(false);
+  return (
+    <section className={`inspector-details ${open ? "is-open" : ""}`}>
+      <button type="button" className="inspector-disclosure-trigger" aria-expanded={open} aria-controls={contentId} onClick={() => setOpen((current) => !current)}>
+        <InterfaceIcon name="caret-right" size={18} />
+        <span>{title}</span>
+      </button>
+      <div id={contentId} className="inspector-details-content" aria-hidden={!open} inert={!open}>
+        <div>{children}</div>
+      </div>
+    </section>
+  );
 }
 
 function blindCandidateLabel(index: number): string {
@@ -954,10 +982,10 @@ export function Navigator({ session, dispatch, actions, mode, onModeChange, cata
             </label>
             <label className="compact-select">
               <span className="sr-only">Review filter</span>
-              <select value={session.workspace.reviewFilter} onChange={(event) => dispatch({ type: "set-review-filter", filter: event.target.value as ReviewState | "all" })}>
+              <SelectControl value={session.workspace.reviewFilter} onChange={(event) => dispatch({ type: "set-review-filter", filter: event.target.value as ReviewState | "all" })}>
                 <option value="all">All decisions</option>
                 {REVIEW_STATES.map((state) => <option value={state} key={state}>{reviewLabels[state]}</option>)}
-              </select>
+              </SelectControl>
             </label>
           </div>
           <div className="candidate-list" aria-label="Candidates">
@@ -1223,7 +1251,7 @@ function CompareWorkspace({ session, dispatch, fontStates, headingRef, compariso
               <article className="compare-card" key={candidate.id}>
                 <div className="compare-meta"><strong>{hidden ? blindLabel : face.family}</strong><span>{hidden ? "Identity hidden" : candidate.label}</span></div>
                 {policy === "nominal" ? <Specimen className="compare-copy" session={session} candidate={candidate} recipe={recipe} fontStates={fontStates} fittedSize={recipe.size} label={`${hidden ? blindLabel : `${face.family} ${candidate.label}`}. ${policyLabels[policy].label}.`} /> : <SimpleCandidateCopy className="compare-copy" session={session} candidate={candidate} fontStates={fontStates} stressTest={false} fit="compare" policy={policy} label={`${hidden ? blindLabel : `${face.family} ${candidate.label}`}. ${policyLabels[policy].label}.`} />}
-                <div className="compare-footer"><span>{policyLabels[policy].label}</span><span className="reorder-buttons"><button type="button" aria-label={`Move ${hidden ? blindLabel : `${face.family} ${candidate.label}`} left`} onClick={() => move(index, -1)} disabled={index === 0}><InterfaceIcon name="arrow-left" /></button><button type="button" aria-label={`Move ${hidden ? blindLabel : `${face.family} ${candidate.label}`} right`} onClick={() => move(index, 1)} disabled={index === candidates.length - 1}><InterfaceIcon name="arrow-right" /></button><button type="button" aria-label={`Remove ${hidden ? blindLabel : `${face.family} ${candidate.label}`} from comparison`} onClick={() => dispatch({ type: "toggle-tray", candidateId: candidate.id })}>Remove</button></span></div>
+                <div className="compare-footer"><span>{policyLabels[policy].label}</span><span className="reorder-buttons"><button type="button" aria-label={`Move ${hidden ? blindLabel : `${face.family} ${candidate.label}`} left`} onClick={() => move(index, -1)} disabled={index === 0}><InterfaceIcon name="arrow-left" /></button><button type="button" aria-label={`Move ${hidden ? blindLabel : `${face.family} ${candidate.label}`} right`} onClick={() => move(index, 1)} disabled={index === candidates.length - 1}><InterfaceIcon name="arrow-right" /></button><button type="button" aria-label={`Remove ${hidden ? blindLabel : `${face.family} ${candidate.label}`} from comparison`} onClick={() => dispatch({ type: "toggle-tray", candidateId: candidate.id })}><InterfaceIcon name="remove" /></button></span></div>
               </article>
             );
           })}
@@ -1244,7 +1272,7 @@ function SystemWorkspace({ session, dispatch, fontStates, headingRef }: Workspac
   const sceneRecipe = recipes.find((recipe) => recipe.name.toLocaleLowerCase().includes(session.workspace.activeScene)) ?? activeRecipe(session);
   return (
     <main className="workspace system-workspace" id="workspace" aria-labelledby="workspace-heading">
-      <div className="workspace-heading-row"><div><p className="section-kicker">Typography System · {system.fontUses.length}/{SYSTEM_ROLES.length} Roles</p><h1 id="workspace-heading" ref={headingRef} tabIndex={-1}>{system.name}</h1></div><label className="compact-select">Scene <select value={session.workspace.activeScene} onChange={(event) => dispatch({ type: "set-scene", scene: event.target.value as typeof session.workspace.activeScene })}>{["title", "logline", "body", "data", "legal"].map((scene) => <option value={scene} key={scene}>{scene[0].toUpperCase() + scene.slice(1)}</option>)}</select></label></div>
+      <div className="workspace-heading-row"><div><p className="section-kicker">Typography System · {system.fontUses.length}/{SYSTEM_ROLES.length} Roles</p><h1 id="workspace-heading" ref={headingRef} tabIndex={-1}>{system.name}</h1></div><label className="compact-select">Scene <SelectControl value={session.workspace.activeScene} onChange={(event) => dispatch({ type: "set-scene", scene: event.target.value as typeof session.workspace.activeScene })}>{["title", "logline", "body", "data", "legal"].map((scene) => <option value={scene} key={scene}>{scene[0].toUpperCase() + scene.slice(1)}</option>)}</SelectControl></label></div>
       <section className={`deck-scene scene-${session.workspace.activeScene}`} aria-label={`${session.workspace.activeScene} deck Scene`}>
         {(["display", "body", "data", "caption", "legal", "utility"] as const).map((role) => {
           const candidate = candidateForRole(session, role);
@@ -1275,7 +1303,7 @@ function HandoffWorkspace({ session, dispatch, headingRef, actions, capabilities
     <main className="workspace handoff-workspace" id="workspace" aria-labelledby="workspace-heading">
       <div className="workspace-heading-row"><div><p className="section-kicker">Preflight · {blockers} blockers · {missingSources.length} cautions</p><h1 id="workspace-heading" ref={headingRef} tabIndex={-1}>A handoff that can stand alone</h1></div><button type="button" className="primary-button" disabled={blockers > 0 || preferences.outputs.length === 0} onClick={() => actions.exportHandoff(preferences.includeSources)}>Export Handoff</button></div>
       <div className="handoff-columns">
-        <section className="handoff-panel"><p className="section-kicker">1 · Profile</p><label className="field-label"><span>Audience</span><select value={preferences.profile} onChange={(event) => update({ profile: event.target.value as HandoffPreferences["profile"] })}><option value="internal">Internal review</option><option value="client">Client review</option><option value="designer">Designer handoff</option><option value="technical">Technical proof</option></select></label><p className="handoff-note">Profile changes required evidence. It never changes your typography decisions.</p></section>
+        <section className="handoff-panel"><p className="section-kicker">1 · Profile</p><label className="field-label"><span>Audience</span><SelectControl value={preferences.profile} onChange={(event) => update({ profile: event.target.value as HandoffPreferences["profile"] })}><option value="internal">Internal review</option><option value="client">Client review</option><option value="designer">Designer handoff</option><option value="technical">Technical proof</option></SelectControl></label><p className="handoff-note">Profile changes required evidence. It never changes your typography decisions.</p></section>
         <section className="handoff-panel"><p className="section-kicker">2 · Preflight</p><div className="handoff-list"><article><span className={`check-mark ${missingRoles.length ? "" : "is-ready"}`} aria-hidden="true"><InterfaceIcon name={missingRoles.length ? "source-warning" : "source-ready"} size={22} /></span><div><h2>Required Roles</h2><p>{missingRoles.length ? `Assign ${missingRoles.map((role) => roleLabels[role as SystemRole]).join(" and ")}.` : "Display and Body are assigned."}</p></div></article><article><span className={`check-mark ${missingSources.length ? "" : "is-ready"}`} aria-hidden="true"><InterfaceIcon name={missingSources.length ? "source-warning" : "source-ready"} size={22} /></span><div><h2>Source health</h2><p>{missingSources.length ? `${missingSources.length} Sources are missing or limited. Decisions remain intact.` : "All Sources are locally bound."}</p></div></article><article><span className={`check-mark ${capabilities?.transactionalHandoff ? "is-ready" : ""}`} aria-hidden="true"><InterfaceIcon name={capabilities?.transactionalHandoff ? "source-ready" : "source-warning"} size={22} /></span><div><h2>Transactional export</h2><p>{capabilities?.transactionalHandoff ? "Host will stage, verify, checksum, then commit." : "Browser development mode cannot produce the full bundle."}</p></div></article></div></section>
         <section className="handoff-panel"><p className="section-kicker">3 · Outputs</p><div className="output-grid">{(["review-png", "compare-png", "system-png", "pdf", "summary", "json", "csv"] as const).map((output) => <label key={output}><input type="checkbox" checked={preferences.outputs.includes(output)} onChange={() => toggleOutput(output)} /><span>{output.replaceAll("-", " ")}</span></label>)}</div></section>
         <section className="handoff-panel source-permission"><p className="section-kicker">4 · Source copies</p><label><input type="checkbox" checked={preferences.includeSources} onChange={(event) => update({ includeSources: event.target.checked })} />Include original Source files</label><p>{preferences.includeSources ? "On by default for this internal tool. Turn it off before sharing outside your licensed team." : "Source files will not be copied."}</p></section>
@@ -1319,17 +1347,17 @@ export function Inspector({ session, dispatch, fontStates, actions, blindIdentit
     <aside className="inspector" aria-label="Inspector">
       <div className="inspector-title"><p className="section-kicker">Candidate</p><h2>{face.family}</h2><p>{candidate.label} · Face {face.faceIndex}</p></div>
       <label className="field-label"><span>Instance label</span><input value={candidate.label} onChange={(event) => dispatch({ type: "edit-candidate", candidateId: candidate.id, patch: { label: event.target.value } })} /></label>
-      <label className="field-label"><span>Role</span><select value={use?.role ?? ""} onChange={(event) => dispatch({ type: "assign-role", candidateId: candidate.id, role: (event.target.value || undefined) as SystemRole | undefined })}><option value="">Unassigned</option>{SYSTEM_ROLES.map((role) => <option value={role} key={role}>{roleLabels[role]}</option>)}</select><small>Role creates a distinct Font Use. Candidate remains unchanged.</small></label>
+      <label className="field-label"><span>Role</span><SelectControl value={use?.role ?? ""} onChange={(event) => dispatch({ type: "assign-role", candidateId: candidate.id, role: (event.target.value || undefined) as SystemRole | undefined })}><option value="">Unassigned</option>{SYSTEM_ROLES.map((role) => <option value={role} key={role}>{roleLabels[role]}</option>)}</SelectControl><small>Role creates a distinct Font Use. Candidate remains unchanged.</small></label>
       <div className="inspector-actions"><button type="button" className="quiet-button" onClick={() => dispatch({ type: "toggle-tray", candidateId: candidate.id })}>{session.workspace.trayIds.includes(candidate.id) ? "Remove from Compare" : "Add to Compare"}</button><button type="button" className="quiet-button" onClick={() => dispatch({ type: "duplicate-candidate", candidateId: candidate.id })}>Duplicate instance</button></div>
-      {face.namedInstances.length ? <label className="field-label"><span>Named instance</span><select value="" onChange={(event) => { const instance = face.namedInstances.find((item) => item.name === event.target.value); instance?.coordinates.forEach((axis) => dispatch({ type: "set-axis", candidateId: candidate.id, tag: axis.tag, value: axis.value })); }}><option value="">Custom</option>{face.namedInstances.map((instance) => <option key={instance.name}>{instance.name}</option>)}</select></label> : null}
+      {face.namedInstances.length ? <label className="field-label"><span>Named instance</span><SelectControl value="" onChange={(event) => { const instance = face.namedInstances.find((item) => item.name === event.target.value); instance?.coordinates.forEach((axis) => dispatch({ type: "set-axis", candidateId: candidate.id, tag: axis.tag, value: axis.value })); }}><option value="">Custom</option>{face.namedInstances.map((instance) => <option key={instance.name}>{instance.name}</option>)}</SelectControl></label> : null}
       {face.axes.map((axis) => { const value = candidate.axes.find((item) => item.tag === axis.tag)?.value ?? axis.defaultValue; return <label className="axis-control" key={axis.tag}><span><strong>{axis.name}</strong><code>{axis.tag}</code><output>{Math.round(value * 100) / 100}</output></span><input type="range" min={axis.minimum} max={axis.maximum} step={(axis.maximum - axis.minimum) / 200 || 1} value={value} onChange={(event) => dispatch({ type: "set-axis", candidateId: candidate.id, tag: axis.tag, value: Number(event.target.value) })} /><small>{axis.minimum} · default {axis.defaultValue} · {axis.maximum}</small></label>; })}
       {face.features.length ? <fieldset className="feature-list"><legend>OpenType features</legend>{face.features.map((feature) => { const enabled = candidate.features.find((item) => item.tag === feature.tag)?.enabled ?? feature.defaultEnabled; return <label key={feature.tag}><input type="checkbox" checked={enabled} onChange={(event) => dispatch({ type: "set-feature", candidateId: candidate.id, tag: feature.tag, enabled: event.target.checked })} /><span>{feature.name}<code>{feature.tag}</code></span></label>; })}</fieldset> : null}
-      <label className="field-label"><span>Casing</span><select value={candidate.casing} onChange={(event) => dispatch({ type: "edit-candidate", candidateId: candidate.id, patch: { casing: event.target.value as Candidate["casing"] } })}><option value="exact">Exact</option><option value="uppercase">UPPERCASE</option><option value="lowercase">lowercase</option><option value="title">Title Case</option><option value="ap-title">AP Title Case</option></select></label>
+      <label className="field-label"><span>Casing</span><SelectControl value={candidate.casing} onChange={(event) => dispatch({ type: "edit-candidate", candidateId: candidate.id, patch: { casing: event.target.value as Candidate["casing"] } })}><option value="exact">Exact</option><option value="uppercase">UPPERCASE</option><option value="lowercase">lowercase</option><option value="title">Title Case</option><option value="ap-title">AP Title Case</option></SelectControl></label>
       <label className="field-label"><span>Tags</span><input value={tags} onChange={(event) => setTags(event.target.value)} onBlur={() => dispatch({ type: "edit-candidate", candidateId: candidate.id, patch: { tags: tags.split(",") } })} placeholder="quiet, editorial" /></label>
       <label className="field-label"><span>Notes</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} onBlur={() => dispatch({ type: "edit-candidate", candidateId: candidate.id, patch: { notes } })} rows={3} /></label>
       <label className="field-label"><span>Rationale</span><textarea value={rationale} onChange={(event) => setRationale(event.target.value)} onBlur={() => dispatch({ type: "edit-candidate", candidateId: candidate.id, patch: { rationale } })} rows={3} /></label>
-      <details className="inspector-details"><summary>Characters & evidence</summary><label className="field-label"><span>Probe text</span><input value={probe} onChange={(event) => setProbe(event.target.value)} /></label><p className="character-probe" style={specimenStyle(session.document, candidate, activeRecipe(session), fontStates.get(face.id), { fittedSize: 28 })}>{probe}</p><p className="evidence-note">{rendererStatusLabel(fontStates.get(face.id))}. Coverage level: {face.coverage.evidenceLevel}. Visible output alone does not prove language support or fallback.</p></details>
-      <details className="inspector-details"><summary>Source & Face</summary><dl className="facts"><div><dt>Source</dt><dd>{source.displayName}<small>{source.hint.format} · {source.hint.fileSize ? `${Math.round(source.hint.fileSize / 1_024)} KB` : "size unknown"}</small></dd></div><div><dt>Binding</dt><dd>{binding?.state ?? "missing"}<small>{binding?.rendererSupport ?? "unsupported"}</small></dd></div><div><dt>Face</dt><dd>{face.postScriptName || `${face.family} ${face.style}`}<small>collection index {face.faceIndex}</small></dd></div><div><dt>Scripts</dt><dd>{face.coverage.scripts.join(", ") || "Not inspected"}<small>{face.coverage.supportedCodePointCount || "Unknown"} code points</small></dd></div></dl><p className="evidence-note">Metadata reported by the font. Confirm the actual licence before redistribution.</p><div className="inspector-actions"><button type="button" className="quiet-button" onClick={() => actions.relinkSource(source.id)}>Relink…</button><button type="button" className="quiet-button" onClick={() => actions.revealSource(source.id)}>Show in file manager</button></div></details>
+      <InspectorDisclosure title="Characters & evidence"><label className="field-label"><span>Probe text</span><input value={probe} onChange={(event) => setProbe(event.target.value)} /></label><p className="character-probe" style={specimenStyle(session.document, candidate, activeRecipe(session), fontStates.get(face.id), { fittedSize: 28 })}>{probe}</p><p className="evidence-note">{rendererStatusLabel(fontStates.get(face.id))}. Coverage level: {face.coverage.evidenceLevel}. Visible output alone does not prove language support or fallback.</p></InspectorDisclosure>
+      <InspectorDisclosure title="Source & Face"><dl className="facts"><div><dt>Source</dt><dd>{source.displayName}<small>{source.hint.format} · {source.hint.fileSize ? `${Math.round(source.hint.fileSize / 1_024)} KB` : "size unknown"}</small></dd></div><div><dt>Binding</dt><dd>{binding?.state ?? "missing"}<small>{binding?.rendererSupport ?? "unsupported"}</small></dd></div><div><dt>Face</dt><dd>{face.postScriptName || `${face.family} ${face.style}`}<small>collection index {face.faceIndex}</small></dd></div><div><dt>Scripts</dt><dd>{face.coverage.scripts.join(", ") || "Not inspected"}<small>{face.coverage.supportedCodePointCount || "Unknown"} code points</small></dd></div></dl><p className="evidence-note">Metadata reported by the font. Confirm the actual licence before redistribution.</p><div className="inspector-actions"><button type="button" className="quiet-button" onClick={() => actions.relinkSource(source.id)}>Relink…</button><button type="button" className="quiet-button" onClick={() => actions.revealSource(source.id)}>Show in file manager</button></div></InspectorDisclosure>
     </aside>
   );
 }

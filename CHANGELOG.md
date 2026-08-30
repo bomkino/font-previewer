@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.0-rc.6 — 2026-08-30
+
+### Changed
+
+- Replaced platform-native select arrows with centered 18 px bold Phosphor carets, a 16 px edge inset, and a 48 px text reserve so labels and icons keep a deliberate gap at every interface scale.
+- Rebuilt Inspector disclosure rows as stable, focus-safe shells with a rotating Phosphor caret and short interruptible open/close motion instead of snapping native disclosure geometry.
+- Normalized icon-only controls and text-plus-icon buttons around shared centering, line-height, padding, and no-shrink rules; Compare footer actions now use one consistent icon language.
+- Added restrained 160–180 ms opacity and transform entry motion to dialogs while preserving reduced-motion behavior.
+
+### Hardened
+
+- Extended displayed Host evidence to measure productive-control height, icon and select-caret centering, caret edge clearance, Studio panel alignment, tray boundaries, and horizontal overflow.
+- Added an explicit disclosure-motion trace that proves expanded and collapsed semantics, closed-content inertness, intermediate frames, caret rotation, and return to the original layout.
+- Added public-seam coverage for every custom select shell and Inspector disclosure, including the absence of native `details`/`summary` controls.
+
+### Not claimed
+
+- Attended VoiceOver or Orca usability.
+- Human approval of every layout, typeface, script, or reading-size relationship.
+- Independent clean-machine reconstruction or universal Mac/Linux behavior.
+- Developer ID signing, notarisation, stapling, or Gatekeeper acceptance.
+
 ## 0.1.0-rc.5 — 2026-08-30
 
 ### Added

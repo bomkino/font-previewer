@@ -231,6 +231,37 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Record exact dry-run proof
+        if: ${{ inputs.publish == false }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$PUBLISH" = "false"
+          jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg target_sha "$TARGET_SHA" \
+            --arg verification_run_id "$RUN_ID" \
+            --arg tag "$TAG" \
+            --arg workflow_run_id "$GITHUB_RUN_ID" \
+            '{
+              schema: "font-previewer-release-dry-run-proof/v1",
+              repository: $repository,
+              target_sha: $target_sha,
+              verification_run_id: $verification_run_id,
+              tag: $tag,
+              publish: false,
+              workflow_run_id: $workflow_run_id
+            }' > "$RUNNER_TEMP/release-dry-run-proof.json"
+
+      - name: Upload exact dry-run proof
+        if: ${{ inputs.publish == false }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: font-previewer-release-dry-run-proof-${{ inputs.target_sha }}-${{ inputs.tag }}
+          path: ${{ runner.temp }}/release-dry-run-proof.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Publish prerelease only when explicitly confirmed
         if: ${{ inputs.publish }}
         shell: bash
