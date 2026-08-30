@@ -110,10 +110,11 @@ verify_app() {
     esac
   done < <(otool -L "$executable" | tail -n +2 | awk '{ print $1 }')
 
-  if find "$candidate" -type f \( -name '*.map' -o -name '*.otf' -o -name '*.ttf' -o -name '*.ttc' -o -name '*.otc' -o -name '*.woff' -o -name '*.woff2' -o -name '*.dfont' \) -print -quit | grep -q .; then
-    echo "Package contains a source map or font binary." >&2
+  if find "$candidate" -type f -name '*.map' -print -quit | grep -q .; then
+    echo "Package contains a source map." >&2
     return 1
   fi
+  node "$SCRIPT_DIR/audit-font-binaries.mjs" macos-app "$candidate"
   if find "$candidate" \( -name '.git' -o -name 'node_modules' -o -name 'tests' -o -name '__tests__' -o -name '.DS_Store' \) -print -quit | grep -q .; then
     echo "Package contains build, test, cache, or source residue." >&2
     return 1

@@ -1,5 +1,12 @@
 # Master Handoff
 
+> [!IMPORTANT]
+> **HISTORICAL ARCHIVE — NOT CURRENT AUTHORITY**
+>
+> This handover pack is retained as programme evidence. It is not current build, release, or repository authority. Current truth lives in [`docs/maintenance/REPOSITORY_STATE.md`](../../maintenance/REPOSITORY_STATE.md).
+>
+> Any references below to signed or notarized distribution describe historical intent only. They are not claims about the current application or its published artifacts.
+
 ## Assignment
 
 Turn the current Font Previewer native reference into one coherent local product with two desktop clients:

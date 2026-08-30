@@ -1,5 +1,12 @@
 # Font Previewer — Final Cloud Work Handover
 
+> [!IMPORTANT]
+> **HISTORICAL ARCHIVE — NOT CURRENT AUTHORITY**
+>
+> This handover pack is retained as programme evidence. It is not current build, release, or repository authority. Current truth lives in [`docs/maintenance/REPOSITORY_STATE.md`](../../maintenance/REPOSITORY_STATE.md).
+>
+> Any references below to signed or notarized distribution describe historical intent only. They are not claims about the current application or its published artifacts.
+
 This pack is the build authority for the Font Previewer two-application programme.
 
 It replaces the earlier single-document architecture thesis with a decision-controlled product, prototype, implementation, and release programme suitable for a fresh ChatGPT Work / Codex handoff.

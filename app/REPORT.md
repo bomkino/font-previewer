@@ -5,6 +5,7 @@
 - Canonical branch: `main`
 - Source version: `0.1.0`
 - Current release posture: published `v0.1.0-rc.4` at exact source `b0950402316253cc9cb7bf7a6ec86ea5f669184f`
+- Prepared release source: `v0.1.0-rc.5`; exact-main verification, tag, and publication are pending
 - Prior prereleases: immutable `v0.1.0-rc.3`, `v0.1.0-rc.2`, and `v0.1.0-rc.1`
 - Stable release: not approved or claimed
 
@@ -22,6 +23,8 @@ Font Previewer is one local typography-decision product delivered through:
 
 Simple and Studio share imported fonts/styles, live copy, casing, axes, candidate order, review/include decisions, and the active comparison sizing policy. Body Copy renders one full-text reading page per included font at one shared fitted size; Boards retains the original four-up comparison. Interface mode, page format, sample preference, interface scale, stress visibility, and unsaved export toggles remain local presentation preferences; saving a Comparison Set makes its policy portable Study data.
 
+Application chrome uses seven exact CC0-1.0 WOFF2 files from pitch.dog Type System v13 and one Phosphor icon adapter. Candidate specimens retain isolated generated families. One reusable audit requires the approved UI-font locations, sizes, and SHA-256 digests in every build/package surface and rejects all other font binaries.
+
 The root `macos/` SwiftUI/CoreText application is a preserved reference, not an active package or second product.
 
 ## Automated verification
@@ -37,7 +40,7 @@ Permanent application verification is defined by [`.github/workflows/verify.yml`
 - Linux X11 and native Wayland/Ozone evidence;
 - Linux `.deb` and portable package assembly, reproducibility, install/launch/remove journeys, sandbox ownership, and residue checks;
 - macOS app assembly, hardened runtime, ad-hoc signature verification, archive round trip, and checksums;
-- package inventory, private-path, credential-marker, source-map, licence, notice, SBOM, and font-binary checks.
+- package inventory, private-path, credential-marker, source-map, licence, notice, SBOM, and exact seven-font allowlist checks.
 
 Current workflow evidence is recorded in [`../docs/maintenance/REPOSITORY_STATE.md`](../docs/maintenance/REPOSITORY_STATE.md), the exact-SHA `SOURCE_SHA` release asset, and the release-linked Actions runs. The older cleanup receipt remains historical evidence for the canonicalisation that preceded this release.
 
@@ -51,7 +54,7 @@ Current workflow evidence is recorded in [`../docs/maintenance/REPOSITORY_STATE.
 - verified source-SHA manifests, checksums, package contents, notices, SBOM, and release notes;
 - an explicit publication boolean and exact tag confirmation before any GitHub release write.
 
-The default path creates a downloadable dry-run bundle. It refuses existing tags and releases. The owner-authorized `v0.1.0-rc.4` publication completed through verification run `33151448579`, dry run `33151866338`, and publication run `33151987068`. That one-use authority has been exercised; any later tag requires new authorization.
+The default path creates a downloadable dry-run bundle. It refuses existing tags and releases. The owner-authorized `v0.1.0-rc.4` publication completed through verification run `33151448579`, dry run `33151866338`, and publication run `33151987068`. The owner separately authorized one guarded `v0.1.0-rc.5` publication on 2026-08-30; exact-main verification and dry-run evidence are still required, and the authority does not extend to stable `v1.0.0` or a later tag.
 
 ## Remaining human and physical gates
 

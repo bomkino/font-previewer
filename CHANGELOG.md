@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.1.0-rc.5 — 2026-08-30
+
+### Added
+
+- Added pitch.dog Type System 13.0.0 from exact commit `786b4a2b671182319320f922b8de8f927ea3a002` as the interface typography source, with seven governed CC0-1.0 WOFF2 assets bundled locally.
+- Added Phosphor Icons for React 2.1.10 and replaced improvised text marks and one-off SVGs across navigation, review states, source health, page modes, scale controls, status, and Handoff preflight.
+- Added one reusable font-binary auditor for renderer, macOS app, Linux portable, and Debian package layouts.
+
+### Changed
+
+- Replaced platform-dependent interface fallbacks with the pitch.dog Head, Body, Body Alt, and Eyebrow roles while leaving imported Candidate rendering under its existing isolated `FontPreviewer_<hash>` families.
+- Introduced a 4 px spacing scale, 56 px primary control geometry, consistent padding, gaps, and radii, stable scrollbars, and a narrower responsive Studio/titlebar layout at high interface scales.
+- Corrected font-intake copy to describe the supported file/folder chooser instead of promising an unimplemented drop interaction.
+
+### Hardened
+
+- Made builds and packages require all seven approved UI fonts at their exact byte sizes and SHA-256 digests, in the sole approved renderer-assets directory, while rejecting duplicates, omissions, disguised font magic, and every other font binary.
+- Made release preparation extract and inspect the macOS ZIP, Linux portable archive, and Debian package independently before assembly.
+- Made both displayed Host journeys wait for PD Body Roman, PD Body Italic, PD Head, and PD Eyebrow to load before visual evidence is captured.
+- Restricted Studio review shortcuts to the Review stage and the currently visible filtered/search result set, preventing hidden or off-stage Candidate mutations.
+- Unified Compare's live blind/reveal state with Inspector redaction, preventing unsaved blind comparisons from leaking Candidate identity in the side panel.
+- Preserved the privacy boundary between fixed application-interface fonts and user Sources, Faces, Candidates, local Bindings, and permission-gated Handoff copies.
+
+### Not claimed
+
+- Publication of `v0.1.0-rc.5`; an exact verified source SHA, release tag, and public assets remain pending.
+- Attended VoiceOver or Orca usability.
+- Human approval of every layout, typeface, script, or reading-size relationship.
+- Independent clean-machine reconstruction or universal Mac/Linux behavior.
+- Developer ID signing, notarisation, stapling, or Gatekeeper acceptance.
+
 ## 0.1.0-rc.4 — 2026-08-28
 
 ### Added

@@ -8,7 +8,7 @@ Font Previewer is prerelease software. `main` is the canonical branch. Read `AGE
 2. Keep privileged operations in the Host and the HostBridge closed, path-free, runtime-validated, and bounded.
 3. Add tests at a public seam for a named user, security, privacy, accessibility, or migration risk.
 4. Preserve the root `macos/` reference until a deliberate evidence-backed disposition replaces it.
-5. Keep font binaries, Studies, recovery files, Handoffs, client material, absolute paths, email addresses, credentials, and internal handover packages out of Git and release artifacts.
+5. Keep user/imported/installed font binaries, Studies, recovery files, Handoffs, client material, absolute paths, email addresses, credentials, and internal handover packages out of Git and release artifacts. The only font exception is the seven checksum-pinned CC0-1.0 application-interface WOFF2 assets enforced by the package audit.
 6. Record exact SHA, commands, evidence, limitations, and changed risk.
 7. Do not weaken an evidence assertion merely to make CI green.
 8. Do not publish, overwrite a release, move a published tag, add secrets, or make signing/notarisation claims without explicit owner authorization.

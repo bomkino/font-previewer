@@ -6,10 +6,10 @@
 - Source version remains `0.1.0`.
 - `v0.1.0-rc.4` is published from exact source `b0950402316253cc9cb7bf7a6ec86ea5f669184f`.
 - Published `v0.1.0-rc.1` through `v0.1.0-rc.4` remain immutable with their original assets.
-- No later candidate is designated.
+- `v0.1.0-rc.5` source is the prepared candidate; it remains untagged and unpublished until exact-main verification and the guarded dry run pass.
 - No stable release is approved or claimed.
 - The owner-authorized rc.4 publication completed through exact-main verification `33151448579`, dry run `33151866338`, and publication `33151987068`.
-- The rc.4 authorization has been exercised. It was candidate-specific and does not authorize stable v1 or a later tag.
+- The rc.4 authorization has been exercised. The owner granted one-use authorization for guarded `v0.1.0-rc.5` publication on 2026-08-30; it is conditional on the exact-main verification and dry-run gates and does not authorize stable v1 or a later tag.
 
 The prior owner decision that authorized the first prerelease while work remained isolated on an RC branch is preserved unchanged at [`../archive/2026-08-27/RELEASE_DECISION_PACKET_PRE_MAIN.md`](../archive/2026-08-27/RELEASE_DECISION_PACKET_PRE_MAIN.md). Its branch instructions are historical and do not override current `main`.
 

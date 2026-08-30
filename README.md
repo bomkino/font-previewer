@@ -15,10 +15,10 @@ It imports and inspects fonts, maintains portable `.pitchfontstudy` documents, c
 - Source version: `0.1.0`
 - Latest published release: [`v0.1.0-rc.4`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.4)
 - Exact release source: `b0950402316253cc9cb7bf7a6ec86ea5f669184f`
-- Current `main`: release source plus documentation-only release receipt
+- Prepared candidate source: [`v0.1.0-rc.5`](docs/releases/v0.1.0-rc.5.md); no `rc.5` tag, release, exact candidate SHA, or public assets are claimed yet
 - Public stable release: none
 
-Published `v0.1.0-rc.4` adds one-font Body Copy reading pages without removing the original fast four-up Boards journey or the deeper Studio. Published `rc.1` through `rc.4` history remains intact.
+Published `v0.1.0-rc.4` adds one-font Body Copy reading pages without removing the original fast four-up Boards journey or the deeper Studio. Published `rc.1` through `rc.4` history remains intact. The prepared `rc.5` source adds the pinned pitch.dog interface typography, Phosphor icons, a 4 px spacing contract, safer Review shortcuts, font-ready visual evidence, and exact seven-font package gates; publication still requires exact-head verification and the manual release path.
 
 The exact current repository state, automated evidence, and remaining human gates live in [`docs/maintenance/REPOSITORY_STATE.md`](docs/maintenance/REPOSITORY_STATE.md).
 
@@ -83,7 +83,7 @@ Build, verify, install to `/Applications`, and launch:
 ./build-font-previewer-app.command
 ```
 
-`npm run verify` checks version surfaces, strict TypeScript, public-seam tests, production Studio and Host builds, SBOM generation, bundle hygiene, and high-severity npm audit. GitHub Actions adds displayed Host journeys, recovery and Handoff fault injection, accessibility semantics, package round trips, checksums, reproducibility, X11, native Wayland/Ozone smoke, and ad-hoc signature verification.
+`npm run verify` checks version surfaces, strict TypeScript, public-seam tests, production Studio and Host builds, SBOM generation, bundle hygiene, the exact seven-font UI allowlist, and high-severity npm audit. GitHub Actions adds font-ready displayed Host journeys, recovery and Handoff fault injection, accessibility semantics, package round trips, checksums, reproducibility, X11, native Wayland/Ozone smoke, and ad-hoc signature verification.
 
 Permanent verification is defined by [`.github/workflows/verify.yml`](.github/workflows/verify.yml). Release preparation is manual, exact-SHA guarded, dry-run first, and non-overwriting; no release is published automatically.
 
@@ -121,8 +121,9 @@ The root `macos/` SwiftUI/CoreText application is a historical native reference 
 - Local-only: no account, analytics, upload, updater, or required network.
 - No font installation, activation, mutation, moving, or deletion.
 - No automatic winner, taste score, or fake Figma integration.
-- No paid, client, copied system, or mystery font binaries in Git or packages.
+- Packages may contain only the seven approved CC0-1.0 pitch.dog interface WOFF2 files, identified by approved package location, byte size, and SHA-256 digest.
+- No paid, client, copied system, mystery, imported, or installed-font Candidate binaries enter Git or packages; user Source copies remain explicit and permission-gated inside Handoffs.
 - No raster-parity claim between CoreText/WebKit and Chromium.
 - Public prereleases are GitHub-only; stable `v1.0.0` remains separately gated.
 
-MIT licensed. See [`LICENSE`](LICENSE).
+Font Previewer source is MIT licensed. Separately governed pitch.dog Type System materials retain the terms recorded in [`app/THIRD_PARTY_NOTICES.md`](app/THIRD_PARTY_NOTICES.md). See [`LICENSE`](LICENSE).

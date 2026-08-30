@@ -1,6 +1,6 @@
 # Programme status
 
-> **Current-status pointer — 2026-08-28**
+> **Current-status pointer — 2026-08-30**
 >
 > The implementation programme has completed its merge into canonical `main`. This file no longer maintains an independent branch or milestone truth. Use [`../maintenance/REPOSITORY_STATE.md`](../maintenance/REPOSITORY_STATE.md) for current repository status, [`../../app/REPORT.md`](../../app/REPORT.md) for the current implementation report, and [`../QA.md`](../QA.md) for reproducible gates.
 
@@ -8,7 +8,7 @@
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Current candidate: none designated
+- Current candidate: `v0.1.0-rc.5` source prepared; exact-main verification and guarded publication pending
 - Latest published prerelease: `v0.1.0-rc.4`
 - Exact latest-published source: `b0950402316253cc9cb7bf7a6ec86ea5f669184f`; the tag and public `SOURCE_SHA` agree
 - RC, hardening, and pre-Mac implementation: merged into `main`
@@ -25,6 +25,6 @@
 - hostile cross-format font containment beyond current automated fixtures;
 - induced WKWebView content-process termination;
 - optional Developer ID signing/notarisation only if a future paid distribution path is deliberately adopted;
-- new explicit authorization for any public release after `v0.1.0-rc.4`.
+- the one-use `v0.1.0-rc.5` authorization applies only after exact-main verification and the guarded dry run; any later tag or stable release requires new authorization.
 
 Historical status before canonicalisation is preserved at [`../archive/2026-08-27/PROGRAMME_STATUS_PRE_MAIN.md`](../archive/2026-08-27/PROGRAMME_STATUS_PRE_MAIN.md). Old ticket and handover documents remain evidence, not current merge or release instructions.

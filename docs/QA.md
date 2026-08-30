@@ -18,7 +18,7 @@ npm run verify
 3. public-seam domain, migration, grouping, protocol, Host-utility, accessibility, and rendered-surface tests;
 4. production Studio bundle;
 5. Electron main and sandboxed preload compilation;
-6. bundle inventory and private-data audit;
+6. bundle inventory, private-data audit, and the exact seven-font UI allowlist;
 7. CycloneDX SBOM generation;
 8. high-severity npm audit.
 
@@ -37,12 +37,13 @@ The test runner removes compiled output before every run, plants a deliberately 
 - Reject malformed and path-bearing bridge messages; prove Node is unavailable in the renderer.
 - Exercise keyboard wrap, return focus, semantic labels, duplicate-ID checks, overflow checks, and Inspector/help separation.
 - Discover and page the installed Catalog; prove opaque preview URLs, actual font loading, bounded results, cancellation acknowledgement, obsolete-result rejection, and no implicit Study mutation.
+- Require PD Body Roman, PD Body Italic, PD Head, and PD Eyebrow to report loaded, then wait two animation frames before capturing displayed evidence.
 - Save/recover and perform transactional Handoff.
 - Force Electron renderer termination and prove automatic reload, decision preservation, and focus restoration.
 - Capture seven non-empty displayed states, including Simple Body Copy, and verify evidence checksums.
 - Launch the native Wayland/Ozone path under a headless compositor with `DISPLAY` absent and prove a rendered Studio state.
 - Build `.deb` and portable packages twice; require byte-identical checksum manifests.
-- Audit package inventory, local/private paths, credential markers, source maps, licences, notices, SBOM, and font binaries.
+- Audit package inventory, local/private paths, credential markers, source maps, licences, notices, and SBOM; require the seven approved UI WOFF2 digests in the sole renderer-assets path and reject every other font binary, including disguised font magic.
 - Extract and launch the portable package.
 - Install, launch, exercise, remove, and residue-check the Debian package.
 - Verify root-owned mode-4755 Chromium sandbox helper and package checksums.
@@ -56,6 +57,7 @@ The test runner removes compiled output before every run, plants a deliberately 
 - Build the AppKit/WKWebView Host and embed the production Studio, licence, notices, SBOM, and installation guidance.
 - Enable hardened runtime, sign ad hoc, and verify the signature deeply and strictly.
 - Run the displayed Host, native menu/panel routes, installed Catalog, opaque font loading, cancellation, keyboard/focus/semantic checks, recovery, and transactional Handoff fault injection.
+- Require PD Body Roman, PD Body Italic, PD Head, and PD Eyebrow to report loaded, then wait two animation frames before capturing displayed evidence.
 - Exercise Simple file/folder and installed-family/style intake, four-up and index boards, one-font Body Copy pages, authored and custom long copy, four colour quadrants, stress characters, five casing controls, variable axes, include/skip, and full-size preview.
 - Export Body Copy transactionally, decode every page at 5,152 × 2,160, prove full text and one shared fitted size, reject mixed manifests, and prove the copy remains available after switching to Studio.
 - Prove Simple-added Candidates and the active comparison sizing policy appear unchanged in Studio.
@@ -64,11 +66,12 @@ The test runner removes compiled output before every run, plants a deliberately 
 - Label the termination-callback recovery exercise as a simulation; do not claim a real induced WebKit content-process crash.
 - Capture twenty-two non-empty displayed states spanning both modes, family/style dialogs, scale extremes, four-up Boards, Body Copy composition and pages, long copy, locked lines, tuning, and stage layouts.
 - Extract the packaged ZIP, reverify signature, run the package journey, and remove the extracted app.
+- Require exactly seven approved UI WOFF2 files inside `Contents/Resources/Studio/assets/`; compare byte size and SHA-256 identity and reject every other font binary or font-magic payload.
 - Verify package ZIP checksum and add `SOURCE_SHA` to the exact-SHA artifact.
 
 ## Automated evidence boundaries
 
-Hosted-runner measurements are diagnostic, not universal performance claims. Xvfb, headless Weston, and hosted macOS cannot prove independent hardware, every compositor/driver, native feel, or attended accessibility. Automated semantic labels cannot stand in for VoiceOver or Orca.
+Hosted-runner measurements are diagnostic, not universal performance claims. Xvfb, headless Weston, and hosted macOS cannot prove independent hardware, every compositor/driver, native feel, or attended accessibility. A loaded webfont and a non-empty screenshot prove neither visual quality nor absence of clipping. Automated semantic labels cannot stand in for VoiceOver or Orca.
 
 The exact final verified commit, run links, job results, package names, and checksums are recorded in [`maintenance/REPOSITORY_STATE.md`](maintenance/REPOSITORY_STATE.md) and [`maintenance/REPOSITORY_CLEANUP_2026-08-27.md`](maintenance/REPOSITORY_CLEANUP_2026-08-27.md). Historical RC evidence remains under [`archive/2026-08-27/`](archive/2026-08-27/).
 
@@ -121,8 +124,8 @@ The synthetic 10,000-entry Catalog workload, cancellation contract, semantic 500
 - Repeat install, launch, Save, recover, export, and uninstall on independent clean supported Linux images.
 - Repeat portable extraction and launch on an independent machine while preserving sandbox ownership safely.
 - Repeat the packaged macOS journey on an independent compatible Mac.
-- Verify notices, SBOM, checksums, package contents, and `SOURCE_SHA` against the exact intended commit.
+- Verify notices, SBOM, checksums, package contents, `SOURCE_SHA`, and the seven approved UI-font digests against the exact intended commit.
 - Adopt Developer ID signing, notarisation, stapling, and Gatekeeper verification only if that future distribution model is deliberately chosen and credentials are supplied.
 - Obtain explicit owner authorization before any public release.
 
-No source font, Study, recovery file, Handoff, absolute client path, username, email address, signing secret, notarisation credential, or internal handover payload may enter Git or CI artifacts.
+No user Source font, font binary backing an imported or installed Candidate, Study, recovery file, Handoff, absolute client path, username, email address, signing secret, notarisation credential, or internal handover payload may enter Git or CI artifacts. The only font-binary exception is the seven fixed CC0-1.0 application-interface WOFF2 files enforced by the exact allowlist.

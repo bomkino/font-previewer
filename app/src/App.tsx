@@ -14,6 +14,7 @@ import {
   STUDY_LIMITS,
   applyStudyCommand,
   createSession,
+  faceForCandidate,
   isSemanticCommand,
   type RecipePack,
   type FitPolicy,
@@ -195,6 +196,16 @@ function interactiveTarget(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && Boolean(target.closest("a, button, summary, [role='button'], [role='radio']"));
 }
 
+function visibleReviewCandidates(session: StudySession) {
+  const query = session.workspace.search.trim().toLocaleLowerCase();
+  return session.document.candidates.filter((candidate) => {
+    if (session.workspace.reviewFilter !== "all" && candidate.reviewState !== session.workspace.reviewFilter) return false;
+    if (!query) return true;
+    const face = faceForCandidate(session.document, candidate);
+    return `${face.family} ${candidate.label} ${candidate.tags.join(" ")}`.toLocaleLowerCase().includes(query);
+  });
+}
+
 function statusLabel(session: StudySession, recoveryAvailable: boolean | undefined): string {
   if (session.revision === session.intentionallySavedRevision) return "Saved";
   if (session.revision > session.acknowledgedRevision) return "Saving recovery…";
@@ -221,6 +232,8 @@ export default function App() {
   const [bodySampleId, setBodySampleId] = useState(storedBodySampleId);
   const [stressTest, setStressTest] = useState(false);
   const [comparisonFitPolicy, setComparisonFitPolicy] = useState<FitPolicy>("fit");
+  const [comparisonBlind, setComparisonBlind] = useState(false);
+  const [comparisonRevealed, setComparisonRevealed] = useState(false);
   const [includeIndex, setIncludeIndex] = useState(true);
   const [includeSources, setIncludeSources] = useState(false);
   const [launchReady, setLaunchReady] = useState(false);
@@ -721,29 +734,34 @@ export default function App() {
       }
       if (editableTarget(event.target) || interactiveTarget(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
       if (interfaceMode !== "studio") return;
-      const candidateId = sessionRef.current.workspace.selectedCandidateId;
-      if (["0", "1", "2", "3"].includes(event.key) && candidateId) {
+      if (event.key === "Enter") {
+        headingRef.current?.focus();
+        return;
+      }
+      const currentSession = sessionRef.current;
+      if (currentSession.workspace.stage !== "review") return;
+      const candidates = visibleReviewCandidates(currentSession);
+      const candidateId = currentSession.workspace.selectedCandidateId;
+      const candidateIndex = candidates.findIndex((candidate) => candidate.id === candidateId);
+      const candidateIsVisible = candidateIndex >= 0;
+      if (["0", "1", "2", "3"].includes(event.key) && candidateId && candidateIsVisible) {
         const reviewState = ({ "0": "unreviewed", "1": "keep", "2": "maybe", "3": "reject" } as const)[event.key as "0" | "1" | "2" | "3"];
         dispatch({ type: "set-review-state", candidateIds: [candidateId], reviewState });
         return;
       }
-      if (event.code === "Space" && candidateId) {
+      if (event.code === "Space" && candidateId && candidateIsVisible) {
         event.preventDefault();
         dispatch({ type: "toggle-tray", candidateId });
       } else if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+        if (!candidates.length) return;
         event.preventDefault();
-        const candidates = sessionRef.current.document.candidates;
-        const index = candidates.findIndex((candidate) => candidate.id === candidateId);
-        const next = candidates[(index + 1 + candidates.length) % candidates.length];
+        const next = candidates[candidateIsVisible ? (candidateIndex + 1) % candidates.length : 0];
         if (next) dispatch({ type: "select-candidate", candidateId: next.id });
       } else if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+        if (!candidates.length) return;
         event.preventDefault();
-        const candidates = sessionRef.current.document.candidates;
-        const index = candidates.findIndex((candidate) => candidate.id === candidateId);
-        const previous = candidates[(index - 1 + candidates.length) % candidates.length];
+        const previous = candidates[candidateIsVisible ? (candidateIndex - 1 + candidates.length) % candidates.length : candidates.length - 1];
         if (previous) dispatch({ type: "select-candidate", candidateId: previous.id });
-      } else if (event.key === "Enter") {
-        headingRef.current?.focus();
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -759,9 +777,12 @@ export default function App() {
     ? session.document.comparisonSets.find((comparison) => comparison.id === session.workspace.activeComparisonId)
     : undefined;
   useEffect(() => {
-    if (activeComparison) setComparisonFitPolicy(activeComparison.policy);
-  }, [activeComparison?.id, activeComparison?.policy]);
-  const blindIdentityHidden = session.workspace.stage === "compare" && Boolean(activeComparison?.blind && !activeComparison.revealed);
+    if (!activeComparison) return;
+    setComparisonFitPolicy(activeComparison.policy);
+    setComparisonBlind(activeComparison.blind);
+    setComparisonRevealed(activeComparison.revealed);
+  }, [activeComparison?.blind, activeComparison?.id, activeComparison?.policy, activeComparison?.revealed]);
+  const blindIdentityHidden = session.workspace.stage === "compare" && comparisonBlind && !comparisonRevealed;
   const shellStyle = {
     transform: `scale(${uiScale})`,
     width: `${100 / uiScale}%`,
@@ -778,18 +799,18 @@ export default function App() {
     <div className={`app-shell ${showWelcome ? "is-welcome" : ""} mode-${interfaceMode} stage-${session.workspace.stage}`} data-interface-mode={interfaceMode} data-simple-page-mode={simplePageMode} data-recovery-checkpoint={confirmedRecoveryCheckpointKey === recoveryCheckpointIdentity ? "ready" : "pending"} data-ui-scale={Math.round(uiScale * 100)} style={shellStyle}>
       <a className="skip-link" href={showWelcome ? "#welcome-heading" : "#workspace-heading"}>Skip to main content</a>
       <header className="titlebar">
-        <div className="brand-lockup"><img className="brand-mark" src="/font-previewer-icon-64.png" alt="" aria-hidden="true" /><div><strong>Font Previewer</strong><span>{interfaceMode === "simple" ? (simplePageMode === "body" ? "Reading Pages" : "Type Boards") : "Decision Studio"}</span></div></div>
+        <div className="brand-lockup"><img className="brand-mark" src="./font-previewer-icon-64.png" alt="" aria-hidden="true" /><div><strong>Font Previewer</strong><span>{interfaceMode === "simple" ? (simplePageMode === "body" ? "Reading Pages" : "Type Boards") : "Decision Studio"}</span></div></div>
         <div className="interface-switch" role="group" aria-label="Interface mode">
           <button type="button" className={interfaceMode === "simple" ? "is-active" : ""} aria-pressed={interfaceMode === "simple"} onClick={() => { setInterfaceMode("simple"); if (showWelcome && session.document.candidates.length) setShowWelcome(false); }}>Simple</button>
           <button type="button" className={interfaceMode === "studio" ? "is-active" : ""} aria-pressed={interfaceMode === "studio"} onClick={() => { setInterfaceMode("studio"); setShowWelcome(false); }}>Studio</button>
         </div>
-        <label className="document-title"><span className={`save-dot ${session.revision === session.intentionallySavedRevision ? "" : "is-unsaved"}`} aria-hidden="true">●</span><span className="sr-only">Study title</span><input value={titleDraft} onChange={(event) => setTitleDraft(event.target.value)} onBlur={() => dispatch({ type: "rename-study", title: titleDraft })} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} aria-label="Study title" /><span>{statusLabel(session, recoveryAvailable)}</span></label>
+        <label className="document-title"><span className={`save-dot ${session.revision === session.intentionallySavedRevision ? "" : "is-unsaved"}`} aria-hidden="true" /><span className="sr-only">Study title</span><input value={titleDraft} onChange={(event) => setTitleDraft(event.target.value)} onBlur={() => dispatch({ type: "rename-study", title: titleDraft })} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} aria-label="Study title" /><span>{statusLabel(session, recoveryAvailable)}</span></label>
         <div className="ui-scale-control" role="group" aria-label="Interface scale">
-          <button type="button" aria-label="Decrease interface scale" disabled={uiScale === UI_SCALES[0]} onClick={() => changeScale(-1)}>−</button>
+          <button type="button" aria-label="Decrease interface scale" disabled={uiScale === UI_SCALES[0]} onClick={() => changeScale(-1)}><InterfaceIcon name="subtract" /></button>
           <button type="button" className="ui-scale-value" aria-label={`Reset interface scale. Current scale ${Math.round(uiScale * 100)} percent`} onClick={() => setUIScale(1)}>{Math.round(uiScale * 100)}%</button>
-          <button type="button" aria-label="Increase interface scale" disabled={uiScale === UI_SCALES.at(-1)} onClick={() => changeScale(1)}>+</button>
+          <button type="button" aria-label="Increase interface scale" disabled={uiScale === UI_SCALES.at(-1)} onClick={() => changeScale(1)}><InterfaceIcon name="add" /></button>
         </div>
-        <div className="host-actions"><span className="host-probe">{hostName}</span><button type="button" className="quiet-button has-icon" onClick={openStudy}><InterfaceIcon name="folder" />Open</button><button id="import-fonts-button" type="button" className="quiet-button has-icon" onClick={importSources}><InterfaceIcon name="add" />Add Fonts</button><button type="button" className="primary-button has-icon" onClick={() => saveStudy(false)}><InterfaceIcon name="save" />Save</button></div>
+        <div className="host-actions"><span className="host-probe">{hostName}</span><button type="button" className="quiet-button has-icon" aria-label="Open Study" onClick={openStudy}><InterfaceIcon name="folder" /><span className="button-label">Open</span></button><button id="import-fonts-button" type="button" className="quiet-button has-icon" aria-label="Add fonts" onClick={importSources}><InterfaceIcon name="add" /><span className="button-label">Add Fonts</span></button><button type="button" className="primary-button has-icon" aria-label="Save Study" onClick={() => saveStudy(false)}><InterfaceIcon name="save" /><span className="button-label">Save</span></button></div>
       </header>
 
       {showWelcome ? <Welcome actions={actions} capabilities={capabilities} /> : (
@@ -819,15 +840,15 @@ export default function App() {
           />
         ) : <>
           <nav className="stage-nav" aria-label="Workflow stages">{STAGES.map((stage, stageIndex) => <button type="button" key={stage} className={session.workspace.stage === stage ? "is-active" : ""} aria-current={session.workspace.stage === stage ? "step" : undefined} onClick={() => setStage(stage)}><span className="stage-number">{String(stageIndex + 1).padStart(2, "0")}</span><span className="stage-copy"><strong>{stageLabels[stage]}</strong><small>{STAGE_DESCRIPTIONS[stage]}</small></span></button>)}</nav>
-          {session.workspace.stage !== "handoff" ? <Navigator session={session} index={index} dispatch={dispatch} actions={actions} mode={navigatorMode} onModeChange={setNavigatorMode} catalog={catalog} catalogBusy={busyTask === "Scanning installed fonts"} /> : null}
-          <Workspace session={session} index={index} dispatch={dispatch} fontStates={fontStates} headingRef={headingRef} actions={actions} capabilities={capabilities} comparisonPolicy={comparisonFitPolicy} onComparisonPolicyChange={setComparisonFitPolicy} />
+          {session.workspace.stage !== "handoff" ? <Navigator session={session} index={index} dispatch={dispatch} actions={actions} mode={navigatorMode} onModeChange={setNavigatorMode} catalog={catalog} catalogBusy={busyTask === "Scanning installed fonts"} blindIdentityHidden={blindIdentityHidden} /> : null}
+          <Workspace session={session} index={index} dispatch={dispatch} fontStates={fontStates} headingRef={headingRef} actions={actions} capabilities={capabilities} comparisonPolicy={comparisonFitPolicy} onComparisonPolicyChange={setComparisonFitPolicy} comparisonBlind={comparisonBlind} onComparisonBlindChange={setComparisonBlind} comparisonRevealed={comparisonRevealed} onComparisonRevealedChange={setComparisonRevealed} />
           {session.workspace.stage !== "handoff" ? <Inspector key={session.workspace.selectedCandidateId ?? "none"} session={session} dispatch={dispatch} fontStates={fontStates} actions={actions} blindIdentityHidden={blindIdentityHidden} /> : null}
-          {session.workspace.stage === "review" || session.workspace.stage === "compare" ? <Tray session={session} dispatch={dispatch} /> : null}
+          {session.workspace.stage === "review" || session.workspace.stage === "compare" ? <Tray session={session} dispatch={dispatch} blindIdentityHidden={blindIdentityHidden} /> : null}
         </>
       )}
 
-      {busyTask ? <div className="task-status" role="status"><span aria-hidden="true" />{busyTask}…</div> : null}
-      {error ? <div className="error-banner" role="alert"><span>{error}</span><button type="button" aria-label="Dismiss error" onClick={() => setError("")}>×</button></div> : null}
+      {busyTask ? <div className="task-status" role="status"><InterfaceIcon name="spinner" size={18} />{busyTask}…</div> : null}
+      {error ? <div className="error-banner" role="alert"><span>{error}</span><button type="button" aria-label="Dismiss error" onClick={() => setError("")}><InterfaceIcon name="remove" /></button></div> : null}
       {newStudyOpen ? (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeNewStudy(); }}>
           <section ref={newStudyDialogRef} className="new-study-dialog" role="dialog" aria-modal="true" aria-labelledby="new-study-heading" aria-describedby="new-study-description" tabIndex={-1}>

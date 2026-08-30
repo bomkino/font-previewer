@@ -21,8 +21,8 @@
   "files": [
     {
       "path": "00_MASTER_HANDOFF.md",
-      "bytes": 6282,
-      "sha256": "3c420352ec618555be993b0c445e9b90b46830aafcf4856cece4ae6cc34b85fc"
+      "bytes": 6742,
+      "sha256": "9cf9f35f8e97d965199a3df667e815f5ad571fe440c0f1b2ec22b208b55ea140"
     },
     {
       "path": "01_PRODUCT_SPEC.md",
@@ -66,8 +66,8 @@
     },
     {
       "path": "09_ADR_REGISTER.md",
-      "bytes": 5044,
-      "sha256": "96659998b31f031aa2c3958489fb5a20d6a8b13ad125d48d6eab9fa0347a330c"
+      "bytes": 7160,
+      "sha256": "75f317ae408a7b04689ecefa1d0bf46c23e925703396d047b8e8290b1757d607"
     },
     {
       "path": "10_IMPLEMENTATION_ROADMAP.md",
@@ -76,8 +76,8 @@
     },
     {
       "path": "11_BUILD_BACKLOG.md",
-      "bytes": 21861,
-      "sha256": "51e6d84c82f1025a149a381842f9d239183953673a46d8227b65454781130294"
+      "bytes": 21905,
+      "sha256": "9b00dc57d84d33fe031578ae19b35c809a0bee647173d7d62ed5aa72f2527ab3"
     },
     {
       "path": "12_TEST_SECURITY_RELEASE.md",
@@ -111,8 +111,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 3776,
-      "sha256": "085c5af08f296b2839f8cfd39ac22e654414699d0f82e2f1554e56a0a3a98004"
+      "bytes": 4236,
+      "sha256": "d732a65e8882439fcb9e9cb527869a47e90115f09940a5768ba7a57e64f09f82"
     },
     {
       "path": "VALIDATION_REPORT.md",
@@ -131,8 +131,8 @@
     },
     {
       "path": "contracts/backlog.json",
-      "bytes": 25997,
-      "sha256": "0407b0109baad57d179c05eaae79cadd503a53879f6984d2526565c173f4762c"
+      "bytes": 26041,
+      "sha256": "f5d646c25bcab4afe3feec7a61c086e566ca28cd358588017759ae92ab1a21e6"
     },
     {
       "path": "contracts/decision-register.json",

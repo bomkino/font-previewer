@@ -44,7 +44,6 @@ test("shared Studio renders the complete Review-to-Handoff product seam", () => 
   assert.match(html, /Comparison tray/);
   assert.match(html, /Family Group/);
   assert.match(html, /aria-live="polite"/);
-  assert.match(html, /font-previewer-icon-64\.png/);
   assert.match(html, /aria-current="step"/);
   assert.match(html, /class="skip-link" href="#workspace-heading">Skip to main content/);
   assert.equal((html.match(/<main/g) ?? []).length, 1);
@@ -52,6 +51,12 @@ test("shared Studio renders the complete Review-to-Handoff product seam", () => 
   assert.equal((html.match(/<nav/g) ?? []).length, 1);
   assert.equal((html.match(/<footer/g) ?? []).length, 1);
   assert.doesNotMatch(html, /(?:file:\/\/|\/Users\/|\/home\/)/);
+});
+
+test("brand mark source stays renderer-relative for packaged hosts", () => {
+  const html = renderToStaticMarkup(<App />);
+  const source = /<img class="brand-mark" src="([^"]+)"/.exec(html)?.[1];
+  assert.equal(source, "./font-previewer-icon-64.png");
 });
 
 test("Simple mode restores the original font-to-four-up-board pipeline", () => {

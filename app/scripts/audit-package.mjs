@@ -1,5 +1,6 @@
 import { lstat, readFile, readdir } from "node:fs/promises";
 import { basename, join, relative, resolve, sep } from "node:path";
+import { auditApprovedFontBinaries } from "./audit-font-binaries.mjs";
 
 const packageRoot = resolve(process.argv[2] ?? "");
 if (!process.argv[2] || packageRoot === resolve(sep)) throw new Error("A narrow package root is required.");
@@ -46,4 +47,5 @@ while (queue.length) {
   }
 }
 if (files < 10) throw new Error("Packaged application inventory is implausibly small.");
-process.stdout.write(`Audited ${basename(packageRoot)}: ${files} regular files; inventory/secrets/paths/application-source-maps pass.\n`);
+const fontAudit = await auditApprovedFontBinaries(packageRoot, "linux-package");
+process.stdout.write(`Audited ${basename(packageRoot)}: ${files} regular files; inventory/secrets/paths/application-source-maps and ${fontAudit.count} pinned UI fonts pass.\n`);

@@ -37,6 +37,28 @@ async function waitFor(window: BrowserWindow, label: string, expression: string,
   throw new Error(`${label} did not become true within ${milliseconds} ms`);
 }
 
+async function loadInterfaceFonts(window: BrowserWindow): Promise<Record<string, unknown>> {
+  const result = await withTimeout("interface font readiness", window.webContents.executeJavaScript(`(async () => {
+    await document.fonts.ready;
+    const specs = [
+      '400 16px "PD Body"',
+      'italic 400 16px "PD Body"',
+      '500 48px "PD Head"',
+      '500 12px "PD Eyebrow"',
+    ];
+    const loaded = [];
+    for (const spec of specs) {
+      const faces = await document.fonts.load(spec, 'Hamburgefontsiv');
+      if (!faces.length || faces.some((face) => face.status !== 'loaded')) throw new Error('UI font not loaded: ' + spec);
+      loaded.push({ spec, faces: faces.length });
+    }
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    return { status: document.fonts.status, loaded };
+  })()`, true), 20_000) as Record<string, unknown>;
+  if (result.status !== "loaded") throw new Error("Interface fonts did not reach the loaded state.");
+  return result;
+}
+
 async function capture(window: BrowserWindow, outputPath: string): Promise<void> {
   await settle(window, 140);
   const image = await withTimeout("page capture", window.webContents.capturePage());
@@ -49,7 +71,7 @@ async function inspectWorkspace(window: BrowserWindow): Promise<Record<string, u
     return {
       heading: document.querySelector('#workspace-heading')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
       selected: selected?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
-      reviewState: selected?.querySelector('.review-glyph')?.getAttribute('aria-label') ?? null,
+      reviewState: selected?.dataset.reviewState?.replace(/^./, (character) => character.toUpperCase()) ?? null,
       stage: document.querySelector('.stage-nav [aria-current="step"]')?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
       durability: document.querySelector('.document-title > span:last-child')?.textContent?.trim() ?? null,
       recoveryCheckpoint: document.querySelector('.app-shell')?.dataset.recoveryCheckpoint ?? null,
@@ -343,6 +365,8 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   const output = resolve(options.outputDirectory);
   await mkdir(output, { recursive: true, mode: 0o700 });
   await waitFor(options.window, "Studio bootstrap", `window.fontPreviewerHost && document.querySelector('#workspace-heading') && document.querySelector('.host-probe')?.textContent?.includes('electron')`, 25_000);
+  await waitFor(options.window, "brand mark", `document.querySelector('.brand-mark')?.complete && document.querySelector('.brand-mark')?.naturalWidth > 0`);
+  const interfaceFonts = await loadInterfaceFonts(options.window);
   await settle(options.window, 180);
 
   const trace: Record<string, unknown> = {
@@ -351,6 +375,7 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
     architecture: process.arch,
     versions: process.versions,
     initial: await inspectWorkspace(options.window),
+    interfaceFonts,
     nativeMenu: {
       installed: Boolean(Menu.getApplicationMenu()),
       import: Boolean(Menu.getApplicationMenu()?.getMenuItemById("font-previewer-import")),
@@ -362,12 +387,12 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   await capture(options.window, join(output, "01-review.png"));
   trace.keyboardAccessibility = await keyboardAccessibilityAudit(options.window, options.sendMenuCommand);
   options.sendMenuCommand({ type: "mark-keep" });
-  await waitFor(options.window, "native Keep command", `document.querySelector('.candidate-row[aria-current="true"] .review-glyph')?.getAttribute('aria-label') === 'Keep'`);
+  await waitFor(options.window, "native Keep command", `document.querySelector('.candidate-row[aria-current="true"]')?.dataset.reviewState === 'keep'`);
   trace.afterNativeKeep = await inspectWorkspace(options.window);
   options.sendMenuCommand({ type: "undo-study" });
-  await waitFor(options.window, "native semantic undo", `document.querySelector('.candidate-row[aria-current="true"] .review-glyph')?.getAttribute('aria-label') === 'Unreviewed'`);
+  await waitFor(options.window, "native semantic undo", `document.querySelector('.candidate-row[aria-current="true"]')?.dataset.reviewState === 'unreviewed'`);
   options.sendMenuCommand({ type: "redo-study" });
-  await waitFor(options.window, "native semantic redo", `document.querySelector('.candidate-row[aria-current="true"] .review-glyph')?.getAttribute('aria-label') === 'Keep'`);
+  await waitFor(options.window, "native semantic redo", `document.querySelector('.candidate-row[aria-current="true"]')?.dataset.reviewState === 'keep'`);
   trace.afterUndoRedo = await inspectWorkspace(options.window);
 
   trace.bridgeRoundTrip = await measureBridge(options.window);
@@ -394,7 +419,7 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   trace.handoff = await inspectWorkspace(options.window);
   await capture(options.window, join(output, "04-handoff.png"));
   await clickStage(options.window, "Review");
-  await waitFor(options.window, "Review semantics", `document.querySelector('.candidate-row[aria-current="true"] .review-glyph')?.getAttribute('aria-label') === 'Keep'`);
+  await waitFor(options.window, "Review semantics", `document.querySelector('.candidate-row[aria-current="true"]')?.dataset.reviewState === 'keep'`);
   trace.semanticAudit = await semanticAudit(options.window);
   trace.simpleBodyCopy = await simpleBodyCopyAudit(options.window, output);
   trace.securityAudit = await securityAudit(options.window);
@@ -425,7 +450,7 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   await writeFile(join(output, "renderer-crash-boot.json"), `${JSON.stringify(crashBoot, null, 2)}\n`, { mode: 0o600 });
   if (crashBoot.stage !== beforeCrash.stage) throw new Error("Forced renderer crash did not restore the active stage.");
   await clickStage(options.window, "Review");
-  await waitFor(options.window, "recovered Review decision after renderer crash", `document.activeElement?.id === 'workspace-heading' && document.querySelector('.candidate-row[aria-current="true"] .review-glyph')?.getAttribute('aria-label') === 'Keep'`, 20_000);
+  await waitFor(options.window, "recovered Review decision after renderer crash", `document.activeElement?.id === 'workspace-heading' && document.querySelector('.candidate-row[aria-current="true"]')?.dataset.reviewState === 'keep'`, 20_000);
   await waitFor(options.window, "post-crash recovery checkpoint", `document.querySelector('.app-shell')?.dataset.recoveryCheckpoint === 'ready'`, 20_000);
   const afterCrash = await inspectWorkspace(options.window);
   trace.rendererCrashRecovery = { forced: true, details: crashDetails, before: beforeCrash, boot: crashBoot, after: afterCrash };
