@@ -4,11 +4,11 @@
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Current release posture: published `v0.1.0-rc.5` at exact source `06657ebdc1e14436d6ddbed763e12602603a84fa`
-- Prior prereleases: immutable `v0.1.0-rc.4`, `v0.1.0-rc.3`, `v0.1.0-rc.2`, and `v0.1.0-rc.1`
+- Current release posture: published `v0.1.0-rc.6` at exact source `f1aa382c8265b4884261c4308a4a5d37077a5242`
+- Prior prereleases: immutable `v0.1.0-rc.5`, `v0.1.0-rc.4`, `v0.1.0-rc.3`, `v0.1.0-rc.2`, and `v0.1.0-rc.1`
 - Stable release: not approved or claimed
 
-The RC, hardening, and pre-Mac implementation are represented on `main`. Body Copy and its release-blocking scale/recovery repairs reached `main` through PRs #11, #12, and #13; the pitch.dog typography, Phosphor icon, spacing, privacy, and package-integrity work reached `main` through PR #15. No current product implementation remains intentionally based on old branch names.
+The RC, hardening, and pre-Mac implementation are represented on `main`. Body Copy and its release-blocking scale/recovery repairs reached `main` through PRs #11, #12, and #13; the pitch.dog typography, Phosphor icon, spacing, privacy, and package-integrity work reached `main` through PR #15; exact caret, container-fit, and disclosure-motion polish reached `main` through PR #17. No current product implementation remains intentionally based on old branch names.
 
 The detailed autonomous hardening report that originally described an isolated, unmerged branch is preserved unchanged at [`../docs/archive/2026-08-27/APP_REPORT_RC_EVIDENCE.md`](../docs/archive/2026-08-27/APP_REPORT_RC_EVIDENCE.md). It is historical evidence, not current repository status.
 
@@ -32,7 +32,7 @@ Permanent application verification is defined by [`.github/workflows/verify.yml`
 
 - version consistency, strict TypeScript, public-seam tests, production builds, SBOM, and npm audit;
 - malformed protocol and Study inputs, migrations, installed Catalog, cancellation, recovery, and transactional Handoff;
-- accessibility semantics, forced-colours, reduced motion, focus restoration, and keyboard behavior;
+- accessibility semantics, forced-colours, reduced motion, focus restoration, keyboard behavior, centered icons/carets, panel alignment, and overflow;
 - family/style selection, Simple-to-Studio state travel, 80–140% interface scaling, minimum touch sizes, long-copy containment, four-up colour boards, one-font Body Copy pages, full text, shared reading size, stress characters, AP Title, and shared comparison sizing;
 - displayed Electron and WKWebView journeys;
 - forced Electron renderer recovery and the honestly labelled WKWebView termination-callback simulation;
@@ -53,7 +53,7 @@ Current workflow evidence is recorded in [`../docs/maintenance/REPOSITORY_STATE.
 - verified source-SHA manifests, checksums, package contents, notices, SBOM, and release notes;
 - an explicit publication boolean and exact tag confirmation before any GitHub release write.
 
-The default path creates a downloadable dry-run bundle. It refuses existing tags and releases. The owner-authorized `v0.1.0-rc.5` publication completed through exact-main verification run `33292252219`, guarded dry run `33292506974`, and publication run `33292575588`. The one-use authority is exercised and does not extend to stable `v1.0.0` or a later tag.
+The default path creates a downloadable dry-run bundle. It refuses existing tags and releases. The owner-authorized `v0.1.0-rc.6` publication completed through exact-main verification run `33296016674`, guarded dry run `33296253222`, and publication run `33296294623`. The one-use authority is exercised and does not extend to stable `v1.0.0` or a later tag.
 
 ## Remaining human and physical gates
 

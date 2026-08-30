@@ -11,7 +11,7 @@ This directory contains the active shared Simple + Studio renderer and the two d
 - `scripts/` — deterministic test/build cleanup, version checks, SBOM generation, package audits, Linux packaging, and macOS assembly.
 - `assets/icon/` and `public/` — the source icon pair and mechanically derived native/browser icon family.
 
-Source version is `0.1.0`. The latest published prerelease is [`v0.1.0-rc.5`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.5), built from exact source `06657ebdc1e14436d6ddbed763e12602603a84fa`. Its tag, public `SOURCE_SHA`, and downloaded checksum manifest agree. No stable release is designated.
+Source version is `0.1.0`. The latest published prerelease is [`v0.1.0-rc.6`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.6), built from exact source `f1aa382c8265b4884261c4308a4a5d37077a5242`. Its tag, public `SOURCE_SHA`, and freshly downloaded checksum manifest agree. No stable release is designated.
 
 ## Product paths
 
@@ -82,7 +82,7 @@ This runs:
 7. CycloneDX SBOM generation;
 8. `npm audit --audit-level=high`.
 
-The full hosted gate is [`.github/workflows/verify.yml`](../.github/workflows/verify.yml). It adds displayed Electron and WKWebView journeys, Catalog and migration tests, malformed-input rejection, recovery and transactional Handoff fault injection, forced Electron renderer recovery, accessibility semantics, X11 and native Wayland/Ozone evidence, package round trips, package-content/privacy audits, checksums, reproducibility, and macOS ad-hoc signature verification.
+The full hosted gate is [`.github/workflows/verify.yml`](../.github/workflows/verify.yml). It adds displayed Electron and WKWebView journeys, exact control/caret/panel geometry, disclosure motion, Catalog and migration tests, malformed-input rejection, recovery and transactional Handoff fault injection, forced Electron renderer recovery, accessibility semantics, X11 and native Wayland/Ozone evidence, package round trips, package-content/privacy audits, checksums, reproducibility, and macOS ad-hoc signature verification.
 
 ## Package candidates
 

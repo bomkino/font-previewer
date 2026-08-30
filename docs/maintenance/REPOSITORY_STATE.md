@@ -11,26 +11,27 @@ Font Previewer is a local typography decision tool. The active product is one sh
 - Canonical branch: `main`
 - Default branch: `main`
 - Source version: `0.1.0`
-- Current product posture: published `v0.1.0-rc.5` prerelease
-- Latest published release: [`v0.1.0-rc.5`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.5)
-- Exact latest-published source: `06657ebdc1e14436d6ddbed763e12602603a84fa`, confirmed by both tag and public `SOURCE_SHA`
-- Prior published releases: immutable `v0.1.0-rc.4`, `v0.1.0-rc.3`, `v0.1.0-rc.2`, and `v0.1.0-rc.1`
+- Current product posture: published `v0.1.0-rc.6` prerelease
+- Latest published release: [`v0.1.0-rc.6`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.6)
+- Exact latest-published source: `f1aa382c8265b4884261c4308a4a5d37077a5242`, confirmed by both tag and public `SOURCE_SHA`
+- Prior published releases: immutable `v0.1.0-rc.5`, `v0.1.0-rc.4`, `v0.1.0-rc.3`, `v0.1.0-rc.2`, and `v0.1.0-rc.1`
 - Stable release: none
 
-Published `rc.5` adopts the checksum-pinned pitch.dog Type System v13 interface fonts, Phosphor icons, a shared spacing/control contract, font-ready displayed evidence, exact seven-font package guards, scoped Review shortcuts, and blind-comparison redaction across Navigator, Tray, cards, and Inspector.
+Published `rc.6` completes the interface-fit pass over the checksum-pinned pitch.dog Type System v13 foundation: centered Phosphor select/disclosure carets, protected text/icon spacing, balanced icon controls, stable focus-safe disclosure shells, short property-specific motion, and exact cross-Host geometry/motion gates.
 
 The RC, hardening, pre-Mac product work, canonicalisation, and Mac finalisation all reached `main` through reviewed pull requests. Published tags and releases remain immutable; exact source-to-package correspondence is carried by the release tag, workflow run, artifact names, checksums, and `SOURCE_SHA`.
 
 ## Current release evidence
 
-- The complete release-source public-seam suite passes locally on Linux: 52 tests discovered, 51 passed, and one variable-font environment check skipped because no variable font is installed. The exact published source also passed hosted macOS and Linux.
+- The complete release-source public-seam suite passes locally on Linux: 53 tests discovered, 52 passed, and one variable-font environment check skipped because no variable font is installed. The exact published source also passed hosted macOS and Linux.
 - The release-source native AppKit/WKWebView evidence journey passes Simple and Studio at 80–140% scale, with minimum measured controls above 44 px at 80%, no asserted editor/page/header/workspace overflow, no title/candidate truncation in the asserted states, and no horizontal overflow.
+- Exact displayed geometry records four complete centered select carets, 16 px Mac and 17.6 px Linux caret insets, centered icon-only controls, zero panel top/bottom spread, effectively zero tray-boundary gap, and no panel horizontal overflow. Mac verifies the requested reduced-motion path; Linux records real 180 ms open/close intermediate frames, focus-safe inertness, and caret return.
 - The native journey proves installed family/style browsing, four-up board containment, one-font Body Copy composition and export, full text, one shared fitted reading size, four distinct colour quadrants, stress characters, AP Title, variable-axis controls, modal focus trapping/return, and shared copy/candidate/comparison-policy state across Simple and Studio.
 - Both Hosts now reject mixed or impossible Simple export manifests. The macOS Host also canonicalizes export roots and outputs before deriving relative manifest/checksum paths.
 - The native transaction fault proves failed Handoff staging is removed and the prior export remains byte-identical.
-- Exact-source GitHub verification run [`33292252219`](https://github.com/bomkino/font-previewer/actions/runs/33292252219) passed both Hosts, Linux X11/Wayland, forced renderer recovery, package reproducibility, and installed/archive round trips on `main`; repository-truth run [`33292252221`](https://github.com/bomkino/font-previewer/actions/runs/33292252221) also passed.
-- Guarded dry run [`33292506974`](https://github.com/bomkino/font-previewer/actions/runs/33292506974) and publication run [`33292575588`](https://github.com/bomkino/font-previewer/actions/runs/33292575588) assembled and published the non-overwriting prerelease.
-- A fresh public download of all nine assets passed the published `SHA256SUMS`; the release tag and `SOURCE_SHA` both resolve to `06657ebdc1e14436d6ddbed763e12602603a84fa`.
+- Exact-source GitHub verification run [`33296016674`](https://github.com/bomkino/font-previewer/actions/runs/33296016674) passed both Hosts, Linux X11/Wayland, forced renderer recovery, package reproducibility, and installed/archive round trips on `main`; repository-truth run [`33296016673`](https://github.com/bomkino/font-previewer/actions/runs/33296016673) also passed.
+- Guarded dry run [`33296253222`](https://github.com/bomkino/font-previewer/actions/runs/33296253222) and publication run [`33296294623`](https://github.com/bomkino/font-previewer/actions/runs/33296294623) assembled and published the non-overwriting prerelease.
+- A fresh public download of all nine assets passed the published `SHA256SUMS`; the release tag and `SOURCE_SHA` both resolve to `f1aa382c8265b4884261c4308a4a5d37077a5242`.
 
 The exact IDs above point back to GitHub Actions; artifacts and the source SHA remain independently readable from the immutable release.
 
@@ -62,6 +63,7 @@ The exact IDs above point back to GitHub Actions; artifacts and the source SHA r
 - Recovery, atomic Save, transactional Handoff, injected failure cleanup, and focus restoration.
 - Workspace-only recovery checkpoints, serialized Electron recovery writes, forced Electron renderer recovery, and the labelled WKWebView termination-callback simulation.
 - Keyboard, semantic accessibility, forced-colours, and reduced-motion checks.
+- Exact productive-control height, icon/caret centering, caret inset, panel/tray alignment, panel overflow, disclosure semantics, inertness, caret rotation, and enabled/reduced-motion checks.
 - Linux X11 and Wayland/Ozone evidence.
 - Linux package reproducibility, install/remove, sandbox ownership, checksums, and residue audit.
 - macOS package assembly, ad-hoc signature integrity, archive round trip, and checksums.
@@ -82,7 +84,7 @@ These gates prohibit stable `v1.0.0`, broad support claims, attended accessibili
 
 ## Release posture
 
-`v0.1.0-rc.5` is the latest public prerelease. Its one-use publication authorization was exercised only after the type-system, icon, spacing, privacy, package-integrity, exact-head verification, documentation, and GitHub cleanup gates completed. `.github/workflows/release.yml` remains manual, exact-SHA guarded, exact-run guarded, non-overwriting, and dry-run first; no push, PR, tag, or successful verification run publishes automatically. Stable `v1.0.0` and any later tag remain unauthorized.
+`v0.1.0-rc.6` is the latest public prerelease. Its one-use publication authorization was exercised only after the control-geometry, caret, disclosure-motion, exact-head verification, package, documentation, and GitHub cleanup gates completed. `.github/workflows/release.yml` remains manual, exact-SHA guarded, exact-run guarded, non-overwriting, and dry-run first; no push, PR, tag, or successful verification run publishes automatically. Stable `v1.0.0` and any later tag remain unauthorized.
 
 ## Current documents
 
