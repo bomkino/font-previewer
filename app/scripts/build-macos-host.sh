@@ -11,7 +11,7 @@ ICON_MASTER="$APP_DIR/assets/icon/font-previewer-icon-square.png"
 OUTPUT_DIR="${FONT_PREVIEWER_MAC_OUTPUT_DIR:-$APP_DIR/output/macos-host}"
 APP="$OUTPUT_DIR/Font Previewer.app"
 
-for tool in xcrun codesign ditto plutil shasum iconutil sips; do
+for tool in node xcrun codesign ditto plutil shasum iconutil sips; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "Missing required macOS build tool: $tool" >&2
     exit 69
@@ -73,6 +73,7 @@ ditto "$APP_DIR/THIRD_PARTY_NOTICES.md" "$APP/Contents/Resources/THIRD_PARTY_NOT
 ditto "$APP_DIR/DEPENDENCIES.md" "$APP/Contents/Resources/DEPENDENCIES.md"
 ditto "$APP_DIR/INSTALL.md" "$APP/Contents/Resources/INSTALL.md"
 ditto "$APP_DIR/sbom.cdx.json" "$APP/Contents/Resources/sbom.cdx.json"
+node "$SCRIPT_DIR/audit-font-binaries.mjs" macos-app "$APP"
 ICONSET="$TEMP_ROOT/FontPreviewer.iconset"
 mkdir -p "$ICONSET"
 for points in 16 32 128 256 512; do

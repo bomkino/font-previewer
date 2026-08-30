@@ -11,7 +11,7 @@ This directory contains the active shared Simple + Studio renderer and the two d
 - `scripts/` — deterministic test/build cleanup, version checks, SBOM generation, package audits, Linux packaging, and macOS assembly.
 - `assets/icon/` and `public/` — the source icon pair and mechanically derived native/browser icon family.
 
-Source version is `0.1.0`. The latest published prerelease is [`v0.1.0-rc.4`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.4), built from exact source `b0950402316253cc9cb7bf7a6ec86ea5f669184f`. No later candidate or stable release is designated.
+Source version is `0.1.0`. The latest published prerelease is [`v0.1.0-rc.4`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.4), built from exact source `b0950402316253cc9cb7bf7a6ec86ea5f669184f`. `v0.1.0-rc.5` source is prepared but remains untagged and unpublished until the exact-main verification and guarded release path pass. No stable release is designated.
 
 ## Product paths
 
@@ -26,6 +26,12 @@ Simple is the default front door:
 Studio reads the same Study and adds Review, saved Compare sets, blind comparison, System Roles, and full Handoff controls. Switching modes does not duplicate or translate font decisions.
 
 The titlebar scale control changes the complete interface from 80–140% in 10% steps. `Cmd/Ctrl +`, `Cmd/Ctrl -`, and `Cmd/Ctrl 0` increase, decrease, and reset it.
+
+## Bundled interface typography
+
+The application bundles seven SHA-256-allowlisted WOFF2 assets from pitch.dog Type System v13, pinned to source commit `786b4a2b671182319320f922b8de8f927ea3a002`. They style application chrome only and remain separate from every imported Source, Face, Candidate, local Source Binding, and Handoff.
+
+The seven font binaries are CC0-1.0. The surrounding type-system CSS and code remain pitch.dog-owned material and are not relicensed by this repository's MIT licence. Bundling known interface fonts does not permit Font Previewer to copy or redistribute a user's fonts; Source copying still requires the existing explicit Handoff acknowledgement and selected policy.
 
 ## Prerequisites
 

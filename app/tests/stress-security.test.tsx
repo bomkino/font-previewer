@@ -72,6 +72,10 @@ test("100-card Review surface remains path-free and structurally complete", (con
       actions={actions}
       comparisonPolicy="fit"
       onComparisonPolicyChange={noOp}
+      comparisonBlind={false}
+      onComparisonBlindChange={noOp}
+      comparisonRevealed={false}
+      onComparisonRevealedChange={noOp}
     />,
   );
 

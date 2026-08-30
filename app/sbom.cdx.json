@@ -100,6 +100,72 @@
     },
     {
       "type": "library",
+      "name": "@phosphor-icons/react",
+      "version": "2.1.10",
+      "purl": "pkg:npm/%40phosphor-icons/react@2.1.10",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "bedf13beaf062e385e0196586be606fe95bb1c36e8bfc125fcc00d5bca4e033e1e1b1af08676dfad066ad02a78abccc112ef0d2211dd9ebfabf2d8677d148d60"
+        }
+      ],
+      "properties": [
+        {
+          "name": "font-previewer:development",
+          "value": "false"
+        },
+        {
+          "name": "font-previewer:optional",
+          "value": "false"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "@pitchdog/type-system",
+      "version": "13.0.0",
+      "purl": "pkg:npm/%40pitchdog/type-system@13.0.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "SEE LICENSE IN LICENSE.md"
+          }
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "5b8f21228c3bc5cc12ece39503c7a263c67f008e872ee6e6c6a2a0904b10a330aefb572ea5aa497fb4ab0a27c3c81c804d9eb28112871271a351b1dd6f21a733"
+        }
+      ],
+      "properties": [
+        {
+          "name": "font-previewer:development",
+          "value": "true"
+        },
+        {
+          "name": "font-previewer:optional",
+          "value": "false"
+        },
+        {
+          "name": "font-previewer:source-commit",
+          "value": "786b4a2b671182319320f922b8de8f927ea3a002"
+        },
+        {
+          "name": "font-previewer:bundled-font-license",
+          "value": "CC0-1.0"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "name": "@rolldown/binding-android-arm-eabi",
       "version": "1.2.6",
       "purl": "pkg:npm/%40rolldown/binding-android-arm-eabi@1.2.6",

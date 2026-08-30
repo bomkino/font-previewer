@@ -1,6 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { auditApprovedFontBinaries } from "./audit-font-binaries.mjs";
 
 const applicationRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const rendererRoot = join(applicationRoot, "dist", "renderer");
@@ -31,4 +32,5 @@ for (const required of ["prefers-reduced-motion:reduce", "forced-colors:active"]
 for (const required of ["color-scheme:dark", "background:#0b0b0f", "--paper:#111116"]) {
   if (!css.replaceAll(" ", "").includes(required)) throw new Error(`Built Studio is missing dark default: ${required}.`);
 }
-process.stdout.write(`Audited built Studio: ${files.length + 9} files; CSP/locality/icons/dark-default/motion/forced-colors pass.\n`);
+const fontAudit = await auditApprovedFontBinaries(rendererRoot, "renderer");
+process.stdout.write(`Audited built Studio: ${files.length + 9} files; CSP/locality/icons/dark-default/motion/forced-colors and ${fontAudit.count} pinned UI fonts pass.\n`);

@@ -39,7 +39,7 @@ import {
 } from "./font-runtime.js";
 import { groupByFamily } from "./family-groups.js";
 import type { HostCapabilities } from "./protocol.js";
-import { InterfaceIcon } from "./icons.js";
+import { InterfaceIcon, type InterfaceIconName } from "./icons.js";
 import {
   DEFAULT_SIMPLE_BODY_COPY_SAMPLE_ID,
   SIMPLE_BODY_COPY_LIMIT,
@@ -80,12 +80,20 @@ const reviewLabels: Record<ReviewState, string> = {
   reject: "Reject",
 };
 
-const reviewGlyphs: Record<ReviewState, string> = {
-  unreviewed: "○",
-  keep: "+",
-  maybe: "?",
-  reject: "×",
+const reviewIconNames: Record<ReviewState, InterfaceIconName> = {
+  unreviewed: "review-unreviewed",
+  keep: "review-keep",
+  maybe: "review-maybe",
+  reject: "review-reject",
 };
+
+function ReviewStateIcon({ state, size = 18 }: { readonly state: ReviewState; readonly size?: number }) {
+  return <InterfaceIcon name={reviewIconNames[state]} size={size} />;
+}
+
+function blindCandidateLabel(index: number): string {
+  return `Candidate ${String.fromCharCode(65 + index)}`;
+}
 
 const policyLabels: Record<FitPolicy, { label: string; detail: string }> = {
   nominal: { label: "Same size", detail: "Natural scale and width differences remain visible." },
@@ -506,11 +514,11 @@ export function SimpleWorkspace({
             ? pageMode === "body"
               ? "One generous reading page per font. Every page shares the same honest text size."
               : "Tune the fonts once. The four-up pages update immediately."
-            : "Drop in a folder or choose font files. Nothing is installed or uploaded."}</p>
+            : "Choose font files or a folder. Nothing is installed or uploaded."}</p>
           {candidates.length ? (
             <nav className="simple-jump-links" aria-label="Simple sections">
-              <a href="#simple-pages-heading"><span>View</span><strong>{pageCount} {pageCount === 1 ? "page" : "pages"} ↓</strong></a>
-              <a href="#simple-fonts-heading"><span>Tune</span><strong>{candidates.length} fonts ↓</strong></a>
+              <a href="#simple-pages-heading"><span>View</span><strong>{pageCount} {pageCount === 1 ? "page" : "pages"} <InterfaceIcon name="arrow-down" size={18} /></strong></a>
+              <a href="#simple-fonts-heading"><span>Tune</span><strong>{candidates.length} fonts <InterfaceIcon name="arrow-down" size={18} /></strong></a>
             </nav>
           ) : null}
         </div>
@@ -528,10 +536,10 @@ export function SimpleWorkspace({
         </div>
         <div className="simple-page-mode-choices" role="group" aria-label="Simple page format">
           <button type="button" className={pageMode === "boards" ? "is-active" : ""} aria-pressed={pageMode === "boards"} onClick={() => changePageMode("boards")}>
-            <span aria-hidden="true">4×</span><strong>Boards</strong><small>Four fonts per page. Fast visual comparison.</small>
+            <span aria-hidden="true"><InterfaceIcon name="boards" size={48} /></span><strong>Boards</strong><small>Four fonts per page. Fast visual comparison.</small>
           </button>
           <button type="button" className={pageMode === "body" ? "is-active" : ""} aria-pressed={pageMode === "body"} onClick={() => changePageMode("body")}>
-            <span aria-hidden="true">¶</span><strong>Body Copy</strong><small>One font per page. Real reading texture.</small>
+            <span aria-hidden="true"><InterfaceIcon name="body-copy" size={48} /></span><strong>Body Copy</strong><small>One font per page. Real reading texture.</small>
           </button>
         </div>
       </section>
@@ -601,7 +609,7 @@ export function SimpleWorkspace({
               ))}
             </div>
             <div className="simple-body-export-options">
-              <div><strong>Matched reading size</strong><small>All pages use the same fitted size, so differences stay honest.</small></div>
+              <div><span className="simple-body-equal" aria-hidden="true"><InterfaceIcon name="equal" /></span><span><strong>Matched reading size</strong><small>All pages use the same fitted size, so differences stay honest.</small></span></div>
               <label title="Copies the original source font files into the export folder.">
                 <input type="checkbox" checked={includeSources} onChange={(event) => onIncludeSourcesChange(event.target.checked)} />
                 <span><strong>Copy source fonts</strong><small>I have permission to share them</small></span>
@@ -782,7 +790,7 @@ export function SimpleWorkspace({
               <button type="button" className="simple-font-summary" onClick={() => setShowFontControls(true)}>
                 <span>{String(candidates.length).padStart(2, "0")}</span>
                 <span><strong>{included.length} included · {candidates.length - included.length} skipped</strong><small>Casing, variable axes, order, and inclusion are tucked away until you ask.</small></span>
-                <span>Open controls →</span>
+                <span>Open controls <InterfaceIcon name="arrow-right" size={18} /></span>
               </button>
             )}
           </section>
@@ -818,7 +826,7 @@ export function SimpleWorkspace({
                 return (
                   <section className="simple-catalog-family-detail" aria-labelledby="simple-catalog-family-heading">
                     <header>
-                      <button ref={installedFamilyBackRef} type="button" className="quiet-button" onClick={returnToInstalledFamilies}>← All families</button>
+                      <button ref={installedFamilyBackRef} type="button" className="quiet-button has-icon" onClick={returnToInstalledFamilies}><InterfaceIcon name="arrow-left" size={18} />All families</button>
                       <div><p className="section-kicker">Choose styles</p><h3 id="simple-catalog-family-heading">{selectedInstalledGroup.label}</h3><p>{styleCount} {styleCount === 1 ? "style" : "styles"}</p></div>
                       <button type="button" className="primary-button" disabled={!available.length} onClick={() => actions.addCatalogSources(available.map((item) => item.source.id))}>{available.length ? `Add family · ${available.length}` : "Family added"}</button>
                     </header>
@@ -863,9 +871,10 @@ interface NavigatorProps {
   readonly onModeChange: (mode: NavigatorMode) => void;
   readonly catalog: InstalledCatalogView;
   readonly catalogBusy: boolean;
+  readonly blindIdentityHidden: boolean;
 }
 
-export function Navigator({ session, dispatch, actions, mode, onModeChange, catalog, catalogBusy }: NavigatorProps) {
+export function Navigator({ session, dispatch, actions, mode, onModeChange, catalog, catalogBusy, blindIdentityHidden }: NavigatorProps) {
   const [catalogSearch, setCatalogSearch] = useState(catalog.query);
   const [selectedCatalogFamilyKey, setSelectedCatalogFamilyKey] = useState<string>();
   const catalogFamilyBackRef = useRef<HTMLButtonElement>(null);
@@ -915,6 +924,18 @@ export function Navigator({ session, dispatch, actions, mode, onModeChange, cata
     };
   }, [mode, selectedCatalogFamilyKey]);
 
+  if (blindIdentityHidden) {
+    return (
+      <aside className="catalog" aria-label="Study navigation, identities hidden">
+        <div className="catalog-tools">
+          <p className="section-kicker">Blind session</p>
+          <strong>Navigator hidden</strong>
+          <p className="empty-note">Reveal the comparison before browsing Candidate, Source, Set, or Catalog identities.</p>
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <aside className="catalog" aria-label="Study navigation">
       <div className="catalog-switcher" role="group" aria-label="Navigator">
@@ -951,8 +972,8 @@ export function Navigator({ session, dispatch, actions, mode, onModeChange, cata
                   const selected = candidate.id === session.workspace.selectedCandidateId;
                   const use = activeTypographySystem(session.document).fontUses.find((fontUse) => fontUse.originatingCandidateId === candidate.id);
                   return (
-                    <button type="button" key={candidate.id} className={`candidate-row ${selected ? "is-selected" : ""}`} aria-label={`${family} ${candidate.label}, ${reviewLabels[candidate.reviewState]}`} aria-current={selected ? "true" : undefined} onClick={() => dispatch({ type: "select-candidate", candidateId: candidate.id })}>
-                      <span className={`review-glyph review-${candidate.reviewState}`} aria-label={reviewLabels[candidate.reviewState]}>{reviewGlyphs[candidate.reviewState]}</span>
+                    <button type="button" key={candidate.id} className={`candidate-row ${selected ? "is-selected" : ""}`} data-review-state={candidate.reviewState} aria-label={`${family} ${candidate.label}, ${reviewLabels[candidate.reviewState]}`} aria-current={selected ? "true" : undefined} onClick={() => dispatch({ type: "select-candidate", candidateId: candidate.id })}>
+                      <span className={`review-glyph review-${candidate.reviewState}`} aria-hidden="true"><ReviewStateIcon state={candidate.reviewState} size={20} /></span>
                       <span className="candidate-name"><strong>{face.style}</strong><small>{candidate.label}{face.axes.length ? " · Variable" : " · Static"}</small></span>
                       {use ? <span className="role-tag">{roleLabels[use.role]}</span> : null}
                     </button>
@@ -979,7 +1000,7 @@ export function Navigator({ session, dispatch, actions, mode, onModeChange, cata
               const available = imports.filter((item) => !studySourceIds.has(item.source.id));
               const styleCount = imports.reduce((count, item) => count + item.faces.length, 0);
               return <section className="catalog-family-detail" aria-label={`${family} installed family styles`}>
-                <header><button ref={catalogFamilyBackRef} type="button" className="quiet-button" onClick={returnToCatalogFamilies}>← All families</button><span><strong>{family}</strong><small>{styleCount} {styleCount === 1 ? "style" : "styles"}</small></span><button type="button" className="primary-button" aria-label={`Add ${family} family to Study`} disabled={!available.length} onClick={() => actions.addCatalogSources(available.map((item) => item.source.id))}>{available.length ? `Add family · ${styleCount}` : "Family added"}</button></header>
+                <header><button ref={catalogFamilyBackRef} type="button" className="quiet-button has-icon" onClick={returnToCatalogFamilies}><InterfaceIcon name="arrow-left" size={18} />All families</button><span><strong>{family}</strong><small>{styleCount} {styleCount === 1 ? "style" : "styles"}</small></span><button type="button" className="primary-button" aria-label={`Add ${family} family to Study`} disabled={!available.length} onClick={() => actions.addCatalogSources(available.map((item) => item.source.id))}>{available.length ? `Add family · ${styleCount}` : "Family added"}</button></header>
                 <div className="catalog-style-list">{imports.map((item) => {
                   const added = studySourceIds.has(item.source.id);
                   const styles = item.faces.map((face) => face.style).join(" · ");
@@ -1013,9 +1034,9 @@ export function Navigator({ session, dispatch, actions, mode, onModeChange, cata
             const faceCount = session.document.faces.filter((face) => face.sourceId === source.id).length;
             return (
               <article className={`source-row ${binding?.state === "missing" ? "is-missing" : ""}`} key={source.id}>
-                <span className="source-state" aria-hidden="true">{binding?.state === "readable" ? "●" : "!"}</span>
+                <span className="source-state" aria-hidden="true"><InterfaceIcon name={binding?.state === "readable" ? "source-ready" : "source-warning"} size={18} /></span>
                 <span><strong>{source.displayName}</strong><small>{binding?.state ?? source.lastKnownState} · {faceCount} {faceCount === 1 ? "Face" : "Faces"}</small></span>
-                <button type="button" className="icon-button" aria-label={`Relink ${source.displayName}`} onClick={() => actions.relinkSource(source.id)}>↻</button>
+                <button type="button" className="icon-button" aria-label={`Relink ${source.displayName}`} onClick={() => actions.relinkSource(source.id)}><InterfaceIcon name="relink" /></button>
               </article>
             );
           })}
@@ -1070,6 +1091,10 @@ interface WorkspaceProps {
   readonly capabilities?: HostCapabilities;
   readonly comparisonPolicy: FitPolicy;
   readonly onComparisonPolicyChange: (policy: FitPolicy) => void;
+  readonly comparisonBlind: boolean;
+  readonly onComparisonBlindChange: (blind: boolean) => void;
+  readonly comparisonRevealed: boolean;
+  readonly onComparisonRevealedChange: (revealed: boolean) => void;
 }
 
 function ReviewWorkspace({ session, dispatch, fontStates, headingRef }: WorkspaceProps) {
@@ -1117,7 +1142,7 @@ function ReviewWorkspace({ session, dispatch, fontStates, headingRef }: Workspac
                   <span className="specimen-card-meta"><strong>{candidateFace.family}</strong><small>{candidate.label}</small></span>
                 </button>
                 <div className="card-actions" role="group" aria-label={`Review ${candidateFace.family} ${candidate.label}`}>
-                  {REVIEW_STATES.map((reviewState) => <button type="button" key={reviewState} className={candidate.reviewState === reviewState ? "is-active" : ""} aria-label={`${reviewLabels[reviewState]} ${candidateFace.family} ${candidate.label}`} aria-pressed={candidate.reviewState === reviewState} onClick={() => dispatch({ type: "set-review-state", candidateIds: [candidate.id], reviewState })}><span aria-hidden="true">{reviewGlyphs[reviewState]}</span><small>{reviewLabels[reviewState]}</small></button>)}
+                  {REVIEW_STATES.map((reviewState) => <button type="button" key={reviewState} className={candidate.reviewState === reviewState ? "is-active" : ""} aria-label={`${reviewLabels[reviewState]} ${candidateFace.family} ${candidate.label}`} aria-pressed={candidate.reviewState === reviewState} onClick={() => dispatch({ type: "set-review-state", candidateIds: [candidate.id], reviewState })}><span aria-hidden="true"><ReviewStateIcon state={reviewState} /></span><small>{reviewLabels[reviewState]}</small></button>)}
                 </div>
               </article>
             );
@@ -1143,23 +1168,17 @@ function ReviewWorkspace({ session, dispatch, fontStates, headingRef }: Workspac
       ) : null}
 
       <div className="review-controls" role="group" aria-label={`Review ${face.family} ${selected.label}`}>
-        {REVIEW_STATES.map((reviewState) => <button type="button" key={reviewState} className={selected.reviewState === reviewState ? "is-active" : ""} aria-pressed={selected.reviewState === reviewState} onClick={() => dispatch({ type: "set-review-state", candidateIds: [selected.id], reviewState })}><span>{reviewGlyphs[reviewState]}</span>{reviewLabels[reviewState]}<kbd>{reviewState === "keep" ? "1" : reviewState === "maybe" ? "2" : reviewState === "reject" ? "3" : "0"}</kbd></button>)}
+        {REVIEW_STATES.map((reviewState) => <button type="button" key={reviewState} className={selected.reviewState === reviewState ? "is-active" : ""} aria-pressed={selected.reviewState === reviewState} onClick={() => dispatch({ type: "set-review-state", candidateIds: [selected.id], reviewState })}><span aria-hidden="true"><ReviewStateIcon state={reviewState} /></span>{reviewLabels[reviewState]}<kbd>{reviewState === "keep" ? "1" : reviewState === "maybe" ? "2" : reviewState === "reject" ? "3" : "0"}</kbd></button>)}
       </div>
     </main>
   );
 }
 
-function CompareWorkspace({ session, dispatch, fontStates, headingRef, comparisonPolicy: policy, onComparisonPolicyChange }: WorkspaceProps) {
+function CompareWorkspace({ session, dispatch, fontStates, headingRef, comparisonPolicy: policy, onComparisonPolicyChange, comparisonBlind: blind, onComparisonBlindChange, comparisonRevealed: revealed, onComparisonRevealedChange }: WorkspaceProps) {
   const recipe = activeRecipe(session);
   const activeSet = session.workspace.activeComparisonId
     ? session.document.comparisonSets.find((set) => set.id === session.workspace.activeComparisonId)
     : undefined;
-  const [blind, setBlind] = useState(activeSet?.blind ?? false);
-  const [revealed, setRevealed] = useState(activeSet?.revealed ?? false);
-  useEffect(() => {
-    setBlind(activeSet?.blind ?? false);
-    setRevealed(activeSet?.revealed ?? false);
-  }, [activeSet?.blind, activeSet?.id, activeSet?.revealed]);
   const candidates = session.workspace.trayIds.map((id) => session.document.candidates.find((candidate) => candidate.id === id)).filter((candidate): candidate is Candidate => Boolean(candidate));
   const copy = session.workspace.copyOverride ?? recipe.copy;
   const move = (index: number, delta: number) => {
@@ -1191,19 +1210,20 @@ function CompareWorkspace({ session, dispatch, fontStates, headingRef, compariso
         <div className="policy-control" role="radiogroup" aria-label="Comparison policy">
           {FIT_POLICIES.map((item) => <label key={item}><input type="radio" name="fit-policy" value={item} checked={policy === item} onChange={() => onComparisonPolicyChange(item)} /><span><strong>{policyLabels[item].label}</strong><small>{policyLabels[item].detail}</small></span></label>)}
         </div>
-        <label className="blind-toggle"><input type="checkbox" checked={blind} onChange={(event) => { setBlind(event.target.checked); setRevealed(false); }} />Blind comparison</label>
-        {blind ? <button type="button" className="quiet-button" onClick={() => setRevealed(true)} disabled={revealed}>{revealed ? "Revealed" : "Reveal identity"}</button> : null}
+        <label className="blind-toggle"><input type="checkbox" checked={blind} onChange={(event) => { onComparisonBlindChange(event.target.checked); onComparisonRevealedChange(false); }} />Blind comparison</label>
+        {blind ? <button type="button" className="quiet-button" onClick={() => onComparisonRevealedChange(true)} disabled={revealed}>{revealed ? "Revealed" : "Reveal identity"}</button> : null}
       </div>
       {candidates.length >= 2 ? (
         <div className={`compare-grid compare-${candidates.length}`}>
           {candidates.map((candidate, index) => {
             const face = faceForCandidate(session.document, candidate);
             const hidden = blind && !revealed;
+            const blindLabel = blindCandidateLabel(index);
             return (
               <article className="compare-card" key={candidate.id}>
-                <div className="compare-meta"><strong>{hidden ? `Candidate ${String.fromCharCode(65 + index)}` : face.family}</strong><span>{hidden ? "Identity hidden" : candidate.label}</span></div>
-                {policy === "nominal" ? <Specimen className="compare-copy" session={session} candidate={candidate} recipe={recipe} fontStates={fontStates} fittedSize={recipe.size} label={`${hidden ? `Candidate ${String.fromCharCode(65 + index)}` : `${face.family} ${candidate.label}`}. ${policyLabels[policy].label}.`} /> : <SimpleCandidateCopy className="compare-copy" session={session} candidate={candidate} fontStates={fontStates} stressTest={false} fit="compare" policy={policy} label={`${hidden ? `Candidate ${String.fromCharCode(65 + index)}` : `${face.family} ${candidate.label}`}. ${policyLabels[policy].label}.`} />}
-                <div className="compare-footer"><span>{policyLabels[policy].label}</span><span className="reorder-buttons"><button type="button" aria-label={`Move ${hidden ? `Candidate ${String.fromCharCode(65 + index)}` : `${face.family} ${candidate.label}`} left`} onClick={() => move(index, -1)} disabled={index === 0}>←</button><button type="button" aria-label={`Move ${hidden ? `Candidate ${String.fromCharCode(65 + index)}` : `${face.family} ${candidate.label}`} right`} onClick={() => move(index, 1)} disabled={index === candidates.length - 1}>→</button><button type="button" aria-label={`Remove ${hidden ? `Candidate ${String.fromCharCode(65 + index)}` : `${face.family} ${candidate.label}`} from comparison`} onClick={() => dispatch({ type: "toggle-tray", candidateId: candidate.id })}>Remove</button></span></div>
+                <div className="compare-meta"><strong>{hidden ? blindLabel : face.family}</strong><span>{hidden ? "Identity hidden" : candidate.label}</span></div>
+                {policy === "nominal" ? <Specimen className="compare-copy" session={session} candidate={candidate} recipe={recipe} fontStates={fontStates} fittedSize={recipe.size} label={`${hidden ? blindLabel : `${face.family} ${candidate.label}`}. ${policyLabels[policy].label}.`} /> : <SimpleCandidateCopy className="compare-copy" session={session} candidate={candidate} fontStates={fontStates} stressTest={false} fit="compare" policy={policy} label={`${hidden ? blindLabel : `${face.family} ${candidate.label}`}. ${policyLabels[policy].label}.`} />}
+                <div className="compare-footer"><span>{policyLabels[policy].label}</span><span className="reorder-buttons"><button type="button" aria-label={`Move ${hidden ? blindLabel : `${face.family} ${candidate.label}`} left`} onClick={() => move(index, -1)} disabled={index === 0}><InterfaceIcon name="arrow-left" /></button><button type="button" aria-label={`Move ${hidden ? blindLabel : `${face.family} ${candidate.label}`} right`} onClick={() => move(index, 1)} disabled={index === candidates.length - 1}><InterfaceIcon name="arrow-right" /></button><button type="button" aria-label={`Remove ${hidden ? blindLabel : `${face.family} ${candidate.label}`} from comparison`} onClick={() => dispatch({ type: "toggle-tray", candidateId: candidate.id })}>Remove</button></span></div>
               </article>
             );
           })}
@@ -1256,7 +1276,7 @@ function HandoffWorkspace({ session, dispatch, headingRef, actions, capabilities
       <div className="workspace-heading-row"><div><p className="section-kicker">Preflight · {blockers} blockers · {missingSources.length} cautions</p><h1 id="workspace-heading" ref={headingRef} tabIndex={-1}>A handoff that can stand alone</h1></div><button type="button" className="primary-button" disabled={blockers > 0 || preferences.outputs.length === 0} onClick={() => actions.exportHandoff(preferences.includeSources)}>Export Handoff</button></div>
       <div className="handoff-columns">
         <section className="handoff-panel"><p className="section-kicker">1 · Profile</p><label className="field-label"><span>Audience</span><select value={preferences.profile} onChange={(event) => update({ profile: event.target.value as HandoffPreferences["profile"] })}><option value="internal">Internal review</option><option value="client">Client review</option><option value="designer">Designer handoff</option><option value="technical">Technical proof</option></select></label><p className="handoff-note">Profile changes required evidence. It never changes your typography decisions.</p></section>
-        <section className="handoff-panel"><p className="section-kicker">2 · Preflight</p><div className="handoff-list"><article><span className={`check-mark ${missingRoles.length ? "" : "is-ready"}`}>{missingRoles.length ? "!" : "✓"}</span><div><h2>Required Roles</h2><p>{missingRoles.length ? `Assign ${missingRoles.map((role) => roleLabels[role as SystemRole]).join(" and ")}.` : "Display and Body are assigned."}</p></div></article><article><span className={`check-mark ${missingSources.length ? "" : "is-ready"}`}>{missingSources.length ? "!" : "✓"}</span><div><h2>Source health</h2><p>{missingSources.length ? `${missingSources.length} Sources are missing or limited. Decisions remain intact.` : "All Sources are locally bound."}</p></div></article><article><span className={`check-mark ${capabilities?.transactionalHandoff ? "is-ready" : ""}`}>{capabilities?.transactionalHandoff ? "✓" : "!"}</span><div><h2>Transactional export</h2><p>{capabilities?.transactionalHandoff ? "Host will stage, verify, checksum, then commit." : "Browser development mode cannot produce the full bundle."}</p></div></article></div></section>
+        <section className="handoff-panel"><p className="section-kicker">2 · Preflight</p><div className="handoff-list"><article><span className={`check-mark ${missingRoles.length ? "" : "is-ready"}`} aria-hidden="true"><InterfaceIcon name={missingRoles.length ? "source-warning" : "source-ready"} size={22} /></span><div><h2>Required Roles</h2><p>{missingRoles.length ? `Assign ${missingRoles.map((role) => roleLabels[role as SystemRole]).join(" and ")}.` : "Display and Body are assigned."}</p></div></article><article><span className={`check-mark ${missingSources.length ? "" : "is-ready"}`} aria-hidden="true"><InterfaceIcon name={missingSources.length ? "source-warning" : "source-ready"} size={22} /></span><div><h2>Source health</h2><p>{missingSources.length ? `${missingSources.length} Sources are missing or limited. Decisions remain intact.` : "All Sources are locally bound."}</p></div></article><article><span className={`check-mark ${capabilities?.transactionalHandoff ? "is-ready" : ""}`} aria-hidden="true"><InterfaceIcon name={capabilities?.transactionalHandoff ? "source-ready" : "source-warning"} size={22} /></span><div><h2>Transactional export</h2><p>{capabilities?.transactionalHandoff ? "Host will stage, verify, checksum, then commit." : "Browser development mode cannot produce the full bundle."}</p></div></article></div></section>
         <section className="handoff-panel"><p className="section-kicker">3 · Outputs</p><div className="output-grid">{(["review-png", "compare-png", "system-png", "pdf", "summary", "json", "csv"] as const).map((output) => <label key={output}><input type="checkbox" checked={preferences.outputs.includes(output)} onChange={() => toggleOutput(output)} /><span>{output.replaceAll("-", " ")}</span></label>)}</div></section>
         <section className="handoff-panel source-permission"><p className="section-kicker">4 · Source copies</p><label><input type="checkbox" checked={preferences.includeSources} onChange={(event) => update({ includeSources: event.target.checked })} />Include original Source files</label><p>{preferences.includeSources ? "On by default for this internal tool. Turn it off before sharing outside your licensed team." : "Source files will not be copied."}</p></section>
       </div>
@@ -1317,11 +1337,12 @@ export function Inspector({ session, dispatch, fontStates, actions, blindIdentit
 interface TrayProps {
   readonly session: StudySession;
   readonly dispatch: Dispatch<StudyCommand>;
+  readonly blindIdentityHidden: boolean;
 }
 
-export function Tray({ session, dispatch }: TrayProps) {
+export function Tray({ session, dispatch, blindIdentityHidden }: TrayProps) {
   const candidates = session.workspace.trayIds.map((id) => session.document.candidates.find((candidate) => candidate.id === id)).filter((candidate): candidate is Candidate => Boolean(candidate));
   return (
-    <footer className="tray" aria-label="Comparison tray"><div className="tray-label"><span>{candidates.length}/4</span><strong>Compare</strong></div><div className="tray-items">{candidates.map((candidate) => { const face = faceForCandidate(session.document, candidate); return <div className="tray-item" key={candidate.id}><button type="button" className="tray-select" onClick={() => dispatch({ type: "select-candidate", candidateId: candidate.id })}><span aria-hidden="true">{reviewGlyphs[candidate.reviewState]}</span><span><strong>{face.family}</strong><small>{candidate.label}</small></span><span className="sr-only">{reviewLabels[candidate.reviewState]}</span></button><button type="button" className="tray-remove" aria-label={`Remove ${face.family} ${candidate.label} from comparison`} onClick={() => dispatch({ type: "toggle-tray", candidateId: candidate.id })}>×</button></div>; })}{candidates.length === 0 ? <p className="empty-note">Press Space to shortlist selected Candidate.</p> : null}</div><button type="button" className="open-compare" disabled={candidates.length < 2} onClick={() => dispatch({ type: "set-stage", stage: "compare" })}>Open Compare <span aria-hidden="true">↗</span></button></footer>
+    <footer className="tray" aria-label="Comparison tray"><div className="tray-label"><span>{candidates.length}/4</span><strong>Compare</strong></div><div className="tray-items">{candidates.map((candidate, index) => { const face = faceForCandidate(session.document, candidate); const blindLabel = blindCandidateLabel(index); const visibleName = blindIdentityHidden ? blindLabel : face.family; const visibleDetail = blindIdentityHidden ? "Identity hidden" : candidate.label; return <div className="tray-item" key={candidate.id}><button type="button" className="tray-select" aria-label={`Select ${visibleName}. ${reviewLabels[candidate.reviewState]}.`} onClick={() => dispatch({ type: "select-candidate", candidateId: candidate.id })}><span aria-hidden="true"><ReviewStateIcon state={candidate.reviewState} /></span><span><strong>{visibleName}</strong><small>{visibleDetail}</small></span></button><button type="button" className="tray-remove" aria-label={`Remove ${visibleName} from comparison`} onClick={() => dispatch({ type: "toggle-tray", candidateId: candidate.id })}><InterfaceIcon name="remove" /></button></div>; })}{candidates.length === 0 ? <p className="empty-note">Press Space to shortlist selected Candidate.</p> : null}</div><button type="button" className="open-compare" disabled={candidates.length < 2} onClick={() => dispatch({ type: "set-stage", stage: "compare" })}>Open Compare <InterfaceIcon name="arrow-up-right" size={18} /></button></footer>
   );
 }

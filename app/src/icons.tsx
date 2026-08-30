@@ -1,17 +1,111 @@
-export type InterfaceIconName = "add" | "export" | "folder" | "library" | "save" | "tune";
+import type { Icon, IconWeight } from "@phosphor-icons/react";
+import { ArrowCounterClockwise } from "@phosphor-icons/react/dist/icons/ArrowCounterClockwise";
+import { ArrowDown } from "@phosphor-icons/react/dist/icons/ArrowDown";
+import { ArrowLeft } from "@phosphor-icons/react/dist/icons/ArrowLeft";
+import { ArrowRight } from "@phosphor-icons/react/dist/icons/ArrowRight";
+import { ArrowUpRight } from "@phosphor-icons/react/dist/icons/ArrowUpRight";
+import { Books } from "@phosphor-icons/react/dist/icons/Books";
+import { Check } from "@phosphor-icons/react/dist/icons/Check";
+import { CheckCircle } from "@phosphor-icons/react/dist/icons/CheckCircle";
+import { Circle } from "@phosphor-icons/react/dist/icons/Circle";
+import { DownloadSimple } from "@phosphor-icons/react/dist/icons/DownloadSimple";
+import { Equals } from "@phosphor-icons/react/dist/icons/Equals";
+import { FloppyDisk } from "@phosphor-icons/react/dist/icons/FloppyDisk";
+import { FolderOpen } from "@phosphor-icons/react/dist/icons/FolderOpen";
+import { GridFour } from "@phosphor-icons/react/dist/icons/GridFour";
+import { Minus } from "@phosphor-icons/react/dist/icons/Minus";
+import { Paragraph } from "@phosphor-icons/react/dist/icons/Paragraph";
+import { Plus } from "@phosphor-icons/react/dist/icons/Plus";
+import { Question } from "@phosphor-icons/react/dist/icons/Question";
+import { SlidersHorizontal } from "@phosphor-icons/react/dist/icons/SlidersHorizontal";
+import { SpinnerGap } from "@phosphor-icons/react/dist/icons/SpinnerGap";
+import { WarningCircle } from "@phosphor-icons/react/dist/icons/WarningCircle";
+import { X } from "@phosphor-icons/react/dist/icons/X";
 
-export function InterfaceIcon({ name, size = 22 }: { readonly name: InterfaceIconName; readonly size?: number }) {
-  const paths = {
-    add: <><path d="M12 4.5v15" /><path d="M4.5 12h15" /></>,
-    export: <><path d="M12 3.5v12" /><path d="m7.5 11 4.5 4.5 4.5-4.5" /><path d="M4.5 20h15" /></>,
-    folder: <path d="M3.5 7.5h6l2-2h4l2 2h3v11h-17z" />,
-    library: <><path d="M4.5 5h4v14h-4z" /><path d="M10 5h4v14h-4z" /><path d="m16.5 5 3 13.5-3.5.8-3-13.5z" /></>,
-    save: <><path d="M5 4.5h11l3 3v12H5z" /><path d="M8 4.5v5h7v-5" /><path d="M8.5 19.5v-6h7v6" /></>,
-    tune: <><path d="M4 7h16" /><path d="M4 17h16" /><circle cx="9" cy="7" r="2" /><circle cx="15" cy="17" r="2" /></>,
-  } as const;
+export type InterfaceIconName =
+  | "add"
+  | "arrow-down"
+  | "arrow-left"
+  | "arrow-right"
+  | "arrow-up-right"
+  | "body-copy"
+  | "boards"
+  | "equal"
+  | "export"
+  | "folder"
+  | "library"
+  | "relink"
+  | "remove"
+  | "review-keep"
+  | "review-maybe"
+  | "review-reject"
+  | "review-unreviewed"
+  | "save"
+  | "source-ready"
+  | "source-warning"
+  | "spinner"
+  | "subtract"
+  | "tune";
+
+const icons: Readonly<Record<InterfaceIconName, Icon>> = {
+  add: Plus,
+  "arrow-down": ArrowDown,
+  "arrow-left": ArrowLeft,
+  "arrow-right": ArrowRight,
+  "arrow-up-right": ArrowUpRight,
+  "body-copy": Paragraph,
+  boards: GridFour,
+  equal: Equals,
+  export: DownloadSimple,
+  folder: FolderOpen,
+  library: Books,
+  relink: ArrowCounterClockwise,
+  remove: X,
+  "review-keep": Check,
+  "review-maybe": Question,
+  "review-reject": X,
+  "review-unreviewed": Circle,
+  save: FloppyDisk,
+  "source-ready": CheckCircle,
+  "source-warning": WarningCircle,
+  spinner: SpinnerGap,
+  subtract: Minus,
+  tune: SlidersHorizontal,
+};
+
+const weights: Partial<Readonly<Record<InterfaceIconName, IconWeight>>> = {
+  "arrow-down": "bold",
+  "arrow-left": "bold",
+  "arrow-right": "bold",
+  "arrow-up-right": "bold",
+  equal: "bold",
+  remove: "bold",
+  "review-keep": "bold",
+  "review-maybe": "bold",
+  "review-reject": "bold",
+  "review-unreviewed": "bold",
+  "source-ready": "fill",
+  "source-warning": "fill",
+  subtract: "bold",
+};
+
+export function InterfaceIcon({
+  name,
+  size = 20,
+  weight,
+}: {
+  readonly name: InterfaceIconName;
+  readonly size?: number;
+  readonly weight?: IconWeight;
+}) {
+  const PhosphorIcon = icons[name];
   return (
-    <svg className="interface-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="square" strokeLinejoin="miter" aria-hidden="true">
-      {paths[name]}
-    </svg>
+    <PhosphorIcon
+      aria-hidden="true"
+      className={`interface-icon interface-icon-${name}`}
+      focusable="false"
+      size={size}
+      weight={weight ?? weights[name] ?? "regular"}
+    />
   );
 }

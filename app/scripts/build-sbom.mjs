@@ -5,6 +5,13 @@ const root = resolve(import.meta.dirname, "..");
 const lock = JSON.parse(await readFile(resolve(root, "package-lock.json"), "utf8"));
 const application = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
 const packagesByIdentity = new Map();
+
+function licenseEntry(value) {
+  if (!value) return undefined;
+  if (value === "SEE LICENSE IN LICENSE.md") return [{ license: { name: value } }];
+  return [{ license: { id: value } }];
+}
+
 for (const [path, entry] of Object.entries(lock.packages)) {
   if (!path.startsWith("node_modules/") || !entry.version) continue;
   const name = path.split("node_modules/").at(-1);
@@ -17,7 +24,7 @@ for (const [path, entry] of Object.entries(lock.packages)) {
       name,
       version: entry.version,
       purl: `pkg:npm/${purlName}@${entry.version}`,
-      licenses: entry.license ? [{ license: { id: entry.license } }] : undefined,
+      licenses: licenseEntry(entry.license),
       hashes: entry.integrity
         ? [
             {
@@ -31,6 +38,10 @@ for (const [path, entry] of Object.entries(lock.packages)) {
       properties: [
         { name: "font-previewer:development", value: String(Boolean(entry.dev)) },
         { name: "font-previewer:optional", value: String(Boolean(entry.optional)) },
+        ...(name === "@pitchdog/type-system" ? [
+          { name: "font-previewer:source-commit", value: "786b4a2b671182319320f922b8de8f927ea3a002" },
+          { name: "font-previewer:bundled-font-license", value: "CC0-1.0" },
+        ] : []),
       ],
     });
   }
