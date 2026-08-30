@@ -11,7 +11,7 @@ This directory contains the active shared Simple + Studio renderer and the two d
 - `scripts/` — deterministic test/build cleanup, version checks, SBOM generation, package audits, Linux packaging, and macOS assembly.
 - `assets/icon/` and `public/` — the source icon pair and mechanically derived native/browser icon family.
 
-Source version is `0.1.0`. The latest published prerelease is [`v0.1.0-rc.4`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.4), built from exact source `b0950402316253cc9cb7bf7a6ec86ea5f669184f`. `v0.1.0-rc.5` source is prepared but remains untagged and unpublished until the exact-main verification and guarded release path pass. No stable release is designated.
+Source version is `0.1.0`. The latest published prerelease is [`v0.1.0-rc.5`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.5), built from exact source `06657ebdc1e14436d6ddbed763e12602603a84fa`. Its tag, public `SOURCE_SHA`, and downloaded checksum manifest agree. No stable release is designated.
 
 ## Product paths
 

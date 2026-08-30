@@ -13,12 +13,11 @@ It imports and inspects fonts, maintains portable `.pitchfontstudy` documents, c
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Latest published release: [`v0.1.0-rc.4`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.4)
-- Exact release source: `b0950402316253cc9cb7bf7a6ec86ea5f669184f`
-- Prepared candidate source: [`v0.1.0-rc.5`](docs/releases/v0.1.0-rc.5.md); no `rc.5` tag, release, exact candidate SHA, or public assets are claimed yet
+- Latest published release: [`v0.1.0-rc.5`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.5)
+- Exact release source: `06657ebdc1e14436d6ddbed763e12602603a84fa`
 - Public stable release: none
 
-Published `v0.1.0-rc.4` adds one-font Body Copy reading pages without removing the original fast four-up Boards journey or the deeper Studio. Published `rc.1` through `rc.4` history remains intact. The prepared `rc.5` source adds the pinned pitch.dog interface typography, Phosphor icons, a 4 px spacing contract, safer Review shortcuts, font-ready visual evidence, and exact seven-font package gates; publication still requires exact-head verification and the manual release path.
+Published `v0.1.0-rc.5` adds the pinned pitch.dog interface typography, Phosphor icons, a 4 px spacing contract, safer Review shortcuts, font-ready visual evidence, blind-surface privacy repairs, and exact seven-font package gates. Published `rc.1` through `rc.4` history remains immutable.
 
 The exact current repository state, automated evidence, and remaining human gates live in [`docs/maintenance/REPOSITORY_STATE.md`](docs/maintenance/REPOSITORY_STATE.md).
 

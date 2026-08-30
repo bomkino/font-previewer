@@ -11,26 +11,26 @@ Font Previewer is a local typography decision tool. The active product is one sh
 - Canonical branch: `main`
 - Default branch: `main`
 - Source version: `0.1.0`
-- Current product posture: published `v0.1.0-rc.4` prerelease plus prepared `v0.1.0-rc.5` source; the later candidate is not yet tagged or published
-- Latest published release: [`v0.1.0-rc.4`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.4)
-- Exact latest-published source: `b0950402316253cc9cb7bf7a6ec86ea5f669184f`, confirmed by both tag and public `SOURCE_SHA`
-- Prior published releases: immutable `v0.1.0-rc.3`, `v0.1.0-rc.2`, and `v0.1.0-rc.1`
+- Current product posture: published `v0.1.0-rc.5` prerelease
+- Latest published release: [`v0.1.0-rc.5`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.5)
+- Exact latest-published source: `06657ebdc1e14436d6ddbed763e12602603a84fa`, confirmed by both tag and public `SOURCE_SHA`
+- Prior published releases: immutable `v0.1.0-rc.4`, `v0.1.0-rc.3`, `v0.1.0-rc.2`, and `v0.1.0-rc.1`
 - Stable release: none
 
-Prepared `rc.5` source adopts the checksum-pinned pitch.dog Type System v13 interface fonts, Phosphor icons, a shared spacing/control contract, font-ready displayed evidence, exact seven-font package guards, scoped Review shortcuts, and live blind-comparison Inspector redaction. Until exact-main verification and guarded publication complete, the `rc.4` evidence and assets below remain the latest published release truth.
+Published `rc.5` adopts the checksum-pinned pitch.dog Type System v13 interface fonts, Phosphor icons, a shared spacing/control contract, font-ready displayed evidence, exact seven-font package guards, scoped Review shortcuts, and blind-comparison redaction across Navigator, Tray, cards, and Inspector.
 
 The RC, hardening, pre-Mac product work, canonicalisation, and Mac finalisation all reached `main` through reviewed pull requests. Published tags and releases remain immutable; exact source-to-package correspondence is carried by the release tag, workflow run, artifact names, checksums, and `SOURCE_SHA`.
 
 ## Current release evidence
 
-- The complete release-source public-seam suite passes locally on Linux: 52 tests discovered, 51 passed, and one variable-font environment check skipped because no variable font is installed. Exact-candidate hosted macOS/Linux results remain a publication gate.
+- The complete release-source public-seam suite passes locally on Linux: 52 tests discovered, 51 passed, and one variable-font environment check skipped because no variable font is installed. The exact published source also passed hosted macOS and Linux.
 - The release-source native AppKit/WKWebView evidence journey passes Simple and Studio at 80–140% scale, with minimum measured controls above 44 px at 80%, no asserted editor/page/header/workspace overflow, no title/candidate truncation in the asserted states, and no horizontal overflow.
 - The native journey proves installed family/style browsing, four-up board containment, one-font Body Copy composition and export, full text, one shared fitted reading size, four distinct colour quadrants, stress characters, AP Title, variable-axis controls, modal focus trapping/return, and shared copy/candidate/comparison-policy state across Simple and Studio.
 - Both Hosts now reject mixed or impossible Simple export manifests. The macOS Host also canonicalizes export roots and outputs before deriving relative manifest/checksum paths.
 - The native transaction fault proves failed Handoff staging is removed and the prior export remains byte-identical.
-- Exact-source GitHub verification run [`33151448579`](https://github.com/bomkino/font-previewer/actions/runs/33151448579) passed both Hosts, Linux X11/Wayland, forced renderer recovery, package reproducibility, and installed/archive round trips on `main`.
-- Guarded dry run [`33151866338`](https://github.com/bomkino/font-previewer/actions/runs/33151866338) and publication run [`33151987068`](https://github.com/bomkino/font-previewer/actions/runs/33151987068) assembled and published the non-overwriting prerelease.
-- A fresh public download of all nine assets passed the published `SHA256SUMS`; the release tag and `SOURCE_SHA` both resolve to `b0950402316253cc9cb7bf7a6ec86ea5f669184f`.
+- Exact-source GitHub verification run [`33292252219`](https://github.com/bomkino/font-previewer/actions/runs/33292252219) passed both Hosts, Linux X11/Wayland, forced renderer recovery, package reproducibility, and installed/archive round trips on `main`; repository-truth run [`33292252221`](https://github.com/bomkino/font-previewer/actions/runs/33292252221) also passed.
+- Guarded dry run [`33292506974`](https://github.com/bomkino/font-previewer/actions/runs/33292506974) and publication run [`33292575588`](https://github.com/bomkino/font-previewer/actions/runs/33292575588) assembled and published the non-overwriting prerelease.
+- A fresh public download of all nine assets passed the published `SHA256SUMS`; the release tag and `SOURCE_SHA` both resolve to `06657ebdc1e14436d6ddbed763e12602603a84fa`.
 
 The exact IDs above point back to GitHub Actions; artifacts and the source SHA remain independently readable from the immutable release.
 
@@ -82,7 +82,7 @@ These gates prohibit stable `v1.0.0`, broad support claims, attended accessibili
 
 ## Release posture
 
-`v0.1.0-rc.4` remains the latest public prerelease. Its one-use publication authorization was exercised only after the Body Copy work, exact-head verification, local installation, documentation, and GitHub cleanup gates completed. The owner granted one-use authorization for guarded `v0.1.0-rc.5` publication on 2026-08-30; the exact-main verification and dry-run gates remain mandatory. `.github/workflows/release.yml` is manual, exact-SHA guarded, exact-run guarded, non-overwriting, and dry-run first; no push, PR, tag, or successful verification run publishes automatically. Stable `v1.0.0` and any later tag remain unauthorized.
+`v0.1.0-rc.5` is the latest public prerelease. Its one-use publication authorization was exercised only after the type-system, icon, spacing, privacy, package-integrity, exact-head verification, documentation, and GitHub cleanup gates completed. `.github/workflows/release.yml` remains manual, exact-SHA guarded, exact-run guarded, non-overwriting, and dry-run first; no push, PR, tag, or successful verification run publishes automatically. Stable `v1.0.0` and any later tag remain unauthorized.
 
 ## Current documents
 
