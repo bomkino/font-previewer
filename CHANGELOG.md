@@ -25,7 +25,6 @@
 
 ### Not claimed
 
-- Publication of `v0.1.0-rc.5`; an exact verified source SHA, release tag, and public assets remain pending.
 - Attended VoiceOver or Orca usability.
 - Human approval of every layout, typeface, script, or reading-size relationship.
 - Independent clean-machine reconstruction or universal Mac/Linux behavior.

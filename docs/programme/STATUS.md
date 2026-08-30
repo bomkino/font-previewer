@@ -8,9 +8,10 @@
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Current candidate: `v0.1.0-rc.5` source prepared; exact-main verification and guarded publication pending
-- Latest published prerelease: `v0.1.0-rc.4`
-- Exact latest-published source: `b0950402316253cc9cb7bf7a6ec86ea5f669184f`; the tag and public `SOURCE_SHA` agree
+- Latest published prerelease: `v0.1.0-rc.5`
+- Exact latest-published source: `06657ebdc1e14436d6ddbed763e12602603a84fa`; the tag and public `SOURCE_SHA` agree
+- Publication receipt: exact-main Verify `33292252219`, repository truth `33292252221`, guarded dry run `33292506974`, and publication `33292575588`
+- Public release surface: nine assets; the freshly downloaded `SHA256SUMS` verifies every payload
 - RC, hardening, and pre-Mac implementation: merged into `main`
 - Active product: shared Simple + Studio Study plus macOS AppKit/WKWebView Host and Linux Electron Host
 - Preserved reference: root `macos/` SwiftUI/CoreText application
@@ -25,6 +26,6 @@
 - hostile cross-format font containment beyond current automated fixtures;
 - induced WKWebView content-process termination;
 - optional Developer ID signing/notarisation only if a future paid distribution path is deliberately adopted;
-- the one-use `v0.1.0-rc.5` authorization applies only after exact-main verification and the guarded dry run; any later tag or stable release requires new authorization.
+- the one-use `v0.1.0-rc.5` authorization has been exercised; any later tag or stable release requires new authorization.
 
 Historical status before canonicalisation is preserved at [`../archive/2026-08-27/PROGRAMME_STATUS_PRE_MAIN.md`](../archive/2026-08-27/PROGRAMME_STATUS_PRE_MAIN.md). Old ticket and handover documents remain evidence, not current merge or release instructions.
