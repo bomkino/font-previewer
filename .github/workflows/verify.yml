@@ -117,6 +117,22 @@ jobs:
             (.semanticAudit.duplicateIds | length) == 0 and
             .semanticAudit.horizontalOverflow == false and
             .semanticAudit.roleHelpSeparated == true and
+            .semanticAudit.layout.minControlHeight >= 44 and
+            .semanticAudit.layout.iconOnlyButtons > 0 and
+            .semanticAudit.layout.iconCentersAligned == true and
+            .semanticAudit.layout.selectCarets >= 3 and
+            .semanticAudit.layout.selectCaretsComplete == true and
+            .semanticAudit.layout.selectCaretsCentered == true and
+            .semanticAudit.layout.selectCaretInset >= 14 and
+            .semanticAudit.layout.panelTopSpread <= 1 and
+            .semanticAudit.layout.panelBottomSpread <= 1 and
+            .semanticAudit.layout.panelTrayGap <= 1 and
+            (.semanticAudit.layout.horizontalOverflows | length) == 0 and
+            .disclosureMotion.expanded == true and
+            .disclosureMotion.collapsed == true and
+            .disclosureMotion.openIntermediate == true and
+            .disclosureMotion.closeIntermediate == true and
+            .disclosureMotion.caretRotates == true and
             .reloadRecovery.after.activeElement == "workspace-heading" and
             .reloadRecovery.after.reviewState == "Keep" and
             .reloadRecovery.after.stage == .reloadRecovery.before.stage and

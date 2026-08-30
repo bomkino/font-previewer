@@ -59,6 +59,22 @@ test("brand mark source stays renderer-relative for packaged hosts", () => {
   assert.equal(source, "./font-previewer-icon-64.png");
 });
 
+test("Studio controls use centered Phosphor carets and stable disclosure shells", () => {
+  const html = renderToStaticMarkup(<App />);
+  const selects = html.match(/<select/g) ?? [];
+  const selectShells = html.match(/class="select-control"/g) ?? [];
+  const selectCarets = html.match(/interface-icon-caret-down/g) ?? [];
+  const disclosureTriggers = html.match(/class="inspector-disclosure-trigger"/g) ?? [];
+  assert.ok(selects.length >= 3);
+  assert.equal(selectShells.length, selects.length);
+  assert.equal(selectCarets.length, selects.length);
+  assert.equal(disclosureTriggers.length, 2);
+  assert.equal((html.match(/interface-icon-caret-right/g) ?? []).length, 2);
+  assert.match(html, /aria-expanded="false"/);
+  assert.match(html, /class="inspector-details-content" aria-hidden="true" inert=""/);
+  assert.doesNotMatch(html, /<(?:details|summary)[ >]/);
+});
+
 test("Simple mode restores the original font-to-four-up-board pipeline", () => {
   globalThis.location.search = "?fixture=1&mode=simple";
   let html = "";

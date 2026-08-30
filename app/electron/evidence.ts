@@ -171,6 +171,51 @@ async function semanticAudit(window: BrowserWindow): Promise<Record<string, unkn
       return wrapping?.textContent?.trim() || control.textContent?.trim() || '';
     };
     const unnamed = controls.filter((control) => !name(control)).map((control) => control.outerHTML.slice(0, 160));
+    const visible = (element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+    };
+    const measuredControls = controls.filter((control) => {
+      if (!visible(control)) return false;
+      if (control instanceof HTMLInputElement && ['checkbox', 'radio', 'range'].includes(control.type)) return false;
+      return true;
+    });
+    const iconOnlyButtons = controls.filter((control) => {
+      if (!(control instanceof HTMLButtonElement) || !visible(control)) return false;
+      return Boolean(control.querySelector(':scope > .interface-icon')) && !control.textContent?.trim();
+    });
+    const iconCenterDeltas = iconOnlyButtons.map((button) => {
+      const icon = button.querySelector(':scope > .interface-icon');
+      const buttonRect = button.getBoundingClientRect();
+      const iconRect = icon.getBoundingClientRect();
+      return {
+        label: name(button),
+        x: Math.abs((buttonRect.left + buttonRect.width / 2) - (iconRect.left + iconRect.width / 2)),
+        y: Math.abs((buttonRect.top + buttonRect.height / 2) - (iconRect.top + iconRect.height / 2)),
+      };
+    });
+    const selectCaretDeltas = [...document.querySelectorAll('.select-control')].filter(visible).map((shell) => {
+      const select = shell.querySelector('select');
+      const caret = shell.querySelector(':scope > .interface-icon-caret-down');
+      const selectRect = select?.getBoundingClientRect();
+      const caretRect = caret?.getBoundingClientRect();
+      return {
+        complete: Boolean(selectRect && caretRect),
+        y: selectRect && caretRect ? Math.abs((selectRect.top + selectRect.height / 2) - (caretRect.top + caretRect.height / 2)) : 999,
+        trailingSpace: selectRect && caretRect ? selectRect.right - caretRect.right : 0,
+      };
+    });
+    const panelElements = ['.catalog', '.workspace', '.inspector'].map((selector) => document.querySelector(selector));
+    const panelRects = panelElements.map((element) => element?.getBoundingClientRect()).filter(Boolean);
+    const trayRect = document.querySelector('.tray')?.getBoundingClientRect();
+    const panelTopSpread = panelRects.length ? Math.max(...panelRects.map((rect) => rect.top)) - Math.min(...panelRects.map((rect) => rect.top)) : 999;
+    const panelBottomSpread = panelRects.length ? Math.max(...panelRects.map((rect) => rect.bottom)) - Math.min(...panelRects.map((rect) => rect.bottom)) : 999;
+    const panelTrayGap = trayRect && panelRects.length ? Math.max(...panelRects.map((rect) => Math.abs(rect.bottom - trayRect.top))) : 999;
+    const horizontalOverflows = [...document.querySelectorAll('.catalog,.workspace,.inspector')]
+      .filter(visible)
+      .filter((element) => element.scrollWidth > element.clientWidth + 1)
+      .map((element) => element.className);
     return {
       controls: controls.length,
       unnamed,
@@ -183,8 +228,66 @@ async function semanticAudit(window: BrowserWindow): Promise<Record<string, unkn
       duplicateIds: [...document.querySelectorAll('[id]')].map((item) => item.id).filter((id, index, ids) => ids.indexOf(id) !== index),
       horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
       roleHelpSeparated: Boolean(roleSelectRect && roleHelpRect && roleSelectRect.bottom <= roleHelpRect.top),
+      layout: {
+        minControlHeight: measuredControls.length ? Math.min(...measuredControls.map((control) => control.getBoundingClientRect().height)) : 0,
+        iconOnlyButtons: iconCenterDeltas.length,
+        iconCentersAligned: iconCenterDeltas.every((delta) => delta.x <= 1 && delta.y <= 1),
+        selectCarets: selectCaretDeltas.length,
+        selectCaretsComplete: selectCaretDeltas.length > 0 && selectCaretDeltas.every((caret) => caret.complete),
+        selectCaretsCentered: selectCaretDeltas.length > 0 && selectCaretDeltas.every((caret) => caret.y <= 1),
+        selectCaretInset: selectCaretDeltas.length ? Math.min(...selectCaretDeltas.map((caret) => caret.trailingSpace)) : 0,
+        panelTopSpread,
+        panelBottomSpread,
+        panelTrayGap,
+        horizontalOverflows,
+      },
     };
   })()`, true));
+}
+
+async function disclosureMotionAudit(window: BrowserWindow): Promise<Record<string, unknown>> {
+  return withTimeout("disclosure motion audit", window.webContents.executeJavaScript(`(async () => {
+    const disclosure = document.querySelector('.inspector-details');
+    const trigger = disclosure?.querySelector('.inspector-disclosure-trigger');
+    const content = disclosure?.querySelector('.inspector-details-content');
+    const caret = trigger?.querySelector('.interface-icon-caret-right');
+    if (!(disclosure instanceof HTMLElement) || !(trigger instanceof HTMLButtonElement) || !(content instanceof HTMLElement) || !(caret instanceof SVGElement)) throw new Error('Missing disclosure motion surface');
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const settleFrames = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+    const measure = () => ({
+      height: disclosure.getBoundingClientRect().height,
+      expanded: trigger.getAttribute('aria-expanded') === 'true',
+      inert: content.inert,
+      hidden: content.getAttribute('aria-hidden') === 'true',
+      caret: getComputedStyle(caret).transform,
+    });
+    const collapsed = measure();
+    trigger.click();
+    await settleFrames();
+    await wait(60);
+    const opening = measure();
+    await wait(180);
+    const expanded = measure();
+    trigger.click();
+    await settleFrames();
+    await wait(60);
+    const closing = measure();
+    await wait(180);
+    const closed = measure();
+    const openIntermediate = reducedMotion || (opening.height > collapsed.height + 1 && opening.height < expanded.height - 1);
+    const closeIntermediate = reducedMotion || (closing.height < expanded.height - 1 && closing.height > closed.height + 1);
+    return {
+      reducedMotion,
+      expanded: expanded.height > collapsed.height + 20 && expanded.expanded && !expanded.inert && !expanded.hidden,
+      collapsed: Math.abs(closed.height - collapsed.height) <= 1 && !closed.expanded && closed.inert && closed.hidden,
+      openIntermediate,
+      closeIntermediate,
+      caretRotates: expanded.caret !== collapsed.caret && closed.caret === collapsed.caret,
+      transitionDuration: getComputedStyle(content).transitionDuration,
+      samples: { collapsed, opening, expanded, closing, closed },
+    };
+  })()`, true), 10_000);
 }
 
 async function keyboardAccessibilityAudit(window: BrowserWindow, sendMenuCommand: (command: MenuCommand) => void): Promise<Record<string, unknown>> {
@@ -421,6 +524,7 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   await clickStage(options.window, "Review");
   await waitFor(options.window, "Review semantics", `document.querySelector('.candidate-row[aria-current="true"]')?.dataset.reviewState === 'keep'`);
   trace.semanticAudit = await semanticAudit(options.window);
+  trace.disclosureMotion = await disclosureMotionAudit(options.window);
   trace.simpleBodyCopy = await simpleBodyCopyAudit(options.window, output);
   trace.securityAudit = await securityAudit(options.window);
   trace.installedCatalog = await installedCatalogAudit(options.window);
@@ -481,12 +585,15 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   };
   await writeFile(join(output, "metadata.json"), `${JSON.stringify(metadata, null, 2)}\n`, { mode: 0o600 });
 
-  const audit = trace.semanticAudit as { unnamed?: unknown[]; duplicateIds?: unknown[]; horizontalOverflow?: boolean; roleHelpSeparated?: boolean };
+  const audit = trace.semanticAudit as { unnamed?: unknown[]; duplicateIds?: unknown[]; horizontalOverflow?: boolean; roleHelpSeparated?: boolean; layout?: { minControlHeight?: number; iconOnlyButtons?: number; iconCentersAligned?: boolean; selectCarets?: number; selectCaretsComplete?: boolean; selectCaretsCentered?: boolean; selectCaretInset?: number; panelTopSpread?: number; panelBottomSpread?: number; panelTrayGap?: number; horizontalOverflows?: unknown[] } };
+  const disclosure = trace.disclosureMotion as { expanded?: boolean; collapsed?: boolean; openIntermediate?: boolean; closeIntermediate?: boolean; caretRotates?: boolean };
   const security = trace.securityAudit as { invalidRequests?: number; rejected?: number; nodeUnavailable?: boolean };
   const keyboard = trace.keyboardAccessibility as Record<string, boolean>;
   const catalog = trace.installedCatalog as { count?: number; indexed?: number; pathLeak?: boolean; opaquePreviewUrls?: boolean; previewAvailable?: boolean; fontLoaded?: boolean; pageBounded?: boolean; studyUnchanged?: boolean; cancellation?: { acknowledged?: boolean; durationMs?: number; obsoleteResultCancelled?: boolean } };
   const body = trace.simpleBodyCopy as { pageCount?: number; sampleCount?: number; fullText?: boolean; twoParagraphs?: boolean; sharedSize?: boolean; withinFrames?: boolean; noEllipsis?: boolean; minTouchHeight?: number; horizontalOverflow?: boolean; studioShared?: boolean; manifest?: { pageMode?: string; boardCount?: number; bodyCount?: number; indexCount?: number; fontCount?: number; includeIndex?: boolean } };
   if (audit.unnamed?.length || audit.duplicateIds?.length || audit.horizontalOverflow || !audit.roleHelpSeparated) throw new Error("Semantic accessibility or layout audit failed.");
+  if ((audit.layout?.minControlHeight ?? 0) < 44 || !audit.layout?.iconOnlyButtons || !audit.layout.iconCentersAligned || (audit.layout.selectCarets ?? 0) < 3 || !audit.layout.selectCaretsComplete || !audit.layout.selectCaretsCentered || (audit.layout.selectCaretInset ?? 0) < 14 || (audit.layout.panelTopSpread ?? 999) > 1 || (audit.layout.panelBottomSpread ?? 999) > 1 || (audit.layout.panelTrayGap ?? 999) > 1 || audit.layout.horizontalOverflows?.length) throw new Error("Control or panel geometry audit failed.");
+  if (!disclosure.expanded || !disclosure.collapsed || !disclosure.openIntermediate || !disclosure.closeIntermediate || !disclosure.caretRotates) throw new Error("Disclosure motion audit failed.");
   if (security.invalidRequests !== security.rejected || !security.nodeUnavailable) throw new Error("Host security audit failed.");
   if (!catalog.count || !catalog.indexed || catalog.pathLeak || !catalog.opaquePreviewUrls || !catalog.previewAvailable || !catalog.fontLoaded || !catalog.pageBounded || !catalog.studyUnchanged || !catalog.cancellation?.acknowledged || !catalog.cancellation.obsoleteResultCancelled || catalog.cancellation.durationMs === undefined || catalog.cancellation.durationMs > 100) throw new Error("Installed font catalog audit failed.");
   if (!keyboard.forwardWrap || !keyboard.backwardWrap || !keyboard.candidateUnchanged || !keyboard.trayUnchanged || !keyboard.returnFocus) throw new Error("Keyboard accessibility audit failed.");

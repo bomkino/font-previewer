@@ -1,0 +1,180 @@
+name: One-use rc.6 owner release bridge
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+concurrency:
+  group: font-previewer-release-comment-v0.1.0-rc.6
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: Validate owner command and dispatch guarded release
+    if: >-
+      ${{
+        github.repository == 'bomkino/font-previewer' &&
+        github.event.issue.pull_request != null &&
+        github.event.comment.user.login == github.repository_owner &&
+        github.event.comment.author_association == 'OWNER' &&
+        startsWith(github.event.comment.body, '/font-previewer-release-v0.1.0-rc.6 ')
+      }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: bomkino/font-previewer
+      REPOSITORY_OWNER: bomkino
+      RELEASE_TAG: v0.1.0-rc.6
+    steps:
+      - name: Validate exact owner command and release evidence
+        id: command
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test "$(jq -r '.repository.full_name' "$GITHUB_EVENT_PATH")" = "$REPOSITORY"
+          test "$(jq -r '.repository.owner.login' "$GITHUB_EVENT_PATH")" = "$REPOSITORY_OWNER"
+          test "$(jq -r '.comment.user.login' "$GITHUB_EVENT_PATH")" = "$REPOSITORY_OWNER"
+          test "$(jq -r '.comment.user.type' "$GITHUB_EVENT_PATH")" = "User"
+          test "$(jq -r '.comment.author_association' "$GITHUB_EVENT_PATH")" = "OWNER"
+          test -n "$(jq -r '.issue.pull_request.url // empty' "$GITHUB_EVENT_PATH")"
+
+          BODY="$(jq -r '.comment.body' "$GITHUB_EVENT_PATH")"
+          PR_NUMBER="$(jq -r '.issue.number' "$GITHUB_EVENT_PATH")"
+          [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]
+
+          DRY_PATTERN='^/font-previewer-release-v0\.1\.0-rc\.6 dry-run ([0-9a-f]{40}) ([0-9]+)$'
+          PUBLISH_PATTERN='^/font-previewer-release-v0\.1\.0-rc\.6 publish ([0-9a-f]{40}) ([0-9]+) ([0-9]+) confirm=v0\.1\.0-rc\.6$'
+          MODE=""
+          DRY_RUN_ID=""
+          if [[ "$BODY" =~ $DRY_PATTERN ]]; then
+            MODE="dry-run"
+            TARGET_SHA="${BASH_REMATCH[1]}"
+            VERIFY_RUN_ID="${BASH_REMATCH[2]}"
+          elif [[ "$BODY" =~ $PUBLISH_PATTERN ]]; then
+            MODE="publish"
+            TARGET_SHA="${BASH_REMATCH[1]}"
+            VERIFY_RUN_ID="${BASH_REMATCH[2]}"
+            DRY_RUN_ID="${BASH_REMATCH[3]}"
+          else
+            echo "Refusing anything except an exact rc.6 release command." >&2
+            exit 1
+          fi
+
+          gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/pull-request.json"
+          jq -e --arg repository "$REPOSITORY" --arg sha "$TARGET_SHA" '
+            .merged == true and
+            .merged_at != null and
+            .base.ref == "main" and
+            .base.repo.full_name == $repository and
+            .merge_commit_sha == $sha
+          ' "$RUNNER_TEMP/pull-request.json" >/dev/null
+
+          MAIN_SHA="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha')"
+          test "$MAIN_SHA" = "$TARGET_SHA"
+
+          gh api "repos/$REPOSITORY/actions/runs/$VERIFY_RUN_ID" > "$RUNNER_TEMP/verify-run.json"
+          jq -e --arg sha "$TARGET_SHA" '
+            .status == "completed" and
+            .conclusion == "success" and
+            .head_sha == $sha and
+            .head_branch == "main" and
+            .path == ".github/workflows/verify.yml"
+          ' "$RUNNER_TEMP/verify-run.json" >/dev/null
+
+          if [[ "$MODE" == "publish" ]]; then
+            gh api "repos/$REPOSITORY/actions/runs/$DRY_RUN_ID" > "$RUNNER_TEMP/dry-run.json"
+            jq -e --arg sha "$TARGET_SHA" '
+              .status == "completed" and
+              .conclusion == "success" and
+              .event == "workflow_dispatch" and
+              .head_sha == $sha and
+              .head_branch == "main" and
+              .path == ".github/workflows/release.yml"
+            ' "$RUNNER_TEMP/dry-run.json" >/dev/null
+
+            PROOF_NAME="font-previewer-release-dry-run-proof-$TARGET_SHA-$RELEASE_TAG"
+            gh api "repos/$REPOSITORY/actions/runs/$DRY_RUN_ID/artifacts?per_page=100" > "$RUNNER_TEMP/artifacts.json"
+            mapfile -t PROOF_IDS < <(
+              jq -r --arg name "$PROOF_NAME" '
+                .artifacts[] | select(.name == $name and .expired == false) | .id
+              ' "$RUNNER_TEMP/artifacts.json"
+            )
+            test "${#PROOF_IDS[@]}" -eq 1
+
+            curl --fail --location --silent --show-error \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$REPOSITORY/actions/artifacts/${PROOF_IDS[0]}/zip" \
+              --output "$RUNNER_TEMP/dry-run-proof.zip"
+            mapfile -t PROOF_ENTRIES < <(unzip -Z1 "$RUNNER_TEMP/dry-run-proof.zip")
+            test "${#PROOF_ENTRIES[@]}" -eq 1
+            test "${PROOF_ENTRIES[0]}" = "release-dry-run-proof.json"
+            unzip -p "$RUNNER_TEMP/dry-run-proof.zip" release-dry-run-proof.json > "$RUNNER_TEMP/dry-run-proof.json"
+            jq -e \
+              --arg repository "$REPOSITORY" \
+              --arg sha "$TARGET_SHA" \
+              --arg verify_run_id "$VERIFY_RUN_ID" \
+              --arg tag "$RELEASE_TAG" \
+              --arg dry_run_id "$DRY_RUN_ID" '
+                .schema == "font-previewer-release-dry-run-proof/v1" and
+                .repository == $repository and
+                .target_sha == $sha and
+                .verification_run_id == $verify_run_id and
+                .tag == $tag and
+                .publish == false and
+                .workflow_run_id == $dry_run_id
+              ' "$RUNNER_TEMP/dry-run-proof.json" >/dev/null
+          fi
+
+          printf 'mode=%s\n' "$MODE" >> "$GITHUB_OUTPUT"
+          printf 'target_sha=%s\n' "$TARGET_SHA" >> "$GITHUB_OUTPUT"
+          printf 'verification_run_id=%s\n' "$VERIFY_RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch exact guarded release workflow
+        shell: bash
+        env:
+          MODE: ${{ steps.command.outputs.mode }}
+          TARGET_SHA: ${{ steps.command.outputs.target_sha }}
+          VERIFY_RUN_ID: ${{ steps.command.outputs.verification_run_id }}
+        run: |
+          set -euo pipefail
+          if [[ "$MODE" == "publish" ]]; then
+            PUBLISH="true"
+            CONFIRMATION="$RELEASE_TAG"
+          else
+            test "$MODE" = "dry-run"
+            PUBLISH="false"
+            CONFIRMATION=""
+          fi
+
+          jq -n \
+            --arg target_sha "$TARGET_SHA" \
+            --arg verification_run_id "$VERIFY_RUN_ID" \
+            --arg tag "$RELEASE_TAG" \
+            --arg publish "$PUBLISH" \
+            --arg confirmation "$CONFIRMATION" \
+            '{
+              ref: "main",
+              inputs: {
+                target_sha: $target_sha,
+                verification_run_id: $verification_run_id,
+                tag: $tag,
+                publish: $publish,
+                confirmation: $confirmation
+              }
+            }' > "$RUNNER_TEMP/dispatch.json"
+
+          gh api \
+            --method POST \
+            "repos/$REPOSITORY/actions/workflows/release.yml/dispatches" \
+            --input "$RUNNER_TEMP/dispatch.json"
+          printf 'Dispatched %s validation for %s at %s.\n' "$RELEASE_TAG" "$MODE" "$TARGET_SHA"
