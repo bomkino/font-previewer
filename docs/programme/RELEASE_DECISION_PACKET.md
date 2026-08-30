@@ -4,14 +4,14 @@
 
 - `main` is canonical and contains the merged RC, hardening, and pre-Mac implementation.
 - Source version remains `0.1.0`.
-- `v0.1.0-rc.5` is published from exact source `06657ebdc1e14436d6ddbed763e12602603a84fa`.
-- Published `v0.1.0-rc.1` through `v0.1.0-rc.5` remain immutable with their original assets.
+- `v0.1.0-rc.6` is published from exact source `f1aa382c8265b4884261c4308a4a5d37077a5242`.
+- Published `v0.1.0-rc.1` through `v0.1.0-rc.6` remain immutable with their original assets.
 - No stable release is approved or claimed.
-- The owner-authorized rc.5 publication completed through exact-main Verify `33292252219`, repository truth `33292252221`, guarded dry run `33292506974`, and publication `33292575588`.
+- The owner-authorized rc.6 publication completed through exact-main Verify `33296016674`, repository truth `33296016673`, guarded dry run `33296253222`, and publication `33296294623`.
 - The public release has nine assets. A fresh download of `SHA256SUMS` verifies every published payload.
-- The one-use rc.5 authorization has been exercised. Stable v1 and every later tag remain unauthorized and require a new owner decision.
+- The one-use rc.6 authorization has been exercised. Stable v1 and every later tag remain unauthorized and require a new owner decision.
 
-The preceding rc.4 publication remains recorded by exact-main verification `33151448579`, dry run `33151866338`, and publication `33151987068`.
+The preceding rc.5 publication remains recorded by exact-main verification `33292252219`, repository truth `33292252221`, dry run `33292506974`, and publication `33292575588`.
 
 The prior owner decision that authorized the first prerelease while work remained isolated on an RC branch is preserved unchanged at [`../archive/2026-08-27/RELEASE_DECISION_PACKET_PRE_MAIN.md`](../archive/2026-08-27/RELEASE_DECISION_PACKET_PRE_MAIN.md). Its branch instructions are historical and do not override current `main`.
 

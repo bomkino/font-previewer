@@ -35,7 +35,7 @@ The test runner removes compiled output before every run, plants a deliberately 
 - Run a retained 500-Face, 2,000-operation, 100-recovery-round-trip diagnostic.
 - Launch the displayed Electron Host under Xvfb and isolated D-Bus.
 - Reject malformed and path-bearing bridge messages; prove Node is unavailable in the renderer.
-- Exercise keyboard wrap, return focus, semantic labels, duplicate-ID checks, overflow checks, and Inspector/help separation.
+- Exercise keyboard wrap, return focus, semantic labels, duplicate-ID checks, overflow checks, Inspector/help separation, productive-control height, centered icon-only controls, centered/inset select carets, aligned panels/tray boundaries, and disclosure open/close motion.
 - Discover and page the installed Catalog; prove opaque preview URLs, actual font loading, bounded results, cancellation acknowledgement, obsolete-result rejection, and no implicit Study mutation.
 - Require PD Body Roman, PD Body Italic, PD Head, and PD Eyebrow to report loaded, then wait two animation frames before capturing displayed evidence.
 - Save/recover and perform transactional Handoff.
@@ -56,7 +56,7 @@ The test runner removes compiled output before every run, plants a deliberately 
 - Run the retained 500-Face long-session diagnostic.
 - Build the AppKit/WKWebView Host and embed the production Studio, licence, notices, SBOM, and installation guidance.
 - Enable hardened runtime, sign ad hoc, and verify the signature deeply and strictly.
-- Run the displayed Host, native menu/panel routes, installed Catalog, opaque font loading, cancellation, keyboard/focus/semantic checks, recovery, and transactional Handoff fault injection.
+- Run the displayed Host, native menu/panel routes, installed Catalog, opaque font loading, cancellation, keyboard/focus/semantic checks, productive-control height, centered icon/caret geometry, panel/tray alignment, disclosure semantics and reduced-motion behavior, recovery, and transactional Handoff fault injection.
 - Require PD Body Roman, PD Body Italic, PD Head, and PD Eyebrow to report loaded, then wait two animation frames before capturing displayed evidence.
 - Exercise Simple file/folder and installed-family/style intake, four-up and index boards, one-font Body Copy pages, authored and custom long copy, four colour quadrants, stress characters, five casing controls, variable axes, include/skip, and full-size preview.
 - Export Body Copy transactionally, decode every page at 5,152 × 2,160, prove full text and one shared fitted size, reject mixed manifests, and prove the copy remains available after switching to Studio.

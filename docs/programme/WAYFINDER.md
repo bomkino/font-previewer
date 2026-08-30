@@ -6,7 +6,7 @@ Deliver one trustworthy local typography-decision product on Mac and Linux. A de
 
 ## Current reality
 
-Published `v0.1.0-rc.5` combines the default Simple view, original four-up Boards, one-font Body Copy reading pages, and rebuilt Studio with the pinned pitch.dog interface type system, Phosphor icons, consistent spacing, blind-surface privacy, and exact package-font integrity gates. Exact-source cross-platform verification, release assembly, publication, and fresh public checksum readback all passed; human/reference gates remain ahead of stable v1.0.
+Published `v0.1.0-rc.6` combines the default Simple view, original four-up Boards, one-font Body Copy reading pages, and rebuilt Studio with the pinned pitch.dog interface type system, centered Phosphor controls, stable disclosures, consistent container fit, restrained motion, blind-surface privacy, and exact package/layout gates. Exact-source cross-platform verification, release assembly, publication, and fresh public checksum readback all passed; human/reference gates remain ahead of stable v1.0.
 
 The root `macos/` application remains a preserved CoreText oracle. It is not the active product because its historical model stores paths in the Study and collapses concepts that Study v4 keeps distinct.
 

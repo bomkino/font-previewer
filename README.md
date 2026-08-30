@@ -13,11 +13,11 @@ It imports and inspects fonts, maintains portable `.pitchfontstudy` documents, c
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Latest published release: [`v0.1.0-rc.5`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.5)
-- Exact release source: `06657ebdc1e14436d6ddbed763e12602603a84fa`
+- Latest published release: [`v0.1.0-rc.6`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.6)
+- Exact release source: `f1aa382c8265b4884261c4308a4a5d37077a5242`
 - Public stable release: none
 
-Published `v0.1.0-rc.5` adds the pinned pitch.dog interface typography, Phosphor icons, a 4 px spacing contract, safer Review shortcuts, font-ready visual evidence, blind-surface privacy repairs, and exact seven-font package gates. Published `rc.1` through `rc.4` history remains immutable.
+Published `v0.1.0-rc.6` adds centered Phosphor carets, stable disclosure geometry, balanced icon controls, restrained motion, and exact cross-Host layout/motion gates on top of the pinned pitch.dog interface system introduced in `rc.5`. Published `rc.1` through `rc.5` history remains immutable.
 
 The exact current repository state, automated evidence, and remaining human gates live in [`docs/maintenance/REPOSITORY_STATE.md`](docs/maintenance/REPOSITORY_STATE.md).
 
@@ -82,7 +82,7 @@ Build, verify, install to `/Applications`, and launch:
 ./build-font-previewer-app.command
 ```
 
-`npm run verify` checks version surfaces, strict TypeScript, public-seam tests, production Studio and Host builds, SBOM generation, bundle hygiene, the exact seven-font UI allowlist, and high-severity npm audit. GitHub Actions adds font-ready displayed Host journeys, recovery and Handoff fault injection, accessibility semantics, package round trips, checksums, reproducibility, X11, native Wayland/Ozone smoke, and ad-hoc signature verification.
+`npm run verify` checks version surfaces, strict TypeScript, public-seam tests, production Studio and Host builds, SBOM generation, bundle hygiene, the exact seven-font UI allowlist, and high-severity npm audit. GitHub Actions adds font-ready displayed Host journeys, control/caret/panel geometry, disclosure motion, recovery and Handoff fault injection, accessibility semantics, package round trips, checksums, reproducibility, X11, native Wayland/Ozone smoke, and ad-hoc signature verification.
 
 Permanent verification is defined by [`.github/workflows/verify.yml`](.github/workflows/verify.yml). Release preparation is manual, exact-SHA guarded, dry-run first, and non-overwriting; no release is published automatically.
 

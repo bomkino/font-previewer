@@ -4,12 +4,12 @@
 
 Published tags and releases are immutable historical records. Do not move a published tag, overwrite a release, replace its assets, or rewrite its source history.
 
-The latest published Font Previewer release is `v0.1.0-rc.5`. Its tag and `SOURCE_SHA` asset identify immutable release source `06657ebdc1e14436d6ddbed763e12602603a84fa`. The prior `v0.1.0-rc.4`, `v0.1.0-rc.3`, `v0.1.0-rc.2`, and `v0.1.0-rc.1` releases remain fixed with their original assets and source history.
+The latest published Font Previewer release is `v0.1.0-rc.6`. Its tag and `SOURCE_SHA` asset identify immutable release source `f1aa382c8265b4884261c4308a4a5d37077a5242`. The prior `v0.1.0-rc.5`, `v0.1.0-rc.4`, `v0.1.0-rc.3`, `v0.1.0-rc.2`, and `v0.1.0-rc.1` releases remain fixed with their original assets and source history.
 
 ## Version model
 
 - Application source and package version: `0.1.0`.
-- Latest published prerelease: `v0.1.0-rc.5`.
+- Latest published prerelease: `v0.1.0-rc.6`.
 - Prepared later candidate source: none.
 - Stable `v1.0.0`: prohibited until the documented human, physical, typography, accessibility, containment, reconstruction, and distribution decisions close.
 
@@ -27,6 +27,7 @@ A candidate must pass `.github/workflows/verify.yml` at the exact intended commi
 - package inventory, source-map, private-path, credential-marker, licence, notices, and SBOM scans;
 - exactly seven approved CC0-1.0 interface WOFF2 files at the allowed renderer path, byte sizes, and SHA-256 digests, with every other or disguised font binary rejected;
 - displayed evidence captured only after PD Body Roman, PD Body Italic, PD Head, and PD Eyebrow load and two animation frames settle;
+- exact productive-control height, icon/caret centering, caret inset, panel alignment, tray boundary, overflow, disclosure semantics, reduced-motion behavior, and real intermediate motion frames where motion is enabled;
 - macOS hardened-runtime and ad-hoc signature verification.
 
 A successful run on another commit is not transferable evidence.
@@ -43,7 +44,7 @@ A successful run on another commit is not transferable evidence.
 
 The default path creates and retains a dry-run bundle. Publication requires explicit `publish=true` and an exact tag confirmation. The workflow refuses an existing tag or release.
 
-No public release may be published without separate owner authorization, even when dry-run validation succeeds. The one-use authorization for `v0.1.0-rc.4` was exercised by publication run `33151987068` on 2026-08-28. The one-use authorization for `v0.1.0-rc.5` was exercised by publication run `33292575588` on 2026-08-30 after exact-main verification run `33292252219` and guarded dry run `33292506974`. Neither authorization extends to a stable release or later tag.
+No public release may be published without separate owner authorization, even when dry-run validation succeeds. The one-use authorization for `v0.1.0-rc.5` was exercised by publication run `33292575588` on 2026-08-30. The one-use authorization for `v0.1.0-rc.6` was exercised by publication run `33296294623` on 2026-08-30 after exact-main verification run `33296016674` and guarded dry run `33296253222`. Neither authorization extends to a stable release or later tag.
 
 ## Claim boundaries
 
