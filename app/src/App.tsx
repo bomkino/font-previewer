@@ -16,6 +16,10 @@ import {
   createSession,
   faceForCandidate,
   isSemanticCommand,
+  simpleFontSets,
+  candidateSimpleSet,
+  candidatesInSimpleSet,
+  missingSimpleSetFaces,
   type RecipePack,
   type FitPolicy,
   type HandoffPreferences,
@@ -24,6 +28,7 @@ import {
   type StudyCommand,
   type StudyDocument,
   type StudySession,
+  type SimpleSetId,
   type WorkspaceState,
 } from "./domain.js";
 import { createFixtureSession, createNewStudy } from "./fixture.js";
@@ -45,7 +50,9 @@ import { CATALOG_PAGE_SIZE, type HostCapabilities, type MenuCommand } from "./pr
 import {
   DEFAULT_SIMPLE_BODY_COPY_SAMPLE_ID,
   SIMPLE_BODY_COPY_SAMPLES,
-  createSimpleExportRuntime,
+  SIMPLE_PREVIEW_PAGE_SIZE,
+  createSimpleSetsExportRuntime,
+  type SimpleExportScope,
   type SimplePageMode,
 } from "./simple-boards.js";
 import { InterfaceIcon } from "./icons.js";
@@ -117,7 +124,7 @@ function storedBodySampleId(): string {
   }
 }
 
-function importsWithinStudyLimits(document: StudyDocument, imports: readonly ImportedSource[]): ImportedSource[] {
+function importsWithinStudyLimits(document: StudyDocument, imports: readonly ImportedSource[], targetSet?: SimpleSetId): ImportedSource[] {
   const existing = new Set(document.sources.map((source) => source.id));
   const seen = new Set(existing);
   let sources = document.sources.length;
@@ -126,7 +133,11 @@ function importsWithinStudyLimits(document: StudyDocument, imports: readonly Imp
   const accepted: ImportedSource[] = [];
   for (const imported of imports) {
     if (existing.has(imported.source.id)) {
-      if (!accepted.some((item) => item.source.id === imported.source.id)) accepted.push(imported);
+      if (accepted.some((item) => item.source.id === imported.source.id)) continue;
+      const addedCandidates = targetSet ? missingSimpleSetFaces(document, new Set([imported.source.id]), targetSet).length : 0;
+      if (candidates + addedCandidates > STUDY_LIMITS.candidates) continue;
+      accepted.push(imported);
+      candidates += addedCandidates;
       continue;
     }
     if (seen.has(imported.source.id)) continue;
@@ -138,6 +149,14 @@ function importsWithinStudyLimits(document: StudyDocument, imports: readonly Imp
     candidates += imported.faces.length;
   }
   return accepted;
+}
+
+function afterFocusedEdit(action: () => void): void {
+  const active = document.activeElement;
+  if (editableTarget(active) && active instanceof HTMLElement) {
+    active.blur();
+    requestAnimationFrame(action);
+  } else action();
 }
 
 function snapshot(session: StudySession): HistorySnapshot {
@@ -228,10 +247,26 @@ export default function App() {
   const [showWelcome, setShowWelcome] = useState(!fixture);
   const [interfaceMode, setInterfaceMode] = useState<InterfaceMode>(() => storedInterfaceMode(fixture));
   const [uiScale, setUIScale] = useState(storedUIScale);
-  const [simplePageMode, setSimplePageMode] = useState<SimplePageMode>(storedSimplePageMode);
+  const [preferredPageMode, setPreferredPageMode] = useState<SimplePageMode>(storedSimplePageMode);
+  const simplePageMode: SimplePageMode = session.workspace.simpleSet ? (session.workspace.simpleSet === "body" ? "body" : "boards") : preferredPageMode;
+  const simpleSetId: SimpleSetId = simplePageMode === "body" ? "body" : "headlines";
+  const simpleSetIdRef = useRef(simpleSetId);
+  simpleSetIdRef.current = simpleSetId;
+  const [simpleBrowse, setSimpleBrowse] = useState<{ setId: SimpleSetId; page: number }>({ setId: simpleSetId, page: 0 });
+  const [simpleTune, setSimpleTune] = useState<{ setId: SimpleSetId; page: number }>({ setId: simpleSetId, page: 0 });
+  const simpleCandidates = useMemo(() => candidatesInSimpleSet(session.document, simpleSetId), [session.document.candidates, simpleSetId]);
+  const simpleIncluded = useMemo(() => simpleCandidates.filter((candidate) => candidate.reviewState !== "reject"), [simpleCandidates]);
+  const simpleBrowsePage = Math.min(simpleBrowse.setId === simpleSetId ? simpleBrowse.page : 0, Math.max(0, Math.ceil(simpleIncluded.length / SIMPLE_PREVIEW_PAGE_SIZE) - 1));
+  const simpleTunePage = Math.min(simpleTune.setId === simpleSetId ? simpleTune.page : 0, Math.max(0, Math.ceil(simpleCandidates.length / SIMPLE_PREVIEW_PAGE_SIZE) - 1));
+  const visibleSimpleFaceIds = useMemo(() => new Set([
+    ...simpleIncluded.slice(simpleBrowsePage * SIMPLE_PREVIEW_PAGE_SIZE, (simpleBrowsePage + 1) * SIMPLE_PREVIEW_PAGE_SIZE),
+    ...simpleCandidates.slice(simpleTunePage * SIMPLE_PREVIEW_PAGE_SIZE, (simpleTunePage + 1) * SIMPLE_PREVIEW_PAGE_SIZE),
+  ].map((candidate) => candidate.faceId)), [simpleCandidates, simpleIncluded, simpleBrowsePage, simpleTunePage]);
   const [bodySampleId, setBodySampleId] = useState(storedBodySampleId);
   const [stressTest, setStressTest] = useState(false);
-  const [comparisonFitPolicy, setComparisonFitPolicy] = useState<FitPolicy>("fit");
+  const [studioFitPolicy, setStudioFitPolicy] = useState<FitPolicy>("fit");
+  const comparisonFitPolicy = interfaceMode === "simple" || session.workspace.simpleSet
+    ? simpleFontSets(session.document)[session.workspace.simpleSet ?? simpleSetId].fitPolicy : studioFitPolicy;
   const [comparisonBlind, setComparisonBlind] = useState(false);
   const [comparisonRevealed, setComparisonRevealed] = useState(false);
   const [includeIndex, setIncludeIndex] = useState(true);
@@ -257,8 +292,12 @@ export default function App() {
   const newStudyDialogRef = useRef<HTMLElement>(null);
   const newStudyReturnFocusRef = useRef<HTMLElement | null>(null);
   const catalogRequestRef = useRef(0);
+  const exportingRef = useRef(false);
+  const taskInFlightRef = useRef<string | undefined>(undefined);
+  const taskTokenRef = useRef<symbol | undefined>(undefined);
+  const deferredSourceStatesRef = useRef(new Map<string, StudyCommand>());
   const index = useStudyIndex(session.document);
-  const fontStates = useFontRegistry(session);
+  const fontStates = useFontRegistry(session, interfaceMode === "simple" ? visibleSimpleFaceIds : undefined);
   const previousRecoveryCheckpointKeyRef = useRef(recoveryCheckpointKey);
   const recoveryCheckpointSequenceRef = useRef(0);
   if (previousRecoveryCheckpointKeyRef.current !== recoveryCheckpointKey) {
@@ -301,16 +340,17 @@ export default function App() {
   }, [bodySampleId]);
 
   useEffect(() => {
+    if (exportingRef.current) return;
     if (showWelcome || interfaceMode !== "simple") {
       delete window.__fontPreviewerSimpleExport;
       return;
     }
-    const runtime = createSimpleExportRuntime(session, stressTest, includeIndex, comparisonFitPolicy, simplePageMode, bodySampleId);
+    const runtime = createSimpleSetsExportRuntime(session, stressTest, includeIndex, simplePageMode, bodySampleId);
     window.__fontPreviewerSimpleExport = runtime;
     return () => {
-      if (window.__fontPreviewerSimpleExport === runtime) delete window.__fontPreviewerSimpleExport;
+      if (!exportingRef.current && window.__fontPreviewerSimpleExport === runtime) delete window.__fontPreviewerSimpleExport;
     };
-  }, [bodySampleId, comparisonFitPolicy, includeIndex, interfaceMode, session, showWelcome, simplePageMode, stressTest]);
+  }, [bodySampleId, includeIndex, interfaceMode, session.document, session.bindings, session.workspace, showWelcome, simplePageMode, stressTest, busyTask]);
 
   useEffect(() => setTitleDraft(session.document.title), [session.document.id, session.document.title]);
 
@@ -344,10 +384,46 @@ export default function App() {
   });
 
   const dispatch = useCallback<Dispatch<StudyCommand>>((command) => {
-    historyDispatch({ type: "command", command });
+    // Studio export visits its existing stages to capture them. Only that
+    // non-semantic navigation and checkpoint acknowledgements may advance.
+    if (exportingRef.current && command.type !== "acknowledge-revision" && command.type !== "set-stage") {
+      if (command.type === "update-source-state") deferredSourceStatesRef.current.set(command.sourceId, command);
+      return;
+    }
+    const setId = sessionRef.current.workspace.simpleSet;
+    const normalized = command.type === "set-copy-override" && setId
+      ? { type: "edit-simple-set" as const, setId, patch: { copy: command.copy ?? "" } }
+      : command;
+    historyDispatch({ type: "command", command: normalized });
   }, []);
 
+  const setSimplePageMode = useCallback((mode: SimplePageMode) => {
+    setPreferredPageMode(mode);
+    dispatch({ type: "select-simple-set", setId: mode === "body" ? "body" : "headlines" });
+  }, [dispatch]);
+
+  const setComparisonFitPolicy = useCallback((policy: FitPolicy) => {
+    const setId = sessionRef.current.workspace.simpleSet ?? (interfaceMode === "simple" ? simpleSetIdRef.current : undefined);
+    if (setId) dispatch({ type: "edit-simple-set", setId, patch: { fitPolicy: policy } });
+    else setStudioFitPolicy(policy);
+  }, [dispatch, interfaceMode]);
+
+  useEffect(() => {
+    if (interfaceMode === "simple" && !session.workspace.simpleSet) {
+      dispatch({ type: "select-simple-set", setId: simpleSetId });
+    }
+  }, [dispatch, interfaceMode, session.workspace.simpleSet, simpleSetId]);
+
   const runTask = useCallback(async <T,>(label: string, task: () => Promise<T>): Promise<T | undefined> => {
+    // Strict Mode remounts the launch effect; both subscribers still need their
+    // own result. User-initiated native tasks remain single-flight.
+    if (taskInFlightRef.current && !(label === "Starting Host" && taskInFlightRef.current === label)) {
+      setNotice(`${taskInFlightRef.current}. Finish this step before starting another.`);
+      return undefined;
+    }
+    taskInFlightRef.current = label;
+    const taskToken = Symbol(label);
+    taskTokenRef.current = taskToken;
     setBusyTask(label);
     setError("");
     try {
@@ -356,7 +432,10 @@ export default function App() {
       setError(cause instanceof Error ? cause.message : `Could not ${label.toLocaleLowerCase()}.`);
       return undefined;
     } finally {
-      setBusyTask(undefined);
+      if (taskTokenRef.current === taskToken) {
+        taskInFlightRef.current = undefined;
+        setBusyTask(undefined);
+      }
     }
   }, []);
 
@@ -379,9 +458,9 @@ export default function App() {
     void runTask("Importing Sources", async () => {
       const response = await host.request({ type: "open-import" });
       if (response.type !== "import-result") throw new Error("Host returned the wrong import response.");
-      const accepted = importsWithinStudyLimits(sessionRef.current.document, response.imports);
+      const accepted = importsWithinStudyLimits(sessionRef.current.document, response.imports, sessionRef.current.workspace.simpleSet);
       if (accepted.length) {
-        dispatch({ type: "ingest-sources", imports: accepted });
+        dispatch({ type: "ingest-sources", imports: accepted, simpleSet: sessionRef.current.workspace.simpleSet });
         setShowWelcome(false);
         const limited = response.imports.length - accepted.length;
         setNotice(`${accepted.length} ${accepted.length === 1 ? "Source" : "Sources"} imported${response.rejected ? ` · ${response.rejected} rejected` : ""}${response.truncated || limited ? " · Study limit reached" : ""}.`);
@@ -431,13 +510,16 @@ export default function App() {
 
   const addCatalogSources = useCallback((sourceIds: readonly string[]) => {
     const current = sessionRef.current.document;
-    const requested = catalog.imports.filter((item) => sourceIds.includes(item.source.id) && !current.sources.some((source) => source.id === item.source.id));
-    const selected = importsWithinStudyLimits(current, requested);
+    const targetSet = sessionRef.current.workspace.simpleSet;
+    const requested = catalog.imports.filter((item) => sourceIds.includes(item.source.id) && !current.candidates.some((candidate) =>
+      (targetSet === undefined || candidateSimpleSet(candidate) === targetSet) && current.faces.some((face) => face.id === candidate.faceId && face.sourceId === item.source.id),
+    ));
+    const selected = importsWithinStudyLimits(current, requested, targetSet);
     if (!selected.length) {
       setNotice(requested.length ? "Study capacity reached. No installed Sources were added." : "Those Sources are already in this Study.");
       return;
     }
-    dispatch({ type: "ingest-sources", imports: selected });
+    dispatch({ type: "ingest-sources", imports: selected, simpleSet: targetSet });
     setNotice(`${selected.length} installed ${selected.length === 1 ? "Source" : "Sources"} added explicitly to this Study${selected.length < requested.length ? " · Study capacity reached" : ""}.`);
   }, [catalog.imports, dispatch]);
 
@@ -453,7 +535,7 @@ export default function App() {
       pendingWorkspaceFocusRef.current = true;
       historyDispatch({ type: "replace", session: opened });
       setShowWelcome(false);
-      setNotice(response.migratedFrom ? `Study migrated from schema v${response.migratedFrom}. Save to commit v4.` : response.warnings[0] ?? "Study opened.");
+      setNotice(response.migratedFrom ? `Study migrated from schema v${response.migratedFrom}. Save to retain v5.` : response.warnings[0] ?? "Study opened.");
       requestWorkspaceFocus();
     });
   }, [host, requestWorkspaceFocus, runTask]);
@@ -474,42 +556,59 @@ export default function App() {
   }, [dispatch, host, mirror, runTask]);
 
   const saveAfterFocusedEdit = useCallback((saveAs: boolean) => {
-    const activeElement = document.activeElement;
-    if (editableTarget(activeElement) && activeElement instanceof HTMLElement) {
-      activeElement.blur();
-      requestAnimationFrame(() => saveStudy(saveAs));
-      return;
-    }
-    saveStudy(saveAs);
+    afterFocusedEdit(() => saveStudy(saveAs));
   }, [saveStudy]);
 
+  const finishExport = useCallback(() => {
+    exportingRef.current = false;
+    for (const command of deferredSourceStatesRef.current.values()) historyDispatch({ type: "command", command });
+    deferredSourceStatesRef.current.clear();
+  }, []);
+
   const performExport = useCallback((label: string, preferences: HandoffPreferences, sourcePermissionAcknowledged: boolean) => {
-    void runTask(label, async () => {
-      const current = sessionRef.current;
-      await mirror(current);
-      const response = await host.request({
-        type: "export-handoff",
-        document: current.document,
-        revision: current.revision,
-        preferences,
-        sourcePermissionAcknowledged,
-      });
-      if (response.type !== "export-result") throw new Error("Host returned the wrong export response.");
-      setNotice(response.exported ? `Exported ${response.displayName} · ${response.fileCount} files.` : "Export cancelled. No partial Handoff retained.");
+    afterFocusedEdit(() => {
+      if (exportingRef.current || taskInFlightRef.current) return;
+      exportingRef.current = true;
+      void runTask(label, async () => {
+        const current = sessionRef.current;
+        await mirror(current);
+        const response = await host.request({
+          type: "export-handoff",
+          document: current.document,
+          revision: current.revision,
+          preferences,
+          sourcePermissionAcknowledged,
+        });
+        if (response.type !== "export-result") throw new Error("Host returned the wrong export response.");
+        setNotice(response.exported ? `Exported ${response.displayName} · ${response.fileCount} files.` : "Export cancelled. No partial Handoff retained.");
+      }).finally(finishExport);
     });
-  }, [host, mirror, runTask]);
+  }, [finishExport, host, mirror, runTask]);
 
   const exportHandoff = useCallback((sourcePermissionAcknowledged: boolean) => {
     performExport("Exporting Handoff", sessionRef.current.document.handoff, sourcePermissionAcknowledged);
   }, [performExport]);
 
-  const exportBoards = useCallback((copySources: boolean) => {
-    performExport("Exporting Boards", {
-      profile: "internal",
-      outputs: ["summary", "json", "csv"],
-      includeSources: copySources,
-    }, copySources);
-  }, [performExport]);
+  const exportBoards = useCallback((copySources: boolean, scope?: SimpleExportScope) => {
+    afterFocusedEdit(() => {
+      if (exportingRef.current || taskInFlightRef.current) return;
+      exportingRef.current = true;
+      void runTask("Exporting pages", async () => {
+        const current = sessionRef.current;
+        const runtime = createSimpleSetsExportRuntime(current, stressTest, includeIndex, scope ?? simplePageMode, bodySampleId);
+        runtime.manifest();
+        window.__fontPreviewerSimpleExport = runtime;
+        await mirror(current);
+        const response = await host.request({ type: "export-handoff", document: current.document, revision: current.revision,
+          preferences: { profile: "internal", outputs: ["summary", "json", "csv"], includeSources: copySources }, sourcePermissionAcknowledged: copySources });
+        if (response.type !== "export-result") throw new Error("Host returned the wrong export response.");
+        setNotice(response.exported ? `Exported ${response.displayName} · ${response.fileCount} files.` : "Export cancelled. No partial Handoff retained.");
+      }).finally(() => {
+        finishExport();
+        window.__fontPreviewerSimpleExport = createSimpleSetsExportRuntime(sessionRef.current, stressTest, includeIndex, simplePageMode, bodySampleId);
+      });
+    });
+  }, [bodySampleId, finishExport, host, includeIndex, mirror, runTask, simplePageMode, stressTest]);
 
   const relinkSource = useCallback((sourceId: string) => {
     void runTask("Relinking Source", async () => {
@@ -567,6 +666,10 @@ export default function App() {
   }), [addCatalogSources, cancelCatalog, exportBoards, exportHandoff, importSources, loadSample, newStudy, openStudy, relinkSource, revealSource, saveStudy, scanInstalled]);
 
   const handleMenu = useCallback((command: MenuCommand) => {
+    if (exportingRef.current) {
+      setNotice("Export in progress. Editing, saving and quitting are paused until the files finish.");
+      return;
+    }
     switch (command.type) {
       case "new-study": newStudy(); break;
       case "open-study": openStudy(); break;
@@ -575,7 +678,8 @@ export default function App() {
       case "save-study": saveAfterFocusedEdit(false); break;
       case "save-study-as": saveAfterFocusedEdit(true); break;
       case "export-handoff": {
-        exportHandoff(sessionRef.current.document.handoff.includeSources);
+        if (interfaceMode === "simple") exportBoards(includeSources);
+        else exportHandoff(sessionRef.current.document.handoff.includeSources);
         break;
       }
       case "undo-study": historyDispatch({ type: "undo" }); break;
@@ -609,7 +713,7 @@ export default function App() {
       }
       case "reload-studio": void host.request({ type: "reload-studio" }); break;
     }
-  }, [dispatch, exportHandoff, host, importSources, interfaceMode, mirror, newStudy, openStudy, saveAfterFocusedEdit, scanInstalled]);
+  }, [dispatch, exportBoards, exportHandoff, host, importSources, includeSources, interfaceMode, mirror, newStudy, openStudy, saveAfterFocusedEdit, scanInstalled]);
 
   useEffect(() => {
     let active = true;
@@ -688,9 +792,9 @@ export default function App() {
   }, [closeNewStudy, newStudyOpen]);
 
   useEffect(() => {
-    if (!launchReady || lastRecoveryCheckpointRef.current === recoveryCheckpointIdentity) return;
+    if (!launchReady || exportingRef.current || lastRecoveryCheckpointRef.current === recoveryCheckpointIdentity) return;
     const timer = window.setTimeout(() => {
-      if (currentRecoveryCheckpointKeyRef.current !== recoveryCheckpointIdentity) return;
+      if (exportingRef.current || currentRecoveryCheckpointKeyRef.current !== recoveryCheckpointIdentity) return;
       lastRecoveryCheckpointRef.current = recoveryCheckpointIdentity;
       void mirror(session)
         .then(() => {
@@ -703,10 +807,11 @@ export default function App() {
         });
     }, 180);
     return () => window.clearTimeout(timer);
-  }, [launchReady, mirror, recoveryCheckpointIdentity, session]);
+  }, [busyTask, launchReady, mirror, recoveryCheckpointIdentity, session]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (exportingRef.current) { event.preventDefault(); return; }
       const primary = event.metaKey || event.ctrlKey;
       if (primary && ["=", "+", "-", "0"].includes(event.key)) {
         event.preventDefault();
@@ -777,11 +882,11 @@ export default function App() {
     ? session.document.comparisonSets.find((comparison) => comparison.id === session.workspace.activeComparisonId)
     : undefined;
   useEffect(() => {
-    if (!activeComparison) return;
-    setComparisonFitPolicy(activeComparison.policy);
+    if (interfaceMode !== "studio" || !activeComparison) return;
+    setStudioFitPolicy(activeComparison.policy);
     setComparisonBlind(activeComparison.blind);
     setComparisonRevealed(activeComparison.revealed);
-  }, [activeComparison?.blind, activeComparison?.id, activeComparison?.policy, activeComparison?.revealed]);
+  }, [interfaceMode, activeComparison?.blind, activeComparison?.id, activeComparison?.policy, activeComparison?.revealed]);
   const blindIdentityHidden = session.workspace.stage === "compare" && comparisonBlind && !comparisonRevealed;
   const shellStyle = {
     transform: `scale(${uiScale})`,
@@ -795,8 +900,8 @@ export default function App() {
     });
   };
 
-  return (
-    <div className={`app-shell ${showWelcome ? "is-welcome" : ""} mode-${interfaceMode} stage-${session.workspace.stage}`} data-interface-mode={interfaceMode} data-simple-page-mode={simplePageMode} data-recovery-checkpoint={confirmedRecoveryCheckpointKey === recoveryCheckpointIdentity ? "ready" : "pending"} data-ui-scale={Math.round(uiScale * 100)} style={shellStyle}>
+  return (<>
+    <div inert={exportingRef.current || undefined} className={`app-shell ${showWelcome ? "is-welcome" : ""} mode-${interfaceMode} stage-${session.workspace.stage}`} data-interface-mode={interfaceMode} data-simple-page-mode={simplePageMode} data-recovery-checkpoint={confirmedRecoveryCheckpointKey === recoveryCheckpointIdentity ? "ready" : "pending"} data-ui-scale={Math.round(uiScale * 100)} style={shellStyle}>
       <a className="skip-link" href={showWelcome ? "#welcome-heading" : "#workspace-heading"}>Skip to main content</a>
       <header className="titlebar">
         <div className="brand-lockup"><img className="brand-mark" src="./font-previewer-icon-64.png" alt="" aria-hidden="true" /><div><strong>Font Previewer</strong><span>{interfaceMode === "simple" ? (simplePageMode === "body" ? "Reading Pages" : "Type Boards") : "Decision Studio"}</span></div></div>
@@ -817,6 +922,10 @@ export default function App() {
         interfaceMode === "simple" ? (
           <SimpleWorkspace
             session={session}
+            browsePage={simpleBrowsePage}
+            onBrowsePageChange={(page) => setSimpleBrowse({ setId: simpleSetId, page })}
+            tunePage={simpleTunePage}
+            onTunePageChange={(page) => setSimpleTune({ setId: simpleSetId, page })}
             dispatch={dispatch}
             fontStates={fontStates}
             headingRef={headingRef}
@@ -847,7 +956,6 @@ export default function App() {
         </>
       )}
 
-      {busyTask ? <div className="task-status" role="status"><InterfaceIcon name="spinner" size={18} />{busyTask}…</div> : null}
       {error ? <div className="error-banner" role="alert"><span>{error}</span><button type="button" aria-label="Dismiss error" onClick={() => setError("")}><InterfaceIcon name="remove" /></button></div> : null}
       {newStudyOpen ? (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeNewStudy(); }}>
@@ -869,5 +977,6 @@ export default function App() {
       ) : null}
       <div className="sr-only" aria-live="polite">{notice}</div>
     </div>
-  );
+    {busyTask ? <div className="task-status" role="status"><InterfaceIcon name="spinner" size={24} />{busyTask}…{exportingRef.current ? " Your study stays unchanged while the files finish." : ""}</div> : null}
+  </>);
 }

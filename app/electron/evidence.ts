@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { BrowserWindow, Menu } from "electron";
+import { BrowserWindow, Menu, nativeImage } from "electron";
 import type { MenuCommand } from "../src/protocol.js";
 
 interface EvidenceOptions {
@@ -403,52 +403,128 @@ async function installedCatalogAudit(window: BrowserWindow): Promise<Record<stri
 }
 
 async function simpleBodyCopyAudit(window: BrowserWindow, output: string): Promise<Record<string, unknown>> {
-  await window.webContents.executeJavaScript(`(async () => {
-    [...document.querySelectorAll('.interface-switch button')].find((item) => item.textContent?.trim() === 'Simple')?.click();
-    const deadline = performance.now() + 10000;
-    while (!document.querySelector('.simple-page-mode-choices') && performance.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 25));
-    [...document.querySelectorAll('.simple-page-mode-choices button')].find((item) => item.textContent?.includes('Body Copy'))?.click();
-    while (!document.querySelector('.simple-body-page-list') && performance.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 25));
-    [...document.querySelectorAll('.simple-body-samples button')][1]?.click();
-    while (
-      (!document.querySelector('.simple-body-reading-copy')?.textContent?.startsWith('The workshop is quiet')
-        || [...document.querySelectorAll('.simple-body-reading-copy')].some((item) => !item.dataset.naturalFit))
-      && performance.now() < deadline
-    ) await new Promise((resolve) => setTimeout(resolve, 25));
-    document.querySelector('.simple-body-page-wrap')?.scrollIntoView({ block: 'start' });
-    await new Promise((resolve) => setTimeout(resolve, 80));
-  })()`, true);
+  const originalSelection = await window.webContents.executeJavaScript("document.querySelector('.candidate-row[aria-current=true]')?.getAttribute('aria-label')", true) as string;
+  await window.webContents.executeJavaScript(`[...document.querySelectorAll('.interface-switch button')].find(item=>item.textContent?.trim()==='Simple')?.click()`, true);
+  await waitFor(window, "Simple sets", "document.querySelector('.simple-page-mode-choices')");
+  const metrics = await withTimeout("Simple independent sets", window.webContents.executeJavaScript(`
+    (async () => {
+      const pause = () => new Promise(resolve => setTimeout(resolve, 25));
+      const wait = async (label, predicate) => { const end = performance.now() + 10000; while (!predicate() && performance.now() < end) await pause(); if (!predicate()) throw new Error(label); };
+      const mode = label => [...document.querySelectorAll('.simple-page-mode-choices button')].find(item => item.textContent?.includes(label));
+      const count = label => Number(mode(label)?.querySelector('small')?.textContent?.match(/^\\d+/)?.[0] ?? -1);
+      const headlineCopy = document.querySelector('.simple-copy-field textarea')?.value;
+      const headlineCount = count('Headlines');
+      const expectedCount = window.__fontPreviewerSimpleExport.manifest().fontCount;
+      mode('Body Copy').click();
+      await wait('Body Copy empty independent set', () => Boolean(document.querySelector('.simple-set-empty')) && count('Body Copy') === 0);
+      document.querySelector('.simple-set-empty button').click();
+      await wait('Body Copy cloned included fonts', () => window.__fontPreviewerSimpleExport?.manifest().bodyCount === expectedCount && document.querySelectorAll('.simple-body-page-wrap').length === 12);
+      document.querySelectorAll('.simple-body-samples button')[1].click();
+      await wait('Body sample fit', () => document.querySelector('.simple-body-reading-copy')?.textContent?.startsWith('The workshop is quiet') && [...document.querySelectorAll('.simple-body-reading-copy')].every(item => item.dataset.naturalFit));
+      const expected = document.querySelector('#simple-body-copy').value;
+      const firstIds = [...document.querySelectorAll('.simple-body-page-wrap')].map(item => item.dataset.candidateId);
+      [...document.querySelectorAll('[aria-label="Browse font previews"] button')].find(item => item.textContent === 'Next').click();
+      await wait('Body last preview batch', () => document.querySelector('[aria-label="Preview batch"]')?.value === '1' && document.querySelectorAll('.simple-body-page-wrap').length === expectedCount - 12);
+      const lastIds = [...document.querySelectorAll('.simple-body-page-wrap')].map(item => item.dataset.candidateId);
+      const lastPageCount = lastIds.length;
+      const paginationDistinct = firstIds.length === 12 && lastIds.every(id => !firstIds.includes(id)) && new Set([...firstIds, ...lastIds]).size === expectedCount;
+      [...document.querySelectorAll('[aria-label="Browse font previews"] button')].find(item => item.textContent === 'Previous').click();
+      await wait('Body first batch restored', () => document.querySelector('[aria-label="Preview batch"]')?.value === '0' && document.querySelectorAll('.simple-body-page-wrap').length === 12);
+      const tune = document.querySelector('.simple-section-actions button[aria-expanded]');
+      if (tune.getAttribute('aria-expanded') !== 'true') tune.click();
+      await wait('Body controls bounded', () => document.querySelectorAll('.simple-font-card').length === 12);
+      const cards = () => [...document.querySelectorAll('.simple-font-card')];
+      [...cards()[0].querySelectorAll('button')].find(item => item.textContent?.trim() === 'Duplicate font').click();
+      await wait('Independent duplicate added', () => window.__fontPreviewerSimpleExport.manifest().bodyCount === expectedCount + 1 && cards()[1]?.querySelector('header small')?.textContent?.includes('copy'));
+      [...cards()[1].querySelectorAll('.simple-casing button')].find(item => item.textContent === 'UPPER').click();
+      await wait('Duplicate casing changed alone', () => cards()[1].querySelector('.simple-card-copy').textContent === expected.toLocaleUpperCase() && cards()[0].querySelector('.simple-card-copy').textContent === expected);
+      const originalAxis = cards()[0].querySelector('input[type="range"]');
+      const duplicateAxis = cards()[1].querySelector('input[type="range"]');
+      const originalAxisValue = originalAxis?.value;
+      if (!duplicateAxis || !originalAxis) throw new Error('Variable fixture axis controls missing');
+      const changedAxisValue = duplicateAxis.value === duplicateAxis.max ? duplicateAxis.min : duplicateAxis.max;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(duplicateAxis, changedAxisValue);
+      duplicateAxis.dispatchEvent(new Event('input', { bubbles: true }));
+      await wait('Duplicate axes changed alone', () => cards()[1].querySelector('input[type="range"]').value === changedAxisValue && cards()[0].querySelector('input[type="range"]').value === originalAxisValue);
+      const duplicateIndependent = cards()[0].querySelector('.simple-card-copy').textContent === expected && cards()[1].querySelector('.simple-card-copy').textContent === expected.toLocaleUpperCase();
+      cards()[1].querySelector('.remove-font').click();
+      await wait('Temporary duplicate removed', () => window.__fontPreviewerSimpleExport.manifest().bodyCount === expectedCount);
+      [...document.querySelectorAll('[aria-label="Browse font controls"] button')].find(item => item.textContent === 'Next fonts').click();
+      await wait('Last controls batch reachable', () => document.querySelectorAll('.simple-font-card').length === expectedCount - 12 && document.querySelector('.simple-font-number')?.textContent === '13');
+      const lastControlCount = cards().length;
+      [...document.querySelectorAll('[aria-label="Browse font controls"] button')].find(item => item.textContent === 'Previous fonts').click();
+      await wait('First controls batch restored', () => document.querySelector('.simple-font-number')?.textContent === '01');
+      document.querySelector('.simple-section-actions button[aria-expanded]').click();
+      mode('Headlines').click();
+      await wait('Headlines restored unchanged', () => document.querySelector('.simple-copy-field textarea')?.value === headlineCopy);
+      const headlineIndependent = count('Headlines') === headlineCount && window.__fontPreviewerSimpleExport.manifest().fontCount === expectedCount;
+      mode('Body Copy').click();
+      await wait('Body set survives switching', () => document.querySelector('#simple-body-copy')?.value === expected && document.querySelectorAll('.simple-body-page-wrap').length === 12 && [...document.querySelectorAll('.simple-body-reading-copy')].every(item => item.dataset.naturalFit));
+      const pages = [...document.querySelectorAll('.simple-body-page-wrap')];
+      const copies = pages.map(page => page.querySelector('.simple-body-reading-copy'));
+      const frames = pages.map(page => page.querySelector('.simple-body-reading'));
+      const sizes = copies.map(item => Number.parseFloat(getComputedStyle(item).fontSize));
+      const touch = [...document.querySelectorAll('.simple-page-mode-choices button,.simple-body-samples button')].map(item => item.getBoundingClientRect().height).filter(value => value > 0);
+      document.querySelector('.simple-body-compose').scrollIntoView({block:'start'});
+      await new Promise(resolve => setTimeout(resolve, 80));
+      return {
+        headlineCount, expectedCount, headlineIndependent, duplicateIndependent, lastControlCount,
+        pageCount: pages.length, includedCount: window.__fontPreviewerSimpleExport.manifest().bodyCount, lastPageCount, paginationDistinct,
+        sampleCount: document.querySelectorAll('.simple-body-samples button').length,
+        fullText: copies.every(item => item.textContent === expected),
+        twoParagraphs: expected.includes('\\n\\n') && copies.every(item => item.textContent.includes('\\n\\n')),
+        sharedSize: sizes.length === pages.length && new Set(sizes.map(value => value.toFixed(3))).size === 1,
+        withinFrames: copies.every((item, index) => { const copy=item.getBoundingClientRect(), frame=frames[index].getBoundingClientRect(); return copy.left>=frame.left-1 && copy.right<=frame.right+1 && copy.top>=frame.top-1 && copy.bottom<=frame.bottom+1; }),
+        noEllipsis: copies.every(item => getComputedStyle(item).textOverflow !== 'ellipsis'),
+        metadataTruncation: [...document.querySelectorAll('.simple-body-page-meta h3,.simple-body-page-meta p,.simple-body-page-wrap > header span')].filter(item=>getComputedStyle(item).textOverflow === 'ellipsis').length,
+        minTouchHeight: Math.min(...touch), horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+        manifest: window.__fontPreviewerSimpleExport.manifest(),
+      };
+    })()
+  `, true), 90_000) as Record<string, unknown>;
   await capture(window, join(output, "07-simple-body-copy.png"));
-  const metrics = await withTimeout("Simple Body Copy audit", window.webContents.executeJavaScript(`(() => {
-    const pages = [...document.querySelectorAll('.simple-body-page-wrap')];
-    const copies = pages.map((page) => page.querySelector('.simple-body-reading-copy'));
-    const frames = pages.map((page) => page.querySelector('.simple-body-reading'));
-    const expected = document.querySelector('#simple-body-copy')?.value ?? '';
-    const sizes = copies.map((item) => Number.parseFloat(getComputedStyle(item).fontSize));
-    const manifest = window.__fontPreviewerSimpleExport?.manifest();
-    const touch = [...document.querySelectorAll('.simple-page-mode-choices button,.simple-body-samples button')]
-      .map((item) => item.getBoundingClientRect().height)
-      .filter((value) => value > 0);
-    return {
-      pageCount: pages.length,
-      sampleCount: document.querySelectorAll('.simple-body-samples button').length,
-      fullText: copies.every((item) => item?.textContent === expected),
-      twoParagraphs: expected.includes('\\n\\n') && copies.every((item) => item?.textContent?.includes('\\n\\n')),
-      sharedSize: sizes.length === pages.length && new Set(sizes.map((value) => value.toFixed(3))).size === 1,
-      withinFrames: copies.every((item, index) => {
-        const copy = item?.getBoundingClientRect();
-        const frame = frames[index]?.getBoundingClientRect();
-        return Boolean(copy && frame && copy.left >= frame.left - 1 && copy.right <= frame.right + 1 && copy.top >= frame.top - 1 && copy.bottom <= frame.bottom + 1);
-      }),
-      noEllipsis: copies.every((item) => getComputedStyle(item).textOverflow !== 'ellipsis'),
-      minTouchHeight: Math.min(...touch),
-      horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-      manifest,
-    };
-  })()`, true)) as Record<string, unknown>;
-  await window.webContents.executeJavaScript(`[...document.querySelectorAll('.interface-switch button')].find((item) => item.textContent?.trim() === 'Studio')?.click()`, true);
+  await waitFor(window, "Body Copy recovery", "document.querySelector('.app-shell')?.dataset.recoveryCheckpoint === 'ready'");
+  await window.webContents.executeJavaScript(`[...document.querySelectorAll('.simple-hero-actions button')].find(item=>item.textContent?.includes('Export Body Copy'))?.click()`, true);
+  await waitFor(window, "Body Copy export", "!document.querySelector('.task-status') && [...document.querySelectorAll('[aria-live=polite]')].some(item=>item.textContent?.startsWith('Exported '))", 120_000);
+  const bodyFolders = (await readdir(join(output, "simple-ui-exports"), { withFileTypes: true })).filter(entry=>entry.isDirectory());
+  if (bodyFolders.length !== 1 || bodyFolders[0]!.name.includes(".staging-")) throw new Error("Body Copy export left an incomplete or unexpected folder");
+  metrics.export = await inspectSimpleExport(join(output, "simple-ui-exports", bodyFolders[0]!.name), false);
+  const bodyExportNotice = await window.webContents.executeJavaScript("[...document.querySelectorAll('[aria-live=polite]')].find(item=>item.textContent?.startsWith('Exported '))?.textContent", true) as string;
+  await window.webContents.executeJavaScript(`[...document.querySelectorAll('.simple-hero-actions button')].find(item=>item.textContent?.includes('Export both sets'))?.click()`, true);
+  await waitFor(window, "Combined Simple export", `!document.querySelector('.task-status') && [...document.querySelectorAll('[aria-live=polite]')].some(item=>item.textContent?.startsWith('Exported ') && item.textContent !== ${JSON.stringify(bodyExportNotice)})`, 120_000);
+  const committed = (await readdir(join(output, "simple-ui-exports"), { withFileTypes: true })).filter(entry=>entry.isDirectory() && entry.name !== bodyFolders[0]!.name);
+  if (committed.length !== 1 || committed[0]!.name.includes(".staging-")) throw new Error("Combined export left an incomplete or unexpected folder");
+  metrics.combinedExport = await inspectSimpleExport(join(output, "simple-ui-exports", committed[0]!.name), true);
+  await window.webContents.executeJavaScript(`[...document.querySelectorAll('.interface-switch button')].find(item=>item.textContent?.trim()==='Studio')?.click()`, true);
   await waitFor(window, "Body Copy shared with Studio", `document.querySelector('.stage-nav') && document.querySelector('.specimen-select p')?.textContent?.startsWith('The workshop is quiet in the useful way')`);
+  await window.webContents.executeJavaScript(`[...document.querySelectorAll('.candidate-row')].find(item=>item.getAttribute('aria-label') === ${JSON.stringify(originalSelection)})?.click()`, true);
+  await waitFor(window, "Original Studio selection restored", `document.querySelector('.candidate-row[aria-current=true]')?.getAttribute('aria-label') === ${JSON.stringify(originalSelection)}`);
   return { ...metrics, studioShared: true };
+}
+
+async function inspectSimpleExport(root: string, combined: boolean): Promise<Record<string, unknown>> {
+  const study = JSON.parse(await readFile(join(root, "study.pitchfontstudy"), "utf8")) as { candidates: { reviewState: string; simpleSet?: string }[] };
+  const manifest = JSON.parse(await readFile(join(root, "manifest.json"), "utf8")) as { files: { path: string; bytes: number; sha256: string }[] };
+  const candidates = study.candidates.filter(candidate=>candidate.reviewState !== "reject");
+  const bodyExpected = candidates.filter(candidate=>candidate.simpleSet === "body").length;
+  const headlineExpected = combined ? candidates.filter(candidate=>candidate.simpleSet !== "body").length : 0;
+  const counts = { body: 0, board: 0, index: 0 };
+  let decoded = true;
+  let checksums = true;
+  for (const entry of manifest.files) {
+    const bytes = await readFile(join(root, entry.path));
+    checksums &&= bytes.length === entry.bytes && createHash("sha256").update(bytes).digest("hex") === entry.sha256;
+    if (!entry.path.endsWith(".png")) continue;
+    const size = nativeImage.createFromBuffer(bytes).getSize();
+    decoded &&= size.width === 5152 && size.height === 2160;
+    if (entry.path.startsWith("Body Copy/Body_")) counts.body += 1;
+    else if (entry.path.startsWith("Boards/Board_")) counts.board += 1;
+    else if (entry.path.startsWith("Index/Index_")) counts.index += 1;
+    else throw new Error("Unexpected PNG in Simple export");
+  }
+  const expected = { body: bodyExpected, board: Math.ceil(headlineExpected / 4), index: Math.ceil(headlineExpected / 12) };
+  if (!decoded || !checksums || counts.body !== expected.body || counts.board !== expected.board || counts.index !== expected.index || manifest.files.some(entry=>entry.path.startsWith("Sources/"))) throw new Error("Simple export PNG, source exclusion, count, or checksum proof failed");
+  return { ...counts, expected, decoded, checksums, sourceFontsAbsent: true };
 }
 
 async function checksumEvidence(output: string): Promise<void> {
@@ -590,14 +666,14 @@ export async function runEvidenceFlow(options: EvidenceOptions): Promise<void> {
   const security = trace.securityAudit as { invalidRequests?: number; rejected?: number; nodeUnavailable?: boolean };
   const keyboard = trace.keyboardAccessibility as Record<string, boolean>;
   const catalog = trace.installedCatalog as { count?: number; indexed?: number; pathLeak?: boolean; opaquePreviewUrls?: boolean; previewAvailable?: boolean; fontLoaded?: boolean; pageBounded?: boolean; studyUnchanged?: boolean; cancellation?: { acknowledged?: boolean; durationMs?: number; obsoleteResultCancelled?: boolean } };
-  const body = trace.simpleBodyCopy as { pageCount?: number; sampleCount?: number; fullText?: boolean; twoParagraphs?: boolean; sharedSize?: boolean; withinFrames?: boolean; noEllipsis?: boolean; minTouchHeight?: number; horizontalOverflow?: boolean; studioShared?: boolean; manifest?: { pageMode?: string; boardCount?: number; bodyCount?: number; indexCount?: number; fontCount?: number; includeIndex?: boolean } };
+  const body = trace.simpleBodyCopy as { pageCount?: number; includedCount?: number; lastPageCount?: number; paginationDistinct?: boolean; headlineIndependent?: boolean; duplicateIndependent?: boolean; lastControlCount?: number; sampleCount?: number; fullText?: boolean; twoParagraphs?: boolean; sharedSize?: boolean; withinFrames?: boolean; noEllipsis?: boolean; minTouchHeight?: number; horizontalOverflow?: boolean; studioShared?: boolean; manifest?: { pageMode?: string; boardCount?: number; bodyCount?: number; indexCount?: number; fontCount?: number; includeIndex?: boolean } };
   if (audit.unnamed?.length || audit.duplicateIds?.length || audit.horizontalOverflow || !audit.roleHelpSeparated) throw new Error("Semantic accessibility or layout audit failed.");
   if ((audit.layout?.minControlHeight ?? 0) < 44 || !audit.layout?.iconOnlyButtons || !audit.layout.iconCentersAligned || (audit.layout.selectCarets ?? 0) < 3 || !audit.layout.selectCaretsComplete || !audit.layout.selectCaretsCentered || (audit.layout.selectCaretInset ?? 0) < 14 || (audit.layout.panelTopSpread ?? 999) > 1 || (audit.layout.panelBottomSpread ?? 999) > 1 || (audit.layout.panelTrayGap ?? 999) > 1 || audit.layout.horizontalOverflows?.length) throw new Error("Control or panel geometry audit failed.");
   if (!disclosure.expanded || !disclosure.collapsed || !disclosure.openIntermediate || !disclosure.closeIntermediate || !disclosure.caretRotates) throw new Error("Disclosure motion audit failed.");
   if (security.invalidRequests !== security.rejected || !security.nodeUnavailable) throw new Error("Host security audit failed.");
   if (!catalog.count || !catalog.indexed || catalog.pathLeak || !catalog.opaquePreviewUrls || !catalog.previewAvailable || !catalog.fontLoaded || !catalog.pageBounded || !catalog.studyUnchanged || !catalog.cancellation?.acknowledged || !catalog.cancellation.obsoleteResultCancelled || catalog.cancellation.durationMs === undefined || catalog.cancellation.durationMs > 100) throw new Error("Installed font catalog audit failed.");
   if (!keyboard.forwardWrap || !keyboard.backwardWrap || !keyboard.candidateUnchanged || !keyboard.trayUnchanged || !keyboard.returnFocus) throw new Error("Keyboard accessibility audit failed.");
-  if (!body.pageCount || body.pageCount !== body.manifest?.fontCount || body.pageCount !== body.manifest?.bodyCount || body.sampleCount !== 3 || !body.fullText || !body.twoParagraphs || !body.sharedSize || !body.withinFrames || !body.noEllipsis || (body.minTouchHeight ?? 0) < 44 || body.horizontalOverflow || !body.studioShared || body.manifest?.pageMode !== "body" || body.manifest.boardCount !== 0 || body.manifest.indexCount !== 0 || body.manifest.includeIndex !== false) throw new Error("Simple Body Copy audit failed.");
+  if (body.pageCount !== 12 || body.includedCount !== 20 || body.lastPageCount !== 8 || body.lastControlCount !== 8 || !body.paginationDistinct || !body.headlineIndependent || !body.duplicateIndependent || body.manifest?.fontCount !== 20 || body.manifest?.bodyCount !== 20 || body.sampleCount !== 3 || !body.fullText || !body.twoParagraphs || !body.sharedSize || !body.withinFrames || !body.noEllipsis || (body.minTouchHeight ?? 0) < 44 || body.horizontalOverflow || !body.studioShared || body.manifest?.pageMode !== "body" || body.manifest.boardCount !== 0 || body.manifest.indexCount !== 0 || body.manifest.includeIndex !== false) throw new Error("Simple Body Copy audit failed.");
   if ((trace.rendererCrashRecovery as { after?: { activeElement?: string; reviewState?: string } }).after?.activeElement !== "workspace-heading" || (trace.rendererCrashRecovery as { after?: { activeElement?: string; reviewState?: string } }).after?.reviewState !== "Keep") throw new Error("Forced renderer crash recovery failed.");
   if (afterReload.activeElement !== "workspace-heading" || afterReload.reviewState !== "Keep") throw new Error("Reload recovery or focus restoration failed.");
   await checksumEvidence(output);

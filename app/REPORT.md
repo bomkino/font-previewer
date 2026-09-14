@@ -4,11 +4,12 @@
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Current release posture: published `v0.1.0-rc.6` at exact source `f1aa382c8265b4884261c4308a4a5d37077a5242`
+- Published baseline: `v0.1.0-rc.6` at exact source `f1aa382c8265b4884261c4308a4a5d37077a5242`
+- Current source: preparing `v0.1.0-rc.7`; exact-head verification, package evidence, and publication readback remain required
 - Prior prereleases: immutable `v0.1.0-rc.5`, `v0.1.0-rc.4`, `v0.1.0-rc.3`, `v0.1.0-rc.2`, and `v0.1.0-rc.1`
 - Stable release: not approved or claimed
 
-The RC, hardening, and pre-Mac implementation are represented on `main`. Body Copy and its release-blocking scale/recovery repairs reached `main` through PRs #11, #12, and #13; the pitch.dog typography, Phosphor icon, spacing, privacy, and package-integrity work reached `main` through PR #15; exact caret, container-fit, and disclosure-motion polish reached `main` through PR #17. No current product implementation remains intentionally based on old branch names.
+The published baseline is represented on `main`. Body Copy and its release-blocking scale/recovery repairs reached `main` through PRs #11, #12, and #13; the pitch.dog typography, Phosphor icon, spacing, privacy, and package-integrity work reached `main` through PR #15; exact caret, container-fit, and disclosure-motion polish reached `main` through PR #17. The source behavior described below includes the prepared two-set candidate; it is not evidence that `rc.7` has reached `main`, been published, or been installed.
 
 The detailed autonomous hardening report that originally described an isolated, unmerged branch is preserved unchanged at [`../docs/archive/2026-08-27/APP_REPORT_RC_EVIDENCE.md`](../docs/archive/2026-08-27/APP_REPORT_RC_EVIDENCE.md). It is historical evidence, not current repository status.
 
@@ -18,11 +19,21 @@ Font Previewer is one local typography-decision product delivered through:
 
 - an AppKit/WKWebView/CoreText Host on macOS;
 - an Electron/Fontconfig Host on Linux;
-- one shared Study v4 domain with a Simple add → Boards or Body Copy → tune → export view and the deeper Review → Compare → System → Handoff Studio.
+- one shared Study v5 domain with a Simple set → add → pages → tune → export view and the deeper Review → Compare → System → Handoff Studio.
 
-Simple and Studio share imported fonts/styles, live copy, casing, axes, candidate order, review/include decisions, and the active comparison sizing policy. Body Copy renders one full-text reading page per included font at one shared fitted size; Boards retains the original four-up comparison. Interface mode, page format, sample preference, interface scale, stress visibility, and unsaved export toggles remain local presentation preferences; saving a Comparison Set makes its policy portable Study data.
+Simple has independent **Headlines + subheadlines** and **Body Copy** Candidate sets. Each set stores its copy and fit policy in the portable Study. Sources, Faces, Candidate casing/axes/order/decisions, and the active set's copy and comparison policy remain available in Studio through the same session. Explicit duplication or cross-set copying creates a new Unreviewed Candidate with independent settings, not another Source binary or a synchronized document.
+
+Body Copy renders one full-text reading page per included font at one shared fitted size; Headlines retains the original four-up colour comparison and optional index pages. Either set or both can be exported in one Handoff. Preview and Tune each browse 12 Candidates per batch, without reducing the full export count. The Simple registry needs at most 24 Source resources across those batches and starts at most four loads concurrently. Stable Source identities avoid reloads during semantic edits; sequential PNG rendering releases temporary font and canvas resources.
+
+Single-face variable imports use default axes and selectable named styles rather than enumerating named instances as extra Faces. Supported historical variable Candidates are retained; actual collections remain metadata-only. Index centering uses measured ink bounds, and PNG rendering retains Candidate variation and feature settings.
+
+Export flushes the focused title/text edit before capturing its immutable session. Editing and native Mac Quit/window close are held during the transaction; Simple's Cmd-E route honours the current set and visible Source-copy acknowledgement. Opening a saved Studio comparison restores its Recipe, tray, and policy without changing the stored Simple set configurations.
+
+Study v4 migrates to v5 with existing Candidates in Headlines and Body Copy empty. Save retains v5; users who need `rc.6` compatibility must keep the original document. Interface mode, sample preference, interface scale, stress visibility, and unsaved export toggles remain presentation preferences, not a second Study authority.
 
 Application chrome uses seven exact CC0-1.0 WOFF2 files from pitch.dog Type System v13 and one Phosphor icon adapter. Candidate specimens retain isolated generated families. One reusable audit requires the approved UI-font locations, sizes, and SHA-256 digests in every build/package surface and rejects all other font binaries.
+
+The prepared icon family replaces the coral loupe with a capital A whose hammock crossbar holds a lowercase a, using responsive crops for small app and favicon placements. It does not change the dark-first interface or the UI-font allowlist.
 
 The root `macos/` SwiftUI/CoreText application is a preserved reference, not an active package or second product.
 
@@ -41,7 +52,7 @@ Permanent application verification is defined by [`.github/workflows/verify.yml`
 - macOS app assembly, hardened runtime, ad-hoc signature verification, archive round trip, and checksums;
 - package inventory, private-path, credential-marker, source-map, licence, notice, SBOM, and exact seven-font allowlist checks.
 
-Current workflow evidence is recorded in [`../docs/maintenance/REPOSITORY_STATE.md`](../docs/maintenance/REPOSITORY_STATE.md), the exact-SHA `SOURCE_SHA` release asset, and the release-linked Actions runs. The older cleanup receipt remains historical evidence for the canonicalisation that preceded this release.
+Published-baseline workflow evidence is recorded in [`../docs/maintenance/REPOSITORY_STATE.md`](../docs/maintenance/REPOSITORY_STATE.md), the exact-SHA `SOURCE_SHA` release asset, and the release-linked Actions runs. It does not transfer to `rc.7`. The candidate additionally requires the two-set, migration, variable-font, pagination, index, export-lifecycle, and resource-registry gates in [`../docs/QA.md`](../docs/QA.md). No new native measurement, reference-hardware latency, or RAM improvement is asserted here; exact-head workflow and package receipts must establish the candidate's results.
 
 ## Release machinery
 
@@ -53,7 +64,7 @@ Current workflow evidence is recorded in [`../docs/maintenance/REPOSITORY_STATE.
 - verified source-SHA manifests, checksums, package contents, notices, SBOM, and release notes;
 - an explicit publication boolean and exact tag confirmation before any GitHub release write.
 
-The default path creates a downloadable dry-run bundle. It refuses existing tags and releases. The owner-authorized `v0.1.0-rc.6` publication completed through exact-main verification run `33296016674`, guarded dry run `33296253222`, and publication run `33296294623`. The one-use authority is exercised and does not extend to stable `v1.0.0` or a later tag.
+The default path creates a downloadable dry-run bundle. It refuses existing tags and releases. The published `v0.1.0-rc.6` baseline completed through exact-main verification run `33296016674`, guarded dry run `33296253222`, and publication run `33296294623`; those receipts do not verify a later candidate. The owner has requested the next prerelease, and its prepared payload is [`../docs/releases/v0.1.0-rc.7.md`](../docs/releases/v0.1.0-rc.7.md). Publication still requires the candidate's exact-source checks and new workflow receipts. No stable `v1.0.0` claim follows.
 
 ## Remaining human and physical gates
 

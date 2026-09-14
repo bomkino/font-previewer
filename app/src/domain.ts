@@ -1,4 +1,13 @@
-export const STUDY_SCHEMA_VERSION = 4 as const;
+export const STUDY_SCHEMA_VERSION = 5 as const;
+
+export const SIMPLE_SET_IDS = ["headlines", "body"] as const;
+export type SimpleSetId = (typeof SIMPLE_SET_IDS)[number];
+export interface SimpleFontSet {
+  readonly copy: string;
+  readonly fitPolicy: FitPolicy;
+}
+export type SimpleFontSets = Readonly<Record<SimpleSetId, SimpleFontSet>>;
+export const DEFAULT_BODY_COPY = "At six in the morning, the city belongs to bakers, newspaper vans, and anyone walking home slowly enough to notice the shop signs flicker on one by one. The streets have not yet decided what kind of day they will become. A bus sighs at the corner. Somewhere above it, a kettle starts to sing.\n\nGood body type rarely asks to be admired. It keeps the line moving, gives every pause enough air, and disappears into the act of reading. You notice the thought first; the letters simply carry it.";
 
 export const STAGES = ["review", "compare", "system", "handoff"] as const;
 export type Stage = (typeof STAGES)[number];
@@ -131,6 +140,7 @@ export interface Candidate {
   readonly notes: string;
   readonly rationale: string;
   readonly provenance: CandidateProvenance;
+  readonly simpleSet?: SimpleSetId;
 }
 
 export interface Recipe {
@@ -211,6 +221,7 @@ export interface StudyDocument {
   readonly typographySystems: readonly TypographySystem[];
   readonly activeSystemId: string;
   readonly handoff: HandoffPreferences;
+  readonly simpleSets?: SimpleFontSets;
   readonly extensions?: Readonly<Record<string, unknown>>;
 }
 
@@ -221,6 +232,7 @@ export interface WorkspaceState {
   readonly activeComparisonId?: string;
   readonly trayIds: readonly string[];
   readonly copyOverride?: string;
+  readonly simpleSet?: SimpleSetId;
   readonly reviewLayout: "contact-sheet" | "focus" | "waterfall";
   readonly search: string;
   readonly reviewFilter: ReviewState | "all";
@@ -243,6 +255,9 @@ export interface ImportedSource {
 }
 
 export type StudyCommand =
+  | { readonly type: "select-simple-set"; readonly setId: SimpleSetId }
+  | { readonly type: "edit-simple-set"; readonly setId: SimpleSetId; readonly patch: Partial<SimpleFontSet> }
+  | { readonly type: "copy-to-simple-set"; readonly candidateIds: readonly string[]; readonly setId: SimpleSetId }
   | { readonly type: "set-stage"; readonly stage: Stage }
   | { readonly type: "select-candidate"; readonly candidateId?: string }
   | { readonly type: "select-next-unreviewed" }
@@ -257,16 +272,17 @@ export type StudyCommand =
   | { readonly type: "set-search"; readonly search: string }
   | { readonly type: "set-review-filter"; readonly filter: WorkspaceState["reviewFilter"] }
   | { readonly type: "set-scene"; readonly scene: WorkspaceState["activeScene"] }
-  | { readonly type: "ingest-sources"; readonly imports: readonly ImportedSource[] }
+  | { readonly type: "ingest-sources"; readonly imports: readonly ImportedSource[]; readonly simpleSet?: SimpleSetId }
   | { readonly type: "replace-bindings"; readonly bindings: readonly SourceBindingSummary[] }
   | { readonly type: "rename-study"; readonly title: string }
   | { readonly type: "edit-candidate"; readonly candidateId: string; readonly patch: Partial<Pick<Candidate, "label" | "casing" | "notes" | "rationale" | "tags">> }
   | { readonly type: "set-axis"; readonly candidateId: string; readonly tag: string; readonly value: number }
+  | { readonly type: "set-named-instance"; readonly candidateId: string; readonly instanceIndex: number }
   | { readonly type: "set-feature"; readonly candidateId: string; readonly tag: string; readonly enabled: boolean }
   | { readonly type: "duplicate-candidate"; readonly candidateId: string; readonly label?: string; readonly copyDecision?: boolean }
   | { readonly type: "upsert-recipe"; readonly recipe: Recipe }
   | { readonly type: "delete-recipe"; readonly recipeId: string }
-  | { readonly type: "upsert-comparison"; readonly comparison: ComparisonSet }
+  | { readonly type: "upsert-comparison"; readonly comparison: ComparisonSet; readonly displayedCopy?: string }
   | { readonly type: "select-comparison"; readonly comparisonId?: string }
   | { readonly type: "assign-role"; readonly candidateId: string; readonly role?: SystemRole }
   | { readonly type: "edit-system"; readonly name?: string; readonly rationale?: string }
@@ -473,6 +489,7 @@ function parseCandidate(value: unknown): Candidate {
     !Array.isArray(value.axes) ||
     !Array.isArray(value.features) ||
     !oneOf(value.casing, TEXT_CASINGS) ||
+    (value.simpleSet !== undefined && !oneOf(value.simpleSet, SIMPLE_SET_IDS)) ||
     !Array.isArray(value.tags) ||
     !value.tags.every((tag) => isNonEmptyString(tag, 64)) ||
     !isString(value.notes, MAX_COPY_LENGTH) ||
@@ -490,6 +507,7 @@ function parseCandidate(value: unknown): Candidate {
     axes: value.axes.map(parseAxisValue),
     features: value.features.map(parseFeatureSetting),
     casing: value.casing,
+    ...(value.simpleSet === undefined ? {} : { simpleSet: value.simpleSet as SimpleSetId }),
     tags: [...new Set(value.tags as string[])],
     notes: value.notes,
     rationale: value.rationale,
@@ -643,6 +661,51 @@ function parseHandoff(value: unknown): HandoffPreferences {
   };
 }
 
+function parseSimpleFontSets(value: unknown): SimpleFontSets {
+  if (!isRecord(value) || Object.keys(value).length !== 2) throw new DomainError("Invalid Simple font sets");
+  const parseSet = (id: SimpleSetId): SimpleFontSet => {
+    const set = value[id];
+    if (!isRecord(set) || !isString(set.copy, MAX_COPY_LENGTH) || !oneOf(set.fitPolicy, FIT_POLICIES)) {
+      throw new DomainError(`Invalid Simple ${id} set`);
+    }
+    return { copy: set.copy, fitPolicy: set.fitPolicy };
+  };
+  return { headlines: parseSet("headlines"), body: parseSet("body") };
+}
+
+export function simpleFontSets(document: StudyDocument): SimpleFontSets {
+  return document.simpleSets ?? {
+    headlines: { copy: document.recipes[0]?.copy ?? "Your Headline", fitPolicy: "fit" },
+    body: { copy: DEFAULT_BODY_COPY, fitPolicy: "fit" },
+  };
+}
+
+export function candidateSimpleSet(candidate: Candidate): SimpleSetId {
+  return candidate.simpleSet ?? "headlines";
+}
+
+export function candidatesInSimpleSet(document: StudyDocument, setId: SimpleSetId): Candidate[] {
+  return document.candidates.filter((candidate) => candidateSimpleSet(candidate) === setId);
+}
+
+/** Existing single-font variable Sources need one new Candidate, even when old metadata stored named styles as Faces. */
+export function missingSimpleSetFaces(document: StudyDocument, sourceIds: ReadonlySet<string>, setId: SimpleSetId): Face[] {
+  const sources = new Map(document.sources.map((source) => [source.id, source]));
+  const existingFaceIds = new Set(candidatesInSimpleSet(document, setId).map((candidate) => candidate.faceId));
+  const existingSourceIds = new Set(document.faces.filter((face) => existingFaceIds.has(face.id)).map((face) => face.sourceId));
+  const variableFaces = new Map<string, Face>();
+  for (const face of document.faces) {
+    if (!sourceIds.has(face.sourceId) || !face.axes.length || !/^(?:OTF|TTF|WOFF|WOFF2)$/iu.test(sources.get(face.sourceId)?.hint.format ?? "")) continue;
+    const current = variableFaces.get(face.sourceId);
+    if (!current || face.faceIndex < current.faceIndex) variableFaces.set(face.sourceId, face);
+  }
+  return document.faces.filter((face) => {
+    if (!sourceIds.has(face.sourceId) || existingFaceIds.has(face.id)) return false;
+    const canonical = variableFaces.get(face.sourceId);
+    return !canonical || (face === canonical && !existingSourceIds.has(face.sourceId));
+  });
+}
+
 export function assertStudyDocument(value: unknown): StudyDocument {
   if (!isRecord(value)) throw new DomainError("Study is not an object");
   if (typeof value.schemaVersion === "number" && value.schemaVersion > STUDY_SCHEMA_VERSION) {
@@ -669,7 +732,7 @@ export function assertStudyDocument(value: unknown): StudyDocument {
     !isNonEmptyString(value.activeSystemId) ||
     (value.extensions !== undefined && !isRecord(value.extensions))
   ) {
-    throw new DomainError("Invalid Study v4 envelope");
+    throw new DomainError("Invalid Study v5 envelope");
   }
   const document: StudyDocument = {
     schemaVersion: STUDY_SCHEMA_VERSION,
@@ -685,25 +748,28 @@ export function assertStudyDocument(value: unknown): StudyDocument {
     typographySystems: value.typographySystems.map(parseSystem),
     activeSystemId: value.activeSystemId,
     handoff: parseHandoff(value.handoff),
+    ...(value.simpleSets === undefined ? {} : { simpleSets: parseSimpleFontSets(value.simpleSets) }),
     ...(value.extensions === undefined ? {} : { extensions: value.extensions }),
   };
-  const sourceIds = document.sources.map((source) => source.id);
-  const faceIds = document.faces.map((face) => face.id);
-  const candidateIds = document.candidates.map((candidate) => candidate.id);
-  const recipeIds = document.recipes.map((recipe) => recipe.id);
-  const comparisonIds = document.comparisonSets.map((comparison) => comparison.id);
-  const systemIds = document.typographySystems.map((system) => system.id);
-  if (![sourceIds, faceIds, candidateIds, recipeIds, comparisonIds, systemIds].every(unique)) {
+  const sourceIds = new Set(document.sources.map((source) => source.id));
+  const faceIds = new Set(document.faces.map((face) => face.id));
+  const candidatesById = new Map(document.candidates.map((candidate) => [candidate.id, candidate]));
+  const recipeIds = new Set(document.recipes.map((recipe) => recipe.id));
+  const comparisonIds = new Set(document.comparisonSets.map((comparison) => comparison.id));
+  const systemIds = new Set(document.typographySystems.map((system) => system.id));
+  if (sourceIds.size !== document.sources.length || faceIds.size !== document.faces.length ||
+      candidatesById.size !== document.candidates.length || recipeIds.size !== document.recipes.length ||
+      comparisonIds.size !== document.comparisonSets.length || systemIds.size !== document.typographySystems.length) {
     throw new DomainError("Study entity IDs must be unique within their type");
   }
-  if (!document.faces.every((face) => sourceIds.includes(face.sourceId))) throw new DomainError("Face references missing Source");
-  if (!document.candidates.every((candidate) => faceIds.includes(candidate.faceId))) throw new DomainError("Candidate references missing Face");
+  if (!document.faces.every((face) => sourceIds.has(face.sourceId))) throw new DomainError("Face references missing Source");
+  if (!document.candidates.every((candidate) => faceIds.has(candidate.faceId))) throw new DomainError("Candidate references missing Face");
   if (
     !document.comparisonSets.every(
       (comparison) =>
         unique(comparison.candidateIds) &&
-        comparison.candidateIds.every((id) => candidateIds.includes(id)) &&
-        recipeIds.includes(comparison.recipeId),
+        comparison.candidateIds.every((id) => candidatesById.has(id)) &&
+        recipeIds.has(comparison.recipeId),
     )
   ) {
     throw new DomainError("Comparison Set references are inconsistent");
@@ -713,14 +779,14 @@ export function assertStudyDocument(value: unknown): StudyDocument {
       throw new DomainError("Typography System roles and Font Use IDs must be unique");
     }
     for (const fontUse of system.fontUses) {
-      if (!faceIds.includes(fontUse.faceId)) throw new DomainError("Font Use references missing Face");
+      if (!faceIds.has(fontUse.faceId)) throw new DomainError("Font Use references missing Face");
       if (fontUse.originatingCandidateId) {
-        const candidate = document.candidates.find((item) => item.id === fontUse.originatingCandidateId);
+        const candidate = candidatesById.get(fontUse.originatingCandidateId);
         if (!candidate || candidate.faceId !== fontUse.faceId) throw new DomainError("Font Use Candidate and Face disagree");
       }
     }
   }
-  if (!systemIds.includes(document.activeSystemId)) throw new DomainError("Active Typography System does not exist");
+  if (!systemIds.has(document.activeSystemId)) throw new DomainError("Active Typography System does not exist");
   return document;
 }
 
@@ -750,7 +816,12 @@ export function createSession(
   workspace?: Partial<WorkspaceState>,
   revision = 0,
 ): StudySession {
-  const checked = assertStudyDocument(document);
+  const validated = assertStudyDocument(document);
+  const defaults = simpleFontSets(validated);
+  const checked = validated.simpleSets ? validated : {
+    ...validated,
+    simpleSets: { ...defaults, headlines: { ...defaults.headlines, copy: workspace?.copyOverride ?? defaults.headlines.copy } },
+  };
   const bindingList = bindings.map(parseBinding).filter((binding) => checked.sources.some((source) => source.id === binding.sourceId));
   const defaultRecipeId = checked.recipes[0].id;
   const defaultCandidateId = checked.candidates[0]?.id;
@@ -782,6 +853,7 @@ export function createSession(
     activeRecipeId,
     ...(activeComparisonId ? { activeComparisonId } : {}),
     trayIds,
+    ...(workspace?.simpleSet && SIMPLE_SET_IDS.includes(workspace.simpleSet) ? { simpleSet: workspace.simpleSet } : {}),
     ...(typeof workspace?.copyOverride === "string"
       ? { copyOverride: workspace.copyOverride.slice(0, MAX_COPY_LENGTH) }
       : {}),
@@ -814,9 +886,23 @@ function updateWorkspace(session: StudySession, patch: Partial<WorkspaceState>):
 }
 
 function updateDocument(session: StudySession, patch: Partial<StudyDocument>): StudySession {
+  const previous = session.document;
+  const checked = assertStudyDocument({ ...previous, ...patch, updatedAt: new Date().toISOString() });
+  // Untrusted changes are still fully parsed above. Retain only references that
+  // came unchanged from the validated session, so undo does not copy the full graph per keystroke.
+  const retain = <T,>(before: readonly T[], proposed: readonly T[] | undefined, validated: readonly T[]): readonly T[] =>
+    proposed === undefined ? before : validated.map((item, index) => proposed[index] === before[index] ? before[index] : item);
   return {
     ...session,
-    document: assertStudyDocument({ ...session.document, ...patch, updatedAt: new Date().toISOString() }),
+    document: {
+      ...checked,
+      sources: retain(previous.sources, patch.sources, checked.sources),
+      faces: retain(previous.faces, patch.faces, checked.faces),
+      candidates: retain(previous.candidates, patch.candidates, checked.candidates),
+      recipes: retain(previous.recipes, patch.recipes, checked.recipes),
+      comparisonSets: retain(previous.comparisonSets, patch.comparisonSets, checked.comparisonSets),
+      typographySystems: retain(previous.typographySystems, patch.typographySystems, checked.typographySystems),
+    },
     revision: session.revision + 1,
   };
 }
@@ -839,6 +925,7 @@ function unreachable(value: never): never {
 
 export function isSemanticCommand(command: StudyCommand): boolean {
   return ![
+    "select-simple-set",
     "set-stage",
     "select-candidate",
     "select-next-unreviewed",
@@ -860,6 +947,28 @@ export function isSemanticCommand(command: StudyCommand): boolean {
 export function applyStudyCommand(session: StudySession, command: StudyCommand): StudySession {
   const { document, workspace } = session;
   switch (command.type) {
+    case "select-simple-set":
+      if (!SIMPLE_SET_IDS.includes(command.setId)) throw new DomainError("Invalid Simple font set");
+      return updateWorkspace(session, { simpleSet: command.setId, copyOverride: undefined });
+    case "edit-simple-set": {
+      if (!SIMPLE_SET_IDS.includes(command.setId)) throw new DomainError("Invalid Simple font set");
+      const sets = simpleFontSets(document);
+      const next = { ...sets[command.setId], ...command.patch };
+      if (next.copy === sets[command.setId].copy && next.fitPolicy === sets[command.setId].fitPolicy) return session;
+      return updateDocument(session, { simpleSets: { ...sets, [command.setId]: next } });
+    }
+    case "copy-to-simple-set": {
+      if (!SIMPLE_SET_IDS.includes(command.setId)) throw new DomainError("Invalid Simple font set");
+      const originals = [...new Set(command.candidateIds)].map((id) => candidateById(document, id));
+      if (!originals.length) return session;
+      if (document.candidates.length + originals.length > MAX_CANDIDATES) throw new DomainError("Study Candidate limit reached");
+      const copies = originals.map((original): Candidate => ({
+        ...original, id: newID("candidate"), simpleSet: command.setId,
+        reviewState: "unreviewed", rationale: "",
+        provenance: { kind: "duplicate", fromCandidateId: original.id },
+      }));
+      return updateDocument(session, { candidates: [...document.candidates, ...copies] });
+    }
     case "set-stage":
       return workspace.stage === command.stage ? session : updateWorkspace(session, { stage: command.stage });
     case "select-candidate":
@@ -937,7 +1046,7 @@ export function applyStudyCommand(session: StudySession, command: StudyCommand):
       return updateWorkspace(session, { copyOverride: command.copy?.slice(0, MAX_COPY_LENGTH) });
     case "select-recipe":
       if (!document.recipes.some((recipe) => recipe.id === command.recipeId)) throw new DomainError("Recipe does not exist");
-      return updateWorkspace(session, { activeRecipeId: command.recipeId, copyOverride: undefined });
+      return updateWorkspace(session, { activeRecipeId: command.recipeId, copyOverride: undefined, simpleSet: undefined });
     case "toggle-tray": {
       candidateById(document, command.candidateId);
       const trayIds = workspace.trayIds.includes(command.candidateId)
@@ -966,6 +1075,7 @@ export function applyStudyCommand(session: StudySession, command: StudyCommand):
     case "replace-bindings":
       return { ...session, bindings: command.bindings.map(parseBinding) };
     case "ingest-sources": {
+      if (command.simpleSet !== undefined && !SIMPLE_SET_IDS.includes(command.simpleSet)) throw new DomainError("Invalid Simple font set");
       const existingSources = new Set(document.sources.map((source) => source.id));
       const seen = new Set(existingSources);
       const fresh: ImportedSource[] = [];
@@ -988,9 +1098,13 @@ export function applyStudyCommand(session: StudySession, command: StudyCommand):
       const acceptedIds = new Set([...existingSources, ...fresh.map((item) => item.source.id)]);
       const mergedBindings = new Map(session.bindings.map((binding) => [binding.sourceId, binding]));
       command.imports.filter((item) => acceptedIds.has(item.source.id)).forEach((item) => mergedBindings.set(item.binding.sourceId, parseBinding(item.binding)));
-      if (fresh.length === 0) return { ...session, bindings: [...mergedBindings.values()] };
       const newFaces = fresh.flatMap((item) => item.faces.map(parseFace));
-      const newCandidates: Candidate[] = newFaces.map((face) => ({
+      const importedIds = new Set(command.imports.map((item) => item.source.id));
+      const reusedFaces = command.simpleSet === undefined ? [] : missingSimpleSetFaces(document, importedIds, command.simpleSet);
+      const candidateFaces = [...newFaces, ...reusedFaces];
+      if (document.candidates.length + candidateFaces.length > MAX_CANDIDATES) throw new DomainError("Study Candidate limit reached");
+      if (!candidateFaces.length && !fresh.length) return { ...session, bindings: [...mergedBindings.values()] };
+      const newCandidates: Candidate[] = candidateFaces.map((face) => ({
         id: newID("candidate"),
         faceId: face.id,
         label: face.style || "Regular",
@@ -1002,6 +1116,7 @@ export function applyStudyCommand(session: StudySession, command: StudyCommand):
         notes: "",
         rationale: "",
         provenance: { kind: "import" },
+        ...(command.simpleSet === undefined ? {} : { simpleSet: command.simpleSet }),
       }));
       const updated = updateDocument(session, {
         sources: [...document.sources, ...fresh.map((item) => parseSource(item.source))],
@@ -1066,17 +1181,30 @@ export function applyStudyCommand(session: StudySession, command: StudyCommand):
         candidates: document.candidates.map((candidate) => (candidate.id === current.id ? { ...candidate, features } : candidate)),
       });
     }
+    case "set-named-instance": {
+      const current = candidateById(document, command.candidateId);
+      const face = faceForCandidate(document, current);
+      if (!Number.isInteger(command.instanceIndex)) throw new DomainError("Invalid named style");
+      const instance = face.namedInstances[command.instanceIndex];
+      if (!instance) throw new DomainError("Named style does not exist");
+      const axes = face.axes.map((axis) => ({ tag: axis.tag, value: Math.min(axis.maximum, Math.max(axis.minimum,
+        instance.coordinates.find((coordinate) => coordinate.tag === axis.tag)?.value ?? axis.defaultValue,
+      )) }));
+      return updateDocument(session, { candidates: document.candidates.map((candidate) => candidate.id === current.id ? { ...current, label: instance.name, axes } : candidate) });
+    }
     case "duplicate-candidate": {
       const current = candidateById(document, command.candidateId);
+      if (document.candidates.length >= MAX_CANDIDATES) throw new DomainError("Study Candidate limit reached");
       const duplicate: Candidate = {
         ...current,
         id: newID("candidate"),
-        label: command.label?.trim().slice(0, 200) || `${current.label} copy`,
+        label: command.label?.trim().slice(0, 200) || (current.label.length <= 507 ? `${current.label} copy` : current.label),
         reviewState: command.copyDecision ? current.reviewState : "unreviewed",
         rationale: command.copyDecision ? current.rationale : "",
         provenance: { kind: "duplicate", fromCandidateId: current.id },
       };
-      const updated = updateDocument(session, { candidates: [...document.candidates, duplicate] });
+      const position = document.candidates.indexOf(current) + 1;
+      const updated = updateDocument(session, { candidates: [...document.candidates.slice(0, position), duplicate, ...document.candidates.slice(position)] });
       return { ...updated, workspace: { ...updated.workspace, selectedCandidateId: duplicate.id, stage: "review" } };
     }
     case "upsert-recipe": {
@@ -1102,9 +1230,29 @@ export function applyStudyCommand(session: StudySession, command: StudyCommand):
       };
     }
     case "upsert-comparison": {
-      const comparison = parseComparison(command.comparison);
+      let comparison = parseComparison(command.comparison);
+      let recipes: readonly Recipe[] | undefined;
+      if (command.displayedCopy !== undefined) {
+        const referenced = document.recipes.find((recipe) => recipe.id === comparison.recipeId);
+        if (!referenced) throw new DomainError("Comparison Set references missing Recipe");
+        const displayed = parseRecipe({ ...referenced, copy: command.displayedCopy });
+        if (displayed.copy !== referenced.copy) {
+          // Preserve the complete Recipe, not only its text, without changing a
+          // shared Recipe or creating another snapshot on an unchanged save.
+          let saved = document.recipes.find((recipe) => Object.keys({ ...recipe, ...displayed }).every(
+            (key) => key === "id" || recipe[key as keyof Recipe] === displayed[key as keyof Recipe],
+          ));
+          if (!saved) {
+            if (document.recipes.length >= MAX_RECIPES) throw new DomainError("Study Recipe limit reached");
+            saved = { ...displayed, id: newID("recipe") };
+            recipes = [...document.recipes, saved];
+          }
+          comparison = { ...comparison, recipeId: saved.id };
+        }
+      }
       const exists = document.comparisonSets.some((item) => item.id === comparison.id);
       const updated = updateDocument(session, {
+        ...(recipes ? { recipes } : {}),
         comparisonSets: exists
           ? document.comparisonSets.map((item) => (item.id === comparison.id ? comparison : item))
           : [...document.comparisonSets, comparison],
@@ -1114,6 +1262,7 @@ export function applyStudyCommand(session: StudySession, command: StudyCommand):
         workspace: {
           ...updated.workspace,
           activeComparisonId: comparison.id,
+          activeRecipeId: comparison.recipeId,
           trayIds: comparison.candidateIds,
           stage: "compare",
         },
@@ -1126,7 +1275,7 @@ export function applyStudyCommand(session: StudySession, command: StudyCommand):
       if (command.comparisonId && !comparison) throw new DomainError("Comparison Set does not exist");
       return updateWorkspace(session, {
         activeComparisonId: command.comparisonId,
-        ...(comparison ? { trayIds: comparison.candidateIds, activeRecipeId: comparison.recipeId } : {}),
+        ...(comparison ? { trayIds: comparison.candidateIds, activeRecipeId: comparison.recipeId, simpleSet: undefined, copyOverride: undefined } : {}),
       });
     }
     case "assign-role": {
@@ -1208,7 +1357,7 @@ export function bindingForSource(session: StudySession, sourceId: string): Sourc
 export function activeRecipe(session: StudySession): Recipe {
   const recipe = session.document.recipes.find((item) => item.id === session.workspace.activeRecipeId);
   if (!recipe) throw new DomainError("Active Recipe does not exist");
-  return recipe;
+  return session.workspace.simpleSet ? { ...recipe, copy: simpleFontSets(session.document)[session.workspace.simpleSet].copy } : recipe;
 }
 
 export function activeTypographySystem(document: StudyDocument): TypographySystem {
@@ -1230,6 +1379,10 @@ export function migrateLegacyStudy(value: Record<string, unknown>): MigrationRes
   if (version > STUDY_SCHEMA_VERSION) throw new DomainError(`Study schema ${version} is newer than supported schema ${STUDY_SCHEMA_VERSION}`);
   if (version === STUDY_SCHEMA_VERSION) {
     return { document: assertStudyDocument(value), fromVersion: version, warnings: [] };
+  }
+  if (version === 4) {
+    const document = assertStudyDocument({ ...value, schemaVersion: STUDY_SCHEMA_VERSION });
+    return { document, fromVersion: 4, warnings: ["Existing fonts remain in Headlines. Body Copy is a separate set. Save to retain schema v5."] };
   }
   if (![1, 2, 3].includes(version) || !Array.isArray(value.records)) {
     throw new DomainError(`Unsupported legacy Study schema ${version}`);
@@ -1433,7 +1586,7 @@ export function parseRecoverySnapshot(serialized: string): StudySession {
   if (!isRecord(value) || value.recoveryVersion !== 1 || !isRecord(value.workspace) || !isInteger(value.revision)) {
     throw new DomainError("Invalid recovery envelope");
   }
-  const document = assertStudyDocument(value.study);
+  const document = parseStudyDocument(JSON.stringify(value.study));
   const workspace = value.workspace;
   const session = createSession(
     document,
@@ -1447,6 +1600,7 @@ export function parseRecoverySnapshot(serialized: string): StudySession {
         ? workspace.trayIds.filter((candidateId) => isNonEmptyString(candidateId)).slice(0, 4)
         : [],
       copyOverride: isString(workspace.copyOverride, MAX_COPY_LENGTH) ? workspace.copyOverride : undefined,
+      simpleSet: oneOf(workspace.simpleSet, SIMPLE_SET_IDS) ? workspace.simpleSet : undefined,
       reviewLayout: oneOf(workspace.reviewLayout, ["contact-sheet", "focus", "waterfall"] as const)
         ? workspace.reviewLayout
         : "contact-sheet",

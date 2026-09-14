@@ -1,5 +1,6 @@
 import {
   SOURCE_STATES,
+  STUDY_SCHEMA_VERSION,
   STAGES,
   assertStudyDocument,
   type HandoffPreferences,
@@ -175,6 +176,7 @@ function validWorkspace(value: unknown): value is WorkspaceState {
     value.trayIds.length <= 4 &&
     value.trayIds.every((candidateId) => isString(candidateId)) &&
     (value.copyOverride === undefined || typeof value.copyOverride === "string") &&
+    (value.simpleSet === undefined || value.simpleSet === "headlines" || value.simpleSet === "body") &&
     ["contact-sheet", "focus", "waterfall"].includes(String(value.reviewLayout)) &&
     typeof value.search === "string" &&
     ["all", "unreviewed", "keep", "maybe", "reject"].includes(String(value.reviewFilter)) &&
@@ -241,7 +243,7 @@ function validImportedSource(value: unknown): value is ImportedSource {
   try {
     const now = new Date().toISOString();
     assertStudyDocument({
-      schemaVersion: 4,
+      schemaVersion: STUDY_SCHEMA_VERSION,
       id: "study:protocol-validation",
       title: "Protocol validation",
       createdAt: now,

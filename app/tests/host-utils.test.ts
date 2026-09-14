@@ -105,6 +105,32 @@ test("Fontconfig collapses named-instance records only for one variable Face", (
   )[0].family, "Inter");
 });
 
+test("Fontconfig keeps encoded named instances on their physical variable Face", () => {
+  const inspected = parseFontconfigQuery(
+    "0\u001fVariable Sans\u001fRegular\u001fVariableSans-Regular\u001fFalse\u001e" +
+    "65536\u001fVariable Sans\u001fThin\u001fVariableSans-Thin\u001fFalse\u001e" +
+    "131072\u001fVariable Sans\u001fBold\u001fVariableSans-Bold\u001fFalse\u001e" +
+    "1\u001fVariable Serif\u001fRegular\u001fVariableSerif-Regular\u001fTrue\u001e" +
+    "1310721\u001fVariable Serif\u001fHeavy\u001fVariableSerif-Heavy\u001fFalse\u001e",
+  );
+  assert.deepEqual(inspected.map((face) => [face.faceIndex, face.family, face.style, face.variable]), [
+    [0, "Variable Sans", "Regular", true],
+    [1, "Variable Serif", "Regular", true],
+  ]);
+  assert.throws(() => parseFontconfigQuery("65536\u001fVariable Sans\u001fBold\u001fVariableSans-Bold\u001fFalse\u001e"), /physical face/);
+  assert.throws(() => parseFontconfigQuery("2147483648\u001fVariable Sans\u001fBold\u001fVariableSans-Bold\u001fFalse\u001e"), /invalid face index/);
+});
+
+test("Fontconfig bounds physical Faces independently from named-instance count", () => {
+  const base = "0\u001fVariable Sans\u001fRegular\u001fVariableSans-Regular\u001fTrue\u001e";
+  const instances = Array.from({ length: 300 }, (_, index) => `${(index + 1) * 65536}\u001fVariable Sans\u001fInstance ${index + 1}\u001f\u001fFalse\u001e`).join("");
+  const inspected = parseFontconfigQuery(base + instances);
+  assert.equal(inspected.length, 1);
+  assert.equal(inspected[0].faceIndex, 0);
+  const collection = Array.from({ length: 257 }, (_, index) => `${index}\u001fCollection\u001fFace ${index}\u001f\u001fFalse\u001e`).join("");
+  assert.throws(() => parseFontconfigQuery(collection), /physical face/);
+});
+
 test("Linux font inspection rejects a malformed font file before import", {
   skip: process.platform !== "linux" || !existsSync("/usr/bin/fc-query"),
 }, async () => {

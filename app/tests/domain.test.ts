@@ -3,15 +3,19 @@ import test from "node:test";
 import { createNewStudy } from "../src/fixture.js";
 import {
   DomainError,
+  STUDY_SCHEMA_VERSION,
+  activeRecipe,
   activeTypographySystem,
   applyStudyCommand,
   assertStudyDocument,
   createSession,
+  candidatesInSimpleSet,
   migrateLegacyStudy,
   parseRecoverySnapshot,
   parseStudyDocument,
   serializeRecoverySnapshot,
   serializeStudyDocument,
+  simpleFontSets,
   transformedCopy,
   type ImportedSource,
 } from "../src/domain.js";
@@ -130,7 +134,8 @@ test("duplicated family Candidates keep independent decisions and variable setti
   const original = fixture.document.candidates.find((candidate) => candidate.axes.length > 0);
   assert.ok(original);
   const duplicated = applyStudyCommand(fixture, { type: "duplicate-candidate", candidateId: original.id, label: "Family alternate" });
-  const duplicate = duplicated.document.candidates.at(-1);
+  const originalPosition = duplicated.document.candidates.findIndex((candidate) => candidate.id === original.id);
+  const duplicate = duplicated.document.candidates[originalPosition + 1];
   assert.ok(duplicate);
   assert.equal(duplicate.faceId, original.faceId);
   assert.equal(duplicate.reviewState, "unreviewed");
@@ -142,6 +147,10 @@ test("duplicated family Candidates keep independent decisions and variable setti
   assert.equal(decided.document.candidates.find((candidate) => candidate.id === original.id)?.axes[0]?.value, original.axes[0]?.value);
   assert.equal(decided.document.candidates.find((candidate) => candidate.id === duplicate.id)?.reviewState, "keep");
   assert.notEqual(decided.document.candidates.find((candidate) => candidate.id === duplicate.id)?.axes[0]?.value, original.axes[0]?.value);
+  const longLabel = "A".repeat(512);
+  const longNamed = createSession({ ...fixture.document, candidates: fixture.document.candidates.map((candidate) => candidate.id === original.id ? { ...candidate, label: longLabel } : candidate) });
+  const longDuplicate = applyStudyCommand(longNamed, { type: "duplicate-candidate", candidateId: original.id });
+  assert.equal(longDuplicate.document.candidates.find((candidate) => candidate.id === longDuplicate.workspace.selectedCandidateId)?.label, longLabel, "duplicating a maximum-length imported name must not truncate it or invalidate the Study");
 });
 
 test("Simple-mode candidate order, removal, and original casing controls remain semantic and undoable", () => {
@@ -189,7 +198,7 @@ test("every supported legacy schema preserves Maybe evidence and strips source p
       records: [{ id: "one", fileName: "Family-Regular.otf", path: "/Users/person/Fonts/Family-Regular.otf", familyName: "Family", styleName: "Regular", status: "maybe", role: "display" }],
     });
     assert.equal(migrated.fromVersion, schemaVersion);
-    assert.equal(migrated.document.schemaVersion, 4);
+    assert.equal(migrated.document.schemaVersion, STUDY_SCHEMA_VERSION);
     assert.equal(migrated.document.candidates[0].reviewState, "maybe");
     assert.deepEqual(migrated.document.candidates[0].provenance, { kind: "legacy", legacyReviewState: "maybe" });
     assert.equal(activeTypographySystem(migrated.document).fontUses[0].role, "display");
@@ -247,4 +256,183 @@ test("Study parser contains seeded corruption at the portable document seam", ()
 });
 test("new internal studies include bound Sources in Handoff by default", () => {
   assert.equal(createNewStudy().document.handoff.includeSources, true);
+});
+
+test("Simple sets keep independent copy, sizing, casing, and variable choices in one portable Study", () => {
+  const fixture = createFixtureSession();
+  const headline = fixture.document.candidates[0]!;
+  let session = applyStudyCommand(fixture, { type: "copy-to-simple-set", candidateIds: [headline.id], setId: "body" });
+  const body = candidatesInSimpleSet(session.document, "body")[0]!;
+  assert.notEqual(body.id, headline.id);
+  assert.equal(body.faceId, headline.faceId);
+  assert.equal(body.reviewState, "unreviewed");
+  session = applyStudyCommand(session, { type: "edit-simple-set", setId: "headlines", patch: { copy: "A bold headline", fitPolicy: "locked-lines" } });
+  session = applyStudyCommand(session, { type: "edit-simple-set", setId: "body", patch: { copy: "Body copy has its own rhythm.\n\nAnd its own second paragraph.", fitPolicy: "fit" } });
+  session = applyStudyCommand(session, { type: "edit-candidate", candidateId: body.id, patch: { casing: "uppercase" } });
+  session = applyStudyCommand(session, { type: "set-axis", candidateId: body.id, tag: "wght", value: 900 });
+  const duplicate = applyStudyCommand(session, { type: "duplicate-candidate", candidateId: body.id });
+  const bodyCopies = candidatesInSimpleSet(duplicate.document, "body");
+  assert.equal(bodyCopies.length, 2);
+  assert.equal(bodyCopies[1]!.simpleSet, "body");
+  assert.equal(candidatesInSimpleSet(duplicate.document, "headlines").length, fixture.document.candidates.length);
+  assert.deepEqual(duplicate.document.candidates.find((candidate) => candidate.id === headline.id), headline);
+  assert.deepEqual(simpleFontSets(duplicate.document), {
+    headlines: { copy: "A bold headline", fitPolicy: "locked-lines" },
+    body: { copy: "Body copy has its own rhythm.\n\nAnd its own second paragraph.", fitPolicy: "fit" },
+  });
+  const selected = applyStudyCommand(duplicate, { type: "select-simple-set", setId: "body" });
+  assert.equal(selected.revision, duplicate.revision);
+  assert.equal(activeRecipe(selected).copy, simpleFontSets(selected.document).body.copy);
+  const recovered = parseRecoverySnapshot(serializeRecoverySnapshot(selected));
+  assert.deepEqual(recovered.document, selected.document);
+  assert.equal(recovered.workspace.simpleSet, "body");
+  assert.equal(activeRecipe(recovered).copy, simpleFontSets(selected.document).body.copy);
+  assert.deepEqual(parseStudyDocument(serializeStudyDocument(selected.document)), selected.document);
+});
+
+test("selecting a saved Studio comparison restores its Recipe without changing either Simple set", () => {
+  const fixture = createFixtureSession();
+  const comparison = fixture.document.comparisonSets[0]!;
+  const recipe = fixture.document.recipes.find((item) => item.id === comparison.recipeId)!;
+  for (const setId of ["headlines", "body"] as const) {
+    let session = applyStudyCommand(fixture, { type: "edit-simple-set", setId, patch: { copy: "Independent Simple copy", fitPolicy: "locked-lines" } });
+    session = applyStudyCommand(session, { type: "select-simple-set", setId });
+    session = applyStudyCommand(session, { type: "set-copy-override", copy: "Temporary override" });
+    const selected = applyStudyCommand(session, { type: "select-comparison", comparisonId: comparison.id });
+    assert.equal(selected.workspace.simpleSet, undefined);
+    assert.equal(selected.workspace.copyOverride, undefined);
+    assert.equal(activeRecipe(selected).copy, recipe.copy);
+    assert.deepEqual(selected.workspace.trayIds, comparison.candidateIds);
+    assert.equal(selected.document, session.document, "selecting a comparison must not overwrite Simple copy or sizing");
+    assert.equal(selected.revision, session.revision);
+  }
+});
+
+test("saving Simple-authored comparison copy snapshots its complete Recipe once without changing shared settings", () => {
+  const fixture = createFixtureSession();
+  const referenced = activeRecipe(fixture);
+  const copy = "My authored campaign headline";
+  const differentLayout = { ...referenced, id: "recipe:different-layout", copy, lineLimit: (referenced.lineLimit ?? 0) + 1 };
+  let session = createSession({ ...fixture.document, recipes: [...fixture.document.recipes, differentLayout] }, fixture.bindings);
+  session = applyStudyCommand(session, { type: "edit-simple-set", setId: "headlines", patch: { copy } });
+  session = applyStudyCommand(session, { type: "select-simple-set", setId: "headlines" });
+  const command = { type: "upsert-comparison" as const, comparison: { ...session.document.comparisonSets[0]!, id: "comparison:authored", recipeId: referenced.id }, displayedCopy: activeRecipe(session).copy };
+  const saved = applyStudyCommand(session, command);
+  const comparison = saved.document.comparisonSets.find((item) => item.id === command.comparison.id)!;
+  const snapshot = saved.document.recipes.find((recipe) => recipe.id === comparison.recipeId)!;
+  assert.notEqual(snapshot.id, referenced.id);
+  assert.notEqual(snapshot.id, differentLayout.id, "matching copy with different layout is not a matching Recipe");
+  assert.deepEqual(snapshot, { ...referenced, id: snapshot.id, copy });
+  assert.equal(saved.revision, session.revision + 1, "the Recipe and comparison form one undoable edit");
+  assert.equal(saved.document.recipes.find((recipe) => recipe.id === referenced.id), session.document.recipes.find((recipe) => recipe.id === referenced.id));
+  assert.deepEqual(simpleFontSets(saved.document), simpleFontSets(session.document));
+  assert.equal(saved.document.recipes.length, session.document.recipes.length + 1);
+
+  const repeated = applyStudyCommand(saved, command);
+  assert.equal(repeated.document.recipes.length, saved.document.recipes.length, "repeated save against the original Recipe reuses the snapshot");
+  assert.equal(repeated.document.comparisonSets.find((item) => item.id === comparison.id)!.recipeId, snapshot.id);
+  const reopened = applyStudyCommand(createSession(parseStudyDocument(serializeStudyDocument(repeated.document)), repeated.bindings), { type: "select-comparison", comparisonId: comparison.id });
+  assert.equal(activeRecipe(reopened).copy, copy);
+  assert.equal(reopened.workspace.copyOverride, undefined);
+  assert.equal(reopened.workspace.simpleSet, undefined);
+  const savedAgain = applyStudyCommand(reopened, { type: "upsert-comparison", comparison, displayedCopy: activeRecipe(reopened).copy });
+  assert.equal(savedAgain.document.recipes.length, saved.document.recipes.length);
+});
+
+test("comparison copy snapshots respect Recipe capacity and fail atomically on invalid input", () => {
+  const fixture = createFixtureSession();
+  const referenced = activeRecipe(fixture);
+  const recipes = [...fixture.document.recipes, ...Array.from({ length: 256 - fixture.document.recipes.length }, (_, index) => ({ ...referenced, id: `recipe:capacity:${index}`, copy: `Existing copy ${index}` }))];
+  const session = createSession({ ...fixture.document, recipes }, fixture.bindings);
+  const comparison = { ...session.document.comparisonSets[0]!, id: "comparison:capacity", recipeId: referenced.id };
+  const before = serializeRecoverySnapshot(session);
+  assert.throws(() => applyStudyCommand(session, { type: "upsert-comparison", comparison, displayedCopy: "A new snapshot" }), /Recipe limit reached/);
+  assert.throws(() => applyStudyCommand(session, { type: "upsert-comparison", comparison, displayedCopy: "x".repeat(20_001) }), /Invalid Recipe/);
+  assert.equal(serializeRecoverySnapshot(session), before);
+  const reused = applyStudyCommand(session, { type: "upsert-comparison", comparison, displayedCopy: "Existing copy 0" });
+  assert.equal(reused.document.recipes.length, 256);
+  assert.equal(reused.document.comparisonSets.find((item) => item.id === comparison.id)!.recipeId, "recipe:capacity:0");
+  const invalidReferences = { ...comparison, candidateIds: [comparison.candidateIds[0]!, "candidate:missing"] };
+  const fixtureBefore = serializeRecoverySnapshot(fixture);
+  assert.throws(() => applyStudyCommand(fixture, { type: "upsert-comparison", comparison: invalidReferences, displayedCopy: "A new snapshot" }), /references are inconsistent/);
+  assert.equal(serializeRecoverySnapshot(fixture), fixtureBefore, "failed comparison validation must not append its snapshot Recipe");
+});
+
+test("readding a historical variable Source creates one Candidate in the other set and preserves old Faces", () => {
+  const fixture = createFixtureSession();
+  const face = fixture.document.faces[0]!;
+  const source = fixture.document.sources.find((item) => item.id === face.sourceId)!;
+  const binding = fixture.bindings.find((item) => item.sourceId === source.id)!;
+  const historical = { ...face, id: "face:historical:named-heavy", faceIndex: 6, style: "Heavy" };
+  const session = createSession({ ...fixture.document, faces: [...fixture.document.faces, historical] }, fixture.bindings);
+  const imported = { source, binding, faces: [face] };
+  const added = applyStudyCommand(session, { type: "ingest-sources", simpleSet: "body", imports: [imported] });
+  const body = candidatesInSimpleSet(added.document, "body");
+  assert.equal(body.length, 1);
+  assert.equal(body[0]!.faceId, face.id);
+  assert.deepEqual(added.document.faces, session.document.faces);
+  assert.deepEqual(candidatesInSimpleSet(added.document, "headlines"), session.document.candidates);
+  const repeated = applyStudyCommand(added, { type: "ingest-sources", simpleSet: "body", imports: [imported] });
+  assert.equal(candidatesInSimpleSet(repeated.document, "body").length, 1);
+  assert.equal(repeated.revision, added.revision);
+  const collectionSource = { ...source, hint: { ...source.hint, format: "TTC" } };
+  const collection = createSession({ ...session.document, sources: session.document.sources.map((item) => item.id === source.id ? collectionSource : item) }, session.bindings);
+  const collectionAdded = applyStudyCommand(collection, { type: "ingest-sources", simpleSet: "body", imports: [{ ...imported, source: collectionSource }] });
+  assert.equal(candidatesInSimpleSet(collectionAdded.document, "body").length, 2, "real collection Faces retain separate identity");
+});
+
+test("named styles apply all axes in one revision and clamp metadata values to their declared bounds", () => {
+  const fixture = createFixtureSession();
+  const candidate = fixture.document.candidates[0]!;
+  const face = fixture.document.faces.find((item) => item.id === candidate.faceId)!;
+  const styledFace = { ...face, namedInstances: [{ name: "Heavy compressed", coordinates: [{ tag: "wght", value: 5_000 }, { tag: "wdth", value: -1 }] }] };
+  const session = createSession({ ...fixture.document, faces: fixture.document.faces.map((item) => item.id === face.id ? styledFace : item) }, fixture.bindings);
+  const styled = applyStudyCommand(session, { type: "set-named-instance", candidateId: candidate.id, instanceIndex: 0 });
+  const result = styled.document.candidates.find((item) => item.id === candidate.id)!;
+  assert.equal(result.label, "Heavy compressed");
+  assert.deepEqual(result.axes, [{ tag: "wght", value: 900 }, { tag: "wdth", value: 75 }]);
+  assert.equal(styled.revision, session.revision + 1);
+  assert.deepEqual(session.document.candidates[0], candidate);
+  assert.throws(() => applyStudyCommand(session, { type: "set-named-instance", candidateId: candidate.id, instanceIndex: -1 }), DomainError);
+  assert.throws(() => applyStudyCommand(session, { type: "set-named-instance", candidateId: candidate.id, instanceIndex: 0.5 }), DomainError);
+});
+
+test("schema v4 and its recovery migrate without losing Candidate identity, decisions, or authored copy", () => {
+  const fixture = createFixtureSession();
+  const legacy = JSON.parse(serializeStudyDocument(fixture.document)) as Record<string, unknown>;
+  legacy.schemaVersion = 4;
+  delete legacy.simpleSets;
+  const migrated = migrateLegacyStudy(legacy);
+  assert.equal(migrated.fromVersion, 4);
+  assert.equal(migrated.document.schemaVersion, 5);
+  assert.deepEqual(migrated.document.candidates, fixture.document.candidates);
+  assert.deepEqual(migrated.document.faces, fixture.document.faces);
+  const recovery = JSON.parse(serializeRecoverySnapshot(fixture));
+  recovery.study = legacy;
+  recovery.workspace.copyOverride = "Preserve the original headline.";
+  const restored = parseRecoverySnapshot(JSON.stringify(recovery));
+  assert.equal(simpleFontSets(restored.document).headlines.copy, "Preserve the original headline.");
+  assert.ok(simpleFontSets(restored.document).body.copy.length > 300);
+  assert.equal(candidatesInSimpleSet(restored.document, "body").length, 0);
+  assert.equal(candidatesInSimpleSet(restored.document, "headlines").length, fixture.document.candidates.length);
+  assert.deepEqual(restored.document.candidates, fixture.document.candidates);
+  assert.deepEqual(parseStudyDocument(serializeStudyDocument(restored.document)), restored.document);
+});
+
+test("semantic edits retain trusted unchanged graphs for bounded undo memory without bypassing validation", () => {
+  const fixture = createFixtureSession();
+  const copy = applyStudyCommand(fixture, { type: "edit-simple-set", setId: "headlines", patch: { copy: "Another headline" } });
+  assert.equal(copy.document.faces, fixture.document.faces);
+  assert.equal(copy.document.sources, fixture.document.sources);
+  assert.equal(copy.document.candidates, fixture.document.candidates);
+  assert.equal(copy.document.recipes, fixture.document.recipes);
+  const candidate = fixture.document.candidates[0]!;
+  const edited = applyStudyCommand(copy, { type: "edit-candidate", candidateId: candidate.id, patch: { casing: "uppercase" } });
+  assert.notEqual(edited.document.candidates[0], candidate);
+  assert.equal(edited.document.candidates[1], fixture.document.candidates[1]);
+  assert.equal(edited.document.faces, fixture.document.faces);
+  assert.equal(fixture.document.candidates[0]!.casing, candidate.casing);
+  assert.throws(() => applyStudyCommand(copy, { type: "edit-simple-set", setId: "headlines", patch: { copy: "x".repeat(20_001) } }), DomainError);
+  assert.throws(() => assertStudyDocument({ ...copy.document, simpleSets: { headlines: { copy: "Valid", fitPolicy: "fit" } } }), DomainError);
+  assert.throws(() => assertStudyDocument({ ...copy.document, simpleSets: { ...simpleFontSets(copy.document), body: { copy: "Valid", fitPolicy: "invalid" } } }), DomainError);
 });

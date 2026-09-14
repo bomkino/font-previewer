@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.1.0-rc.7 — 2026-09-14
+
+### Added
+
+- Split Simple into independent **Headlines + subheadlines** and **Body Copy** font sets, each with its own copy and sizing, in the same Study used by Studio.
+- Added **Duplicate** for independent casing and style variants, and an explicit action to copy included fonts into the other set without copying Source binaries.
+- Added export for either set or both together, retaining four-up Boards, optional 12-font index pages, and one-font Body Copy pages at 5,152 × 2,160.
+- Added Study v5. Opening a v4 Study keeps existing Candidates in Headlines and starts Body Copy empty; saving retains the new schema.
+
+### Fixed
+
+- Single-face variable fonts now import once with default axis values and selectable named styles instead of multiplying named instances into broken Faces. Existing variable Candidates are retained; actual collections remain metadata-only.
+- Centered index specimens using measured text bounds, including short final pages and case/style variants.
+- Preserved per-Candidate variation and feature settings in Simple PNG rendering.
+- Made Simple's Cmd-E export honour the current set and visible Source-copy acknowledgement, and committed focused title/text edits before freezing the export session.
+- Saved Studio comparisons retain their displayed custom text in an independent Recipe; reopening restores the Recipe, tray, and policy without changing either Simple set's copy or sizing.
+
+### Changed
+
+- Bounded Simple Preview and Tune to 12 Candidates per batch, with at most 24 interactive Source registrations and four concurrent font loads. Exports retain the full included font sets.
+- Kept unchanged font resources through semantic edits and rendered PNG pages sequentially, releasing temporary fonts and canvases after use.
+- Paused editing and native Mac Quit/window close during export so the transaction uses one unchanged Study.
+- Replaced the coral-loupe icon with a capital A whose hammock crossbar holds a lowercase a, with dedicated Dock and favicon crops.
+
+This candidate is not yet published. Exact-head verification, package checks, and release readback remain required. No reference-hardware speed or memory improvement, attended accessibility, independent-machine acceptance, stable release, Developer ID signing, or notarisation is claimed.
+
 ## 0.1.0-rc.6 — 2026-08-30
 
 ### Changed

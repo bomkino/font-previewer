@@ -24,6 +24,21 @@ npm run verify
 
 The test runner removes compiled output before every run, plants a deliberately failing stale artifact, and proves that only newly emitted test files execute.
 
+### Simple two-set regression gates
+
+For the unreleased `rc.7` source, retain focused public-seam and displayed evidence for:
+
+- v4 → v5 migration preserving Candidate IDs, axes, casing, and decisions in Headlines, with Body Copy initially empty; Save/reopen and recovery retaining both sets;
+- import into either set, explicit cross-set copy, and duplication without extra Source binaries or coupled casing/axis edits;
+- 20 included fonts rendering 12 visible previews on the first batch and eight on the next, while exporting all 20; independent set counts and copy, empty sets, rejected fonts, and either/both export scopes;
+- single-face variable import producing one Face with default axes and named styles, encoded Fontconfig named indices not becoming extra Faces, and actual collections remaining metadata-only;
+- retained historical variable Candidates rendering from a full-preview single-face Source without weakening collection or Binding checks;
+- saving and reopening Studio comparisons retaining authored Simple or Studio copy, without mutating shared Recipes or either Simple set;
+- centered index ink with mixed cases/styles and a partial final page, plus PNG variation settings checked against an actual loaded variable font;
+- font registrations remaining stable through semantic edits, the Simple visible-resource/load bounds, sequential page rendering, and cleanup after export success or failure.
+
+These are candidate gates, not a claim that the next release or independent-hardware acceptance has completed. Run the real desktop path as well as the narrow tests before release.
+
 ## Exact-head hosted gate
 
 `.github/workflows/verify.yml` checks the exact pull-request head or push SHA. A successful run on another commit is not evidence for the candidate.
@@ -59,7 +74,7 @@ The test runner removes compiled output before every run, plants a deliberately 
 - Run the displayed Host, native menu/panel routes, installed Catalog, opaque font loading, cancellation, keyboard/focus/semantic checks, productive-control height, centered icon/caret geometry, panel/tray alignment, disclosure semantics and reduced-motion behavior, recovery, and transactional Handoff fault injection.
 - Require PD Body Roman, PD Body Italic, PD Head, and PD Eyebrow to report loaded, then wait two animation frames before capturing displayed evidence.
 - Exercise Simple file/folder and installed-family/style intake, four-up and index boards, one-font Body Copy pages, authored and custom long copy, four colour quadrants, stress characters, five casing controls, variable axes, include/skip, and full-size preview.
-- Export Body Copy transactionally, decode every page at 5,152 × 2,160, prove full text and one shared fitted size, reject mixed manifests, and prove the copy remains available after switching to Studio.
+- Export Headlines, Body Copy, and both sets transactionally; decode every page at 5,152 × 2,160, prove full text and one shared Body Copy size, reject inconsistent or out-of-scope manifests, and prove active copy remains available after switching to Studio.
 - Prove Simple-added Candidates and the active comparison sizing policy appear unchanged in Studio.
 - Exercise Studio Review, Compare, System, and Handoff with contextual panes, full-width Handoff, no title/candidate truncation, and no unwanted tray on System/Handoff.
 - Measure every 80–140% scale step; require no horizontal overflow and a minimum 44 px visible control at the smallest scale.
@@ -94,6 +109,7 @@ Run the complete journey:
 - search, page, rebuild, cancel, and leave during Catalog work;
 - add one Source and one visible Family Group;
 - duplicate a variable Candidate and prove settings/decisions remain independent;
+- build separate Headlines and Body Copy sets, copy a font across them, change the duplicate's casing/style, and compare either-set and combined exports with the full included counts;
 - Review, Compare, assign Roles, Save, quit/recover, reopen on the other Host, relink, and export;
 - cancel every native panel and Handoff;
 - attempt Source copying without rights acknowledgement, then repeat with explicit acknowledgement and a legally redistributable font;
@@ -113,6 +129,7 @@ Run the complete journey:
 
 The synthetic 10,000-entry Catalog workload, cancellation contract, semantic 500-Face soak, malformed protocol/Study corpora, and synthetic hostile headers are automated. Stable `v1.0.0` still requires:
 
+- reference-hardware measurements for the 12-Candidate Simple batches, at most 24 visible Source registrations, four concurrent font loads, and full-set sequential PNG exports; these implementation bounds do not establish a latency or RAM improvement by themselves;
 - responsive 500-Face import and 100 visible review cards on reference hardware;
 - bounded memory over a displayed long Review/Compare session;
 - genuine adversarial multi-format font containment beyond synthetic headers;

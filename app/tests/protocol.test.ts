@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createFixtureSession } from "../src/fixture.js";
+import { getHostPort } from "../src/host-bridge.js";
 import { isHostEvent, isHostRequest, isHostResponse, isMenuCommand } from "../src/protocol.js";
 
 function validImport() {
@@ -114,4 +115,66 @@ test("HostBridge validators contain a deterministic malformed-message corpus", (
   assert.equal(isHostResponse(edgeCases[3]), false);
   assert.equal(isHostResponse(edgeCases[4]), false);
   assert.equal(isHostEvent(edgeCases[5]), false);
+});
+
+test("HostBridge migrates schema v4 open and recovery responses before v5 validation, but rejects corrupt or future data", async (context) => {
+  const session = createFixtureSession();
+  const legacy = JSON.parse(JSON.stringify(session.document));
+  legacy.schemaVersion = 4;
+  delete legacy.simpleSets;
+  let response: unknown;
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { fontPreviewerHost: {
+    async request() { return response; },
+    onMenuCommand() { return () => {}; },
+    onHostEvent() { return () => {}; },
+  } } });
+  context.after(() => {
+    if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
+    else Reflect.deleteProperty(globalThis, "window");
+  });
+  const host = getHostPort();
+  const opened = { type: "study-opened", document: legacy, bindings: session.bindings, warnings: [] };
+  assert.equal(isHostResponse(opened), false, "raw schema v4 cannot bypass the current protocol");
+  response = opened;
+  const migratedOpen = await host.request({ type: "open-study" });
+  assert.equal(migratedOpen.type, "study-opened");
+  if (migratedOpen.type !== "study-opened") return;
+  assert.equal(migratedOpen.document.schemaVersion, 5);
+  assert.deepEqual(migratedOpen.document.candidates, session.document.candidates);
+  assert.deepEqual(migratedOpen.bindings, session.bindings);
+  const launch = {
+    type: "launch-state",
+    capabilities: { host: "wkwebview", platform: "macos", importFiles: true, importFolders: true, installedCatalog: true, nativeSave: true, transactionalHandoff: true, sourceRelink: true, sourceReveal: true, renderProfile: "WebKit", fullFormats: ["OTF"], metadataOnlyFormats: ["TTC"] },
+    recovery: { document: legacy, workspace: { ...session.workspace, copyOverride: "Retained recovery copy" }, bindings: session.bindings, revision: 4, intentionallySavedRevision: 2 },
+    recentDocuments: [],
+  };
+  response = launch;
+  const migratedRecovery = await host.request({ type: "get-launch-state" });
+  assert.equal(migratedRecovery.type, "launch-state");
+  if (migratedRecovery.type !== "launch-state") return;
+  assert.equal(migratedRecovery.recovery?.document.schemaVersion, 5);
+  assert.equal(migratedRecovery.recovery?.workspace.copyOverride, "Retained recovery copy");
+  assert.equal(migratedRecovery.recovery?.revision, 4);
+
+  response = { ...opened, document: session.document };
+  assert.equal((await host.request({ type: "open-study" })).type, "study-opened");
+  response = { ...launch, recovery: { ...launch.recovery, document: session.document, workspace: { ...session.workspace, simpleSet: "body" } } };
+  const currentRecovery = await host.request({ type: "get-launch-state" });
+  assert.equal(currentRecovery.type, "launch-state");
+  if (currentRecovery.type !== "launch-state") return;
+  assert.deepEqual(currentRecovery.recovery?.document, session.document);
+  assert.equal(currentRecovery.recovery?.workspace.simpleSet, "body");
+  for (const badStudy of [
+    { ...legacy, schemaVersion: 99 },
+    { ...legacy, candidates: [{ ...legacy.candidates[0], faceId: "face:missing" }] },
+    { ...session.document, simpleSets: { headlines: { copy: "Incomplete", fitPolicy: "fit" } } },
+  ]) {
+    response = { ...opened, document: badStudy };
+    await assert.rejects(host.request({ type: "open-study" }));
+    response = { ...launch, recovery: { ...launch.recovery, document: badStudy } };
+    await assert.rejects(host.request({ type: "get-launch-state" }));
+  }
+  response = { ...launch, recovery: { ...launch.recovery, workspace: { ...session.workspace, simpleSet: "unknown" } } };
+  await assert.rejects(host.request({ type: "get-launch-state" }), /invalid response/);
 });

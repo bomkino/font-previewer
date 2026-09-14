@@ -180,7 +180,18 @@ export function getHostPort(): HostPort {
   const rawPort = window.fontPreviewerHost ?? browserPort;
   return {
     async request(request) {
-      const response: unknown = await rawPort.request(request);
+      let response: unknown = await rawPort.request(request);
+      // Older native Hosts persist schema v4 verbatim. Migrate at the shared
+      // boundary before protocol validation; future schemas remain rejected.
+      if (response && typeof response === "object") {
+        const value = response as Record<string, unknown>;
+        if (value.type === "study-opened" && value.document) {
+          response = { ...value, document: parseStudyDocument(JSON.stringify(value.document)) };
+        } else if (value.type === "launch-state" && value.recovery && typeof value.recovery === "object") {
+          const recovery = value.recovery as Record<string, unknown>;
+          response = { ...value, recovery: { ...recovery, document: parseStudyDocument(JSON.stringify(recovery.document)) } };
+        }
+      }
       if (!isHostResponse(response)) throw new Error("Host returned an invalid response");
       return response;
     },

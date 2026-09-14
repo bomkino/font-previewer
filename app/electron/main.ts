@@ -65,6 +65,7 @@ const applicationRoot = join(currentDirectory, "..", "..");
 const rendererPath = join(applicationRoot, "dist", "renderer", "index.html");
 const preloadPath = join(currentDirectory, "preload.cjs");
 const evidenceDirectory = process.env.FONT_PREVIEWER_EVIDENCE_DIR;
+let exportInProgress = false;
 const waylandSmokePath = process.env.FONT_PREVIEWER_WAYLAND_SMOKE_PATH;
 const maximumStudyBytes = 8_000_000;
 const maximumSourceBytes = 512 * 1024 * 1024;
@@ -576,7 +577,7 @@ async function handleHostRequest(event: IpcMainInvokeEvent, rawRequest: unknown)
         document,
         bindings: await bindingsForDocument(document),
         ...(version < STUDY_SCHEMA_VERSION ? { migratedFrom: version } : {}),
-        warnings: version < STUDY_SCHEMA_VERSION ? ["Legacy Study migrated in memory. Save to commit schema v4."] : [],
+        warnings: version < STUDY_SCHEMA_VERSION ? [`Legacy Study migrated in memory. Save to commit schema v${STUDY_SCHEMA_VERSION}.`] : [],
       };
     }
     case "mirror-study": {
@@ -602,7 +603,13 @@ async function handleHostRequest(event: IpcMainInvokeEvent, rawRequest: unknown)
     case "export-handoff": {
       if (!mainWindow) throw new Error("No active window.");
       if (!mirrored || mirrored.document.id !== request.document.id || mirrored.revision !== request.revision) throw new Error("Recovery checkpoint must complete before export.");
-      const result = await dialog.showOpenDialog(mainWindow, { title: "Choose Handoff destination", buttonLabel: "Export Here", properties: ["openDirectory", "createDirectory"] });
+      if (exportInProgress) throw new Error("An export is already in progress.");
+      exportInProgress = true;
+      try {
+      const evidenceTarget = evidenceDirectory ? join(evidenceDirectory, "simple-ui-exports") : undefined;
+      if (evidenceTarget) await mkdir(evidenceTarget, { recursive: true });
+      const result = evidenceTarget ? { canceled: false, filePaths: [evidenceTarget] }
+        : await dialog.showOpenDialog(mainWindow, { title: "Choose Handoff destination", buttonLabel: "Export Here", properties: ["openDirectory", "createDirectory"] });
       if (result.canceled || !result.filePaths[0]) return { type: "export-result", displayName: "", exported: false, fileCount: 0 };
       const selectedMetadata = await lstat(result.filePaths[0]);
       if (selectedMetadata.isSymbolicLink() || !selectedMetadata.isDirectory()) throw new Error("Handoff destination must be a regular directory.");
@@ -616,6 +623,7 @@ async function handleHostRequest(event: IpcMainInvokeEvent, rawRequest: unknown)
         sourcePermissionAcknowledged: request.sourcePermissionAcknowledged,
       });
       return { type: "export-result", displayName: exported.displayName, exported: true, fileCount: exported.fileCount };
+      } finally { exportInProgress = false; }
     }
     case "relink-source": {
       if (!mainWindow) throw new Error("No active window.");
@@ -688,6 +696,7 @@ async function createWindow(): Promise<BrowserWindow> {
   window.webContents.on("will-attach-webview", (event) => event.preventDefault());
   window.webContents.session.on("will-download", (event) => event.preventDefault());
   window.once("ready-to-show", () => window.show());
+  window.on("close", (event) => { if (exportInProgress) event.preventDefault(); });
   window.on("closed", () => {
     if (mainWindow === window) mainWindow = undefined;
   });
@@ -800,6 +809,7 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-app.on("before-quit", () => {
+app.on("before-quit", (event) => {
+  if (exportInProgress) { event.preventDefault(); return; }
   sourceWatchers.forEach((watcher) => watcher.close());
 });

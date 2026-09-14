@@ -4,7 +4,7 @@ This directory contains the active shared Simple + Studio renderer and the two d
 
 ## Layout
 
-- `src/` — React/TypeScript Simple + Studio views, shared Study v4 domain, four-up and Body Copy renderers, Family Groups, runtime font registry, and HostBridge protocol.
+- `src/` — React/TypeScript Simple + Studio views, shared Study v5 domain, four-up and Body Copy renderers, Family Groups, runtime font registry, and HostBridge protocol.
 - `electron/` — sandboxed Linux Host, bounded font inspection, transactional Handoff, storage, preload, and displayed evidence runner.
 - `macos/FontPreviewerHost.swift` — AppKit/WKWebView Host with CoreText discovery, native menus/panels, persistence, export, and displayed evidence runner.
 - `tests/` — public-seam domain, protocol, Catalog, grouping, migration, recovery, Handoff, accessibility, and Host tests.
@@ -13,17 +13,26 @@ This directory contains the active shared Simple + Studio renderer and the two d
 
 Source version is `0.1.0`. The latest published prerelease is [`v0.1.0-rc.6`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.6), built from exact source `f1aa382c8265b4884261c4308a4a5d37077a5242`. Its tag, public `SOURCE_SHA`, and freshly downloaded checksum manifest agree. No stable release is designated.
 
+The current source prepares `v0.1.0-rc.7`; it is not yet published. The product paths below describe this source, not the older public download.
+
 ## Product paths
 
 Simple is the default front door:
 
-1. add local font files/folders or open the installed-font Catalog;
-2. choose a family, individual source/style, or the whole family;
-3. choose four-up **Boards** or one-font **Body Copy** pages and see the result immediately;
-4. edit copy, choose an authored reading sample, show stress characters, and tune casing, axes, order, inclusion, and sizing;
-5. export verified 5,152 × 2,160 Boards plus optional index pages, or one Body Copy page per included font.
+1. choose **Headlines + subheadlines** or **Body Copy**; each set keeps its own fonts, copy, and sizing;
+2. add local font files/folders or open the installed-font Catalog, then choose a family, individual source/style, or the whole family;
+3. browse four-up **Boards** for Headlines or one-font reading pages for Body Copy, 12 included fonts at a time;
+4. edit copy, choose an authored reading sample, show stress characters, and tune casing, named styles, axes, order, inclusion, and sizing;
+5. duplicate a font for an independent case/style, or copy included fonts into the other set;
+6. export either set or both: 5,152 × 2,160 Boards plus optional index pages, and one Body Copy page per included font.
 
-Studio reads the same Study and adds Review, saved Compare sets, blind comparison, System Roles, and full Handoff controls. Switching modes does not duplicate or translate font decisions.
+Preview and Tune each show a bounded batch of 12. The Simple interactive font registry retains only the Sources needed by those batches, at most 24, and starts at most four font loads at once. PNGs render sequentially with temporary fonts and canvases released after use. Preview pagination never reduces the export count.
+
+Studio reads the same Study and adds Review, saved Compare sets, blind comparison, System Roles, and full Handoff controls. Switching modes does not duplicate or translate font decisions. Copying or duplicating a font is an explicit action that creates a new Candidate without copying its Source binary.
+
+Single-face variable fonts import as one Face with named styles and default axis values. Old Candidates created from erroneous named-instance Face indices remain available for supported single-face Sources; TTC/OTC/DFONT collections remain metadata-only.
+
+Study v4 opens through an explicit v5 migration: existing Candidates remain in Headlines and Body Copy starts empty. Save to retain v5. Keep the original Study if it must remain readable in `rc.6`.
 
 The titlebar scale control changes the complete interface from 80–140% in 10% steps. `Cmd/Ctrl +`, `Cmd/Ctrl -`, and `Cmd/Ctrl 0` increase, decrease, and reset it.
 
