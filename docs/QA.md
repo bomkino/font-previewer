@@ -26,18 +26,19 @@ The test runner removes compiled output before every run, plants a deliberately 
 
 ### Simple two-set regression gates
 
-For the unreleased `rc.7` source, retain focused public-seam and displayed evidence for:
+Retain the focused public-seam and displayed regression gates introduced in published `rc.7`:
 
 - v4 → v5 migration preserving Candidate IDs, axes, casing, and decisions in Headlines, with Body Copy initially empty; Save/reopen and recovery retaining both sets;
 - import into either set, explicit cross-set copy, and duplication without extra Source binaries or coupled casing/axis edits;
 - 20 included fonts rendering 12 visible previews on the first batch and eight on the next, while exporting all 20; independent set counts and copy, empty sets, rejected fonts, and either/both export scopes;
+- Body Copy matching one reading size within each visible preview batch and one shared size across the whole included set during export; preview pagination must not reduce the export population;
 - single-face variable import producing one Face with default axes and named styles, encoded Fontconfig named indices not becoming extra Faces, and actual collections remaining metadata-only;
 - retained historical variable Candidates rendering from a full-preview single-face Source without weakening collection or Binding checks;
 - saving and reopening Studio comparisons retaining authored Simple or Studio copy, without mutating shared Recipes or either Simple set;
 - centered index ink with mixed cases/styles and a partial final page, plus PNG variation settings checked against an actual loaded variable font;
 - font registrations remaining stable through semantic edits, the Simple visible-resource/load bounds, sequential page rendering, and cleanup after export success or failure.
 
-These are candidate gates, not a claim that the next release or independent-hardware acceptance has completed. Run the real desktop path as well as the narrow tests before release.
+The rc.7 exact-main [verification run `34880045104`](https://github.com/bomkino/font-previewer/actions/runs/34880045104) passed both Hosts. Keep running the real desktop path as well as the narrow tests for later candidates; this release does not close independent-hardware or attended human gates.
 
 ## Exact-head hosted gate
 

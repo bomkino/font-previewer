@@ -4,13 +4,13 @@
 
 Published tags and releases are immutable historical records. Do not move a published tag, overwrite a release, replace its assets, or rewrite its source history.
 
-The latest published Font Previewer release is `v0.1.0-rc.6`. Its tag and `SOURCE_SHA` asset identify immutable release source `f1aa382c8265b4884261c4308a4a5d37077a5242`. The prior `v0.1.0-rc.5`, `v0.1.0-rc.4`, `v0.1.0-rc.3`, `v0.1.0-rc.2`, and `v0.1.0-rc.1` releases remain fixed with their original assets and source history.
+The latest published Font Previewer release is `v0.1.0-rc.7`. Its tag and `SOURCE_SHA` asset identify immutable release source `0c4969ef5dea2ae7a5de6950fe03c707649a8073`. The prior `v0.1.0-rc.6`, `v0.1.0-rc.5`, `v0.1.0-rc.4`, `v0.1.0-rc.3`, `v0.1.0-rc.2`, and `v0.1.0-rc.1` releases remain fixed with their original assets and source history.
 
 ## Version model
 
 - Application source and package version: `0.1.0`.
-- Latest published prerelease: `v0.1.0-rc.6`.
-- Prepared later candidate source: `v0.1.0-rc.7`; not yet published.
+- Latest published prerelease: `v0.1.0-rc.7`.
+- Prepared later candidate source: none.
 - Stable `v1.0.0`: prohibited until the documented human, physical, typography, accessibility, containment, reconstruction, and distribution decisions close.
 
 Every version change must reconcile `app/package.json`, `app/package-lock.json`, macOS bundle metadata, Linux package names/metadata, displayed version, SBOM, README, installation docs, changelog, tests, CI, and release notes. `npm run version:check` is the first gate.
@@ -46,7 +46,7 @@ The default path creates and retains a dry-run bundle. Publication requires expl
 
 No public release may be published without separate owner authorization, even when dry-run validation succeeds. The one-use authorization for `v0.1.0-rc.5` was exercised by publication run `33292575588` on 2026-08-30. The one-use authorization for `v0.1.0-rc.6` was exercised by publication run `33296294623` on 2026-08-30 after exact-main verification run `33296016674` and guarded dry run `33296253222`. Neither authorization extends to a stable release or later tag.
 
-On 2026-09-14 the owner separately authorized the next candidate, rc.7, its local installation, and related repository/documentation cleanup. This authority does not waive exact-head verification, the guarded dry run, immutable publication, or public/installed artifact readback. No paid Apple distribution or stable-release claim was authorized.
+On 2026-09-14 the owner separately authorized rc.7, its local installation, and related repository/documentation cleanup. The publication authorization was exercised by successful [run `34880968632`](https://github.com/bomkino/font-previewer/actions/runs/34880968632) at `2026-09-14T18:28:52Z`, after exact-main [verification `34880045104`](https://github.com/bomkino/font-previewer/actions/runs/34880045104), [repository verification `34880045074`](https://github.com/bomkino/font-previewer/actions/runs/34880045074), and [guarded dry run `34880779961`](https://github.com/bomkino/font-previewer/actions/runs/34880779961). All nine public assets were downloaded; `SHA256SUMS` verified all eight payloads and the tag matched public `SOURCE_SHA`. This does not establish local installation. No later tag, paid Apple distribution, or stable release was authorized.
 
 ## Claim boundaries
 
