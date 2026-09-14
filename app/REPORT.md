@@ -1,15 +1,17 @@
 # Current Font Previewer implementation report
 
+Last reviewed: 2026-09-15 IST
+
 ## Repository truth
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Published baseline: `v0.1.0-rc.6` at exact source `f1aa382c8265b4884261c4308a4a5d37077a5242`
-- Current source: preparing `v0.1.0-rc.7`; exact-head verification, package evidence, and publication readback remain required
-- Prior prereleases: immutable `v0.1.0-rc.5`, `v0.1.0-rc.4`, `v0.1.0-rc.3`, `v0.1.0-rc.2`, and `v0.1.0-rc.1`
+- Published prerelease: `v0.1.0-rc.7` at exact source `0c4969ef5dea2ae7a5de6950fe03c707649a8073`
+- Public readback: tag and `SOURCE_SHA` agree; all nine assets downloaded and all eight payloads verified against `SHA256SUMS`
+- Prior prereleases: immutable `v0.1.0-rc.6`, `v0.1.0-rc.5`, `v0.1.0-rc.4`, `v0.1.0-rc.3`, `v0.1.0-rc.2`, and `v0.1.0-rc.1`
 - Stable release: not approved or claimed
 
-The published baseline is represented on `main`. Body Copy and its release-blocking scale/recovery repairs reached `main` through PRs #11, #12, and #13; the pitch.dog typography, Phosphor icon, spacing, privacy, and package-integrity work reached `main` through PR #15; exact caret, container-fit, and disclosure-motion polish reached `main` through PR #17. The source behavior described below includes the prepared two-set candidate; it is not evidence that `rc.7` has reached `main`, been published, or been installed.
+The published implementation is represented on `main`. Body Copy and its release-blocking scale/recovery repairs reached `main` through PRs #11, #12, and #13; the pitch.dog typography, Phosphor icon, spacing, privacy, and package-integrity work through PR #15; caret, container-fit, and disclosure-motion polish through PR #17; and the two-set, variable-font, export, and resource-lifecycle changes through [PR #19](https://github.com/bomkino/font-previewer/pull/19), from feature head `4eb38ecf21f23c03383435a2c021d47cb9df4218`. Public release evidence does not establish the locally installed app version.
 
 The detailed autonomous hardening report that originally described an isolated, unmerged branch is preserved unchanged at [`../docs/archive/2026-08-27/APP_REPORT_RC_EVIDENCE.md`](../docs/archive/2026-08-27/APP_REPORT_RC_EVIDENCE.md). It is historical evidence, not current repository status.
 
@@ -23,7 +25,7 @@ Font Previewer is one local typography-decision product delivered through:
 
 Simple has independent **Headlines + subheadlines** and **Body Copy** Candidate sets. Each set stores its copy and fit policy in the portable Study. Sources, Faces, Candidate casing/axes/order/decisions, and the active set's copy and comparison policy remain available in Studio through the same session. Explicit duplication or cross-set copying creates a new Unreviewed Candidate with independent settings, not another Source binary or a synchronized document.
 
-Body Copy renders one full-text reading page per included font at one shared fitted size; Headlines retains the original four-up colour comparison and optional index pages. Either set or both can be exported in one Handoff. Preview and Tune each browse 12 Candidates per batch, without reducing the full export count. The Simple registry needs at most 24 Source resources across those batches and starts at most four loads concurrently. Stable Source identities avoid reloads during semantic edits; sequential PNG rendering releases temporary font and canvas resources.
+Body Copy renders one full-text reading page per included font. Preview matches reading size within the visible batch; export uses one matched size across the whole included Body Copy set. Headlines retains the original four-up colour comparison and optional index pages. Either set or both can be exported in one Handoff. Preview and Tune each browse 12 Candidates per batch, without reducing the full export count. The Simple registry needs at most 24 Source resources across those batches and starts at most four loads concurrently. Stable Source identities avoid reloads during semantic edits; sequential PNG rendering releases temporary font and canvas resources.
 
 Single-face variable imports use default axes and selectable named styles rather than enumerating named instances as extra Faces. Supported historical variable Candidates are retained; actual collections remain metadata-only. Index centering uses measured ink bounds, and PNG rendering retains Candidate variation and feature settings.
 
@@ -33,7 +35,7 @@ Study v4 migrates to v5 with existing Candidates in Headlines and Body Copy empt
 
 Application chrome uses seven exact CC0-1.0 WOFF2 files from pitch.dog Type System v13 and one Phosphor icon adapter. Candidate specimens retain isolated generated families. One reusable audit requires the approved UI-font locations, sizes, and SHA-256 digests in every build/package surface and rejects all other font binaries.
 
-The prepared icon family replaces the coral loupe with a capital A whose hammock crossbar holds a lowercase a, using responsive crops for small app and favicon placements. It does not change the dark-first interface or the UI-font allowlist.
+The published icon family replaces the coral loupe with a capital A whose hammock crossbar holds a lowercase a, using responsive crops for small app and favicon placements. It does not change the dark-first interface or the UI-font allowlist.
 
 The root `macos/` SwiftUI/CoreText application is a preserved reference, not an active package or second product.
 
@@ -52,7 +54,7 @@ Permanent application verification is defined by [`.github/workflows/verify.yml`
 - macOS app assembly, hardened runtime, ad-hoc signature verification, archive round trip, and checksums;
 - package inventory, private-path, credential-marker, source-map, licence, notice, SBOM, and exact seven-font allowlist checks.
 
-Published-baseline workflow evidence is recorded in [`../docs/maintenance/REPOSITORY_STATE.md`](../docs/maintenance/REPOSITORY_STATE.md), the exact-SHA `SOURCE_SHA` release asset, and the release-linked Actions runs. It does not transfer to `rc.7`. The candidate additionally requires the two-set, migration, variable-font, pagination, index, export-lifecycle, and resource-registry gates in [`../docs/QA.md`](../docs/QA.md). No new native measurement, reference-hardware latency, or RAM improvement is asserted here; exact-head workflow and package receipts must establish the candidate's results.
+The rc.7 exact-main [verification run `34880045104`](https://github.com/bomkino/font-previewer/actions/runs/34880045104) passed both Hosts, and [repository verification `34880045074`](https://github.com/bomkino/font-previewer/actions/runs/34880045074) passed. The retained two-set, migration, variable-font, pagination, index, export-lifecycle, and resource-registry gates are documented in [`../docs/QA.md`](../docs/QA.md); detailed release evidence remains in [`../docs/maintenance/REPOSITORY_STATE.md`](../docs/maintenance/REPOSITORY_STATE.md). These results do not establish universal latency, an all-app RAM ceiling, or independent-machine acceptance.
 
 ## Release machinery
 
@@ -64,7 +66,7 @@ Published-baseline workflow evidence is recorded in [`../docs/maintenance/REPOSI
 - verified source-SHA manifests, checksums, package contents, notices, SBOM, and release notes;
 - an explicit publication boolean and exact tag confirmation before any GitHub release write.
 
-The default path creates a downloadable dry-run bundle. It refuses existing tags and releases. The published `v0.1.0-rc.6` baseline completed through exact-main verification run `33296016674`, guarded dry run `33296253222`, and publication run `33296294623`; those receipts do not verify a later candidate. The owner has requested the next prerelease, and its prepared payload is [`../docs/releases/v0.1.0-rc.7.md`](../docs/releases/v0.1.0-rc.7.md). Publication still requires the candidate's exact-source checks and new workflow receipts. No stable `v1.0.0` claim follows.
+The default path creates a downloadable dry-run bundle and refuses existing tags and releases. For rc.7, [dry run `34880779961`](https://github.com/bomkino/font-previewer/actions/runs/34880779961) passed, followed by successful [publication `34880968632`](https://github.com/bomkino/font-previewer/actions/runs/34880968632) at `2026-09-14T18:28:52Z`. The [release payload](../docs/releases/v0.1.0-rc.7.md) and all other public assets were downloaded and verified. The public Mac ZIP SHA-256 is `f89508e83f6fa6d0c0a5cf8f51395dc852230579672fd1132708b081025f2c49`. No stable `v1.0.0` or local-installation claim follows from publication.
 
 ## Remaining human and physical gates
 

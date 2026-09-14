@@ -24,7 +24,7 @@
 - Paused editing and native Mac Quit/window close during export so the transaction uses one unchanged Study.
 - Replaced the coral-loupe icon with a capital A whose hammock crossbar holds a lowercase a, with dedicated Dock and favicon crops.
 
-This candidate is not yet published. Exact-head verification, package checks, and release readback remain required. No reference-hardware speed or memory improvement, attended accessibility, independent-machine acceptance, stable release, Developer ID signing, or notarisation is claimed.
+Published from exact source `0c4969ef5dea2ae7a5de6950fe03c707649a8073` after exact-head verification and guarded release preparation. Fresh public downloads passed `SHA256SUMS`. Body Copy preview matching is per visible batch; export matching covers the whole included set. No universal latency or RAM improvement, attended accessibility, independent-machine acceptance, stable release, Developer ID signing, or notarisation is claimed.
 
 ## 0.1.0-rc.6 — 2026-08-30
 

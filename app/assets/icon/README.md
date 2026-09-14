@@ -12,6 +12,6 @@ The candidate was generated with the built-in image tool on 2026-09-14, guided b
 
 The master was inspected at full size, and the responsive family at actual 256, 64, 32, and 16 px. The public PNGs at 16, 32, 64, 180, 192, and 512 px are deterministic resizes of the same responsive source. `favicon.ico` contains matching 16, 32, and 64 px images. All exported PNGs are opaque, 8-bit sRGB with nonessential metadata removed.
 
-Status: agent-checked and promoted for the next release; not separately owner-accepted or yet claimed as published. This family supersedes the coral-loupe icon; its prior pixels remain in Git history. Generated candidates and edit lineage remain outside the public package. No reference image, private path, prompt, generation ID, EXIF, or restricted source material is embedded in the distributed assets.
+Status: agent-checked and published in `v0.1.0-rc.7`; not separately owner-accepted. This family supersedes the coral-loupe icon; its prior pixels remain in Git history. Generated candidates and edit lineage remain outside the public package. No reference image, private path, prompt, generation ID, EXIF, or restricted source material is embedded in the distributed assets.
 
 Caption: “There is room for both.” Alt text when the illustration itself carries meaning: “A capital A cradles a lowercase a in its coral hammock crossbar.” In the application titlebar it is decorative because the adjacent text names Font Previewer.

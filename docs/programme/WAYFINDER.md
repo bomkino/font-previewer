@@ -6,9 +6,11 @@ Deliver one trustworthy local typography-decision product on Mac and Linux. A de
 
 ## Current reality
 
-Published `v0.1.0-rc.6` combines the default Simple view, original four-up Boards, one-font Body Copy reading pages, and rebuilt Studio with the pinned pitch.dog interface type system, centered Phosphor controls, stable disclosures, consistent container fit, restrained motion, blind-surface privacy, and exact package/layout gates. Exact-source cross-platform verification, release assembly, publication, and fresh public checksum readback all passed; human/reference gates remain ahead of stable v1.0.
+Published `v0.1.0-rc.7` gives Simple independent Headlines and Body Copy sets, duplication, variable named styles, either/both exports, centered index specimens, bounded preview/export resources, and the revised icon. It retains the pinned pitch.dog interface system, dark-first presentation, and shared Studio. Exact-source cross-platform verification, guarded release assembly, publication, and fresh public checksum readback passed for `0c4969ef5dea2ae7a5de6950fe03c707649a8073`; human/reference gates remain ahead of stable v1.0.
 
-The root `macos/` application remains a preserved CoreText oracle. It is not the active product because its historical model stores paths in the Study and collapses concepts that Study v4 keeps distinct.
+Body Copy preview matches reading size within each visible batch; export matches the whole included set. Resource bounds do not establish a universal latency or RAM improvement.
+
+The root `macos/` application remains a preserved CoreText oracle. It is not the active product because its historical model stores paths in the Study and collapses concepts that Study v5 keeps distinct.
 
 ## Evidence-backed route
 

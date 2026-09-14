@@ -13,13 +13,11 @@ It imports and inspects fonts, maintains portable `.pitchfontstudy` documents, c
 
 - Canonical branch: `main`
 - Source version: `0.1.0`
-- Latest published release: [`v0.1.0-rc.6`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.6)
-- Exact release source: `f1aa382c8265b4884261c4308a4a5d37077a5242`
+- Latest published release: [`v0.1.0-rc.7`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.7)
+- Exact release source: `0c4969ef5dea2ae7a5de6950fe03c707649a8073`
 - Public stable release: none
 
-Published `v0.1.0-rc.6` adds centered Phosphor carets, stable disclosure geometry, balanced icon controls, restrained motion, and exact cross-Host layout/motion gates on top of the pinned pitch.dog interface system introduced in `rc.5`. Published `rc.1` through `rc.5` history remains immutable.
-
-Current source is preparing `v0.1.0-rc.7`, not yet published. The features below describe that source; the download above remains `rc.6` until the next candidate passes its release gates.
+Published `v0.1.0-rc.7` adds independent Simple font sets, duplication, variable-font and index fixes, bounded preview/export resources, and the revised app icon. Exact-main verification passed both Hosts; all nine public assets were downloaded and `SHA256SUMS` verified all eight payloads. The tag and public `SOURCE_SHA` agree. Published `rc.1` through `rc.6` history remains immutable.
 
 The exact current repository state, automated evidence, and remaining human gates live in [`docs/maintenance/REPOSITORY_STATE.md`](docs/maintenance/REPOSITORY_STATE.md).
 
@@ -28,7 +26,7 @@ The exact current repository state, automated evidence, and remaining human gate
 - Simple mode: local file/folder upload or an installed-font picker with family-first style selection.
 - Independent Headlines + subheadlines and Body Copy sets, with separate copy and sizing. Copy included fonts into the other set, or duplicate a font within its set; casing, axes, and later decisions remain independent.
 - Immediate four-font comparison boards, optional 12-font index pages, four-colour quadrants, stress text, five casing modes including AP Title, variable-axis tuning, reordering, include/skip, and full-size previews.
-- One-font Body Copy pages with three authored reading samples, custom copy, one matched reading size across the set, and full-text previews.
+- One-font Body Copy pages with three authored reading samples, custom copy, and full-text previews. Reading size is matched within each visible preview batch; export uses one matched size across the whole included Body Copy set.
 - Shared Simple/Studio state for imported styles, copy, casing, axes, ordering, decisions, and comparison sizing.
 - Transactional 5,152 × 2,160 PNG export for `Boards/` plus optional `Index/`, `Body Copy/`, or both sets together, with manifest, checksums, Study JSON, CSV, summary, and optional explicitly authorised Source copies.
 - Preview and Tune browse 12 Candidates at a time; export still includes every included Candidate in the chosen sets. Index specimens are centered by measured text bounds, including incomplete pages.

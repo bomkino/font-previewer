@@ -11,9 +11,7 @@ This directory contains the active shared Simple + Studio renderer and the two d
 - `scripts/` — deterministic test/build cleanup, version checks, SBOM generation, package audits, Linux packaging, and macOS assembly.
 - `assets/icon/` and `public/` — the source icon pair and mechanically derived native/browser icon family.
 
-Source version is `0.1.0`. The latest published prerelease is [`v0.1.0-rc.6`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.6), built from exact source `f1aa382c8265b4884261c4308a4a5d37077a5242`. Its tag, public `SOURCE_SHA`, and freshly downloaded checksum manifest agree. No stable release is designated.
-
-The current source prepares `v0.1.0-rc.7`; it is not yet published. The product paths below describe this source, not the older public download.
+Source version is `0.1.0`. The latest published prerelease is [`v0.1.0-rc.7`](https://github.com/bomkino/font-previewer/releases/tag/v0.1.0-rc.7), built from exact source `0c4969ef5dea2ae7a5de6950fe03c707649a8073`. Its tag and public `SOURCE_SHA` agree; all nine public assets were downloaded and `SHA256SUMS` verified all eight payloads. No stable release is designated.
 
 ## Product paths
 
@@ -27,6 +25,8 @@ Simple is the default front door:
 6. export either set or both: 5,152 × 2,160 Boards plus optional index pages, and one Body Copy page per included font.
 
 Preview and Tune each show a bounded batch of 12. The Simple interactive font registry retains only the Sources needed by those batches, at most 24, and starts at most four font loads at once. PNGs render sequentially with temporary fonts and canvases released after use. Preview pagination never reduces the export count.
+
+Body Copy matches reading size within the visible preview batch. Export matches one reading size across the whole included Body Copy set, so exported pages can use a different size from a preview batch. Resource bounds do not establish a universal latency or RAM improvement.
 
 Studio reads the same Study and adds Review, saved Compare sets, blind comparison, System Roles, and full Handoff controls. Switching modes does not duplicate or translate font decisions. Copying or duplicating a font is an explicit action that creates a new Candidate without copying its Source binary.
 

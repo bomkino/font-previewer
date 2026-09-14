@@ -2,14 +2,16 @@
 
 ## Current verdict
 
-- `main` is canonical and contains the merged RC, hardening, and pre-Mac implementation.
+- `main` is canonical and contains the merged RC, hardening, pre-Mac, and two-set implementation; PR #19 brought the latest feature head `4eb38ecf21f23c03383435a2c021d47cb9df4218` into the release line.
 - Source version remains `0.1.0`.
-- `v0.1.0-rc.6` is published from exact source `f1aa382c8265b4884261c4308a4a5d37077a5242`.
-- Published `v0.1.0-rc.1` through `v0.1.0-rc.6` remain immutable with their original assets.
+- `v0.1.0-rc.7` is published from exact source `0c4969ef5dea2ae7a5de6950fe03c707649a8073`; the public tag and `SOURCE_SHA` agree.
+- Published `v0.1.0-rc.1` through `v0.1.0-rc.7` remain immutable with their original assets.
 - No stable release is approved or claimed.
-- The owner-authorized rc.6 publication completed through exact-main Verify `33296016674`, repository truth `33296016673`, guarded dry run `33296253222`, and publication `33296294623`.
-- The public release has nine assets. A fresh download of `SHA256SUMS` verifies every published payload.
-- The one-use rc.6 authorization has been exercised. Stable v1 and every later tag remain unauthorized and require a new owner decision.
+- The owner-authorized rc.7 publication completed through exact-main Verify `34880045104`, repository truth `34880045074`, guarded dry run `34880779961`, and publication `34880968632` at `2026-09-14T18:28:52Z`.
+- All nine public assets were downloaded. `SHA256SUMS` verifies all eight published payloads; the Mac ZIP SHA-256 is `f89508e83f6fa6d0c0a5cf8f51395dc852230579672fd1132708b081025f2c49`.
+- The one-use rc.7 publication authorization has been exercised. Stable v1 and every later tag remain unauthorized and require a new owner decision. Publication does not itself establish local installation.
+
+The preceding rc.6 publication remains recorded by exact-main verification `33296016674`, repository truth `33296016673`, dry run `33296253222`, and publication `33296294623`.
 
 The preceding rc.5 publication remains recorded by exact-main verification `33292252219`, repository truth `33292252221`, dry run `33292506974`, and publication `33292575588`.
 
