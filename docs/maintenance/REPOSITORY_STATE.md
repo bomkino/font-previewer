@@ -1,6 +1,6 @@
 # Font Previewer repository state
 
-Last reviewed: 2026-08-30
+Last reviewed: 2026-09-14
 
 ## Purpose
 
@@ -16,6 +16,16 @@ Font Previewer is a local typography decision tool. The active product is one sh
 - Exact latest-published source: `f1aa382c8265b4884261c4308a4a5d37077a5242`, confirmed by both tag and public `SOURCE_SHA`
 - Prior published releases: immutable `v0.1.0-rc.5`, `v0.1.0-rc.4`, `v0.1.0-rc.3`, `v0.1.0-rc.2`, and `v0.1.0-rc.1`
 - Stable release: none
+
+## Candidate in preparation: simple-font-sets
+
+The owner authorized the next prerelease, local installation, and repository/documentation cleanup on 2026-09-14. `feat/simple-font-sets` starts from current canonical main `abe234eedfc74d82f475c674d7797ce15019fe95`, preserving the published rc.6 typography and interface work.
+
+The source prepares rc.7: independent Headlines and Body Copy sets in Study v5, duplication and named styles, either/both exports, centered index ink, bounded preview/font/export resources, and the revised app icon. Existing v4 documents migrate without deleting original Candidates. Published rc.6 remains the current downloadable package until the new release gates finish.
+
+Local M2/8 GB checks: strict types, 76-test verification (73 passed; three Linux-only skips), bundle/font/privacy audit, zero npm vulnerabilities, and the 500-Face/2,000-operation/100-recovery diagnostic passed. The packaged Mac journey passed all 22 displayed states, generated 20 Body pages and a combined 5-board/2-index/20-body transaction, and proved one physical variable Face with 14 complete named styles. Real native index PNGs measure 645/721 px ink widths at width-axis 87.5/100, with centering error at most 1.5 px; export leaves zero temporary FontFaces. Three malformed manifests are rejected without altering prior PNGs or leaving staging. Final saved-comparison copy changes passed the domain regressions and complete local verification; exact-head hosted journeys remain required. No all-app RAM ceiling or independent-machine acceptance is claimed.
+
+Next proof: verify the exact proposed head on both hosted platforms. Publication and local replacement are not yet claimed.
 
 Published `rc.6` completes the interface-fit pass over the checksum-pinned pitch.dog Type System v13 foundation: centered Phosphor select/disclosure carets, protected text/icon spacing, balanced icon controls, stable focus-safe disclosure shells, short property-specific motion, and exact cross-Host geometry/motion gates.
 

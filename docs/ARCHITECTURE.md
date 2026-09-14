@@ -14,12 +14,15 @@ No Host installs fonts, exposes arbitrary filesystem access to the Studio, or re
 
 Simple and Studio render the same `StudySession`; they are not separate document formats or synchronized copies.
 
-- Adding local or installed Sources in either view runs the same bounded `ingest-sources` command and creates the same Faces and Candidates.
-- Copy, casing, variable axes, Candidate order, review/include decisions, tray membership, Comparison Sets, and Typography Systems remain shared semantic state.
-- The active Same size / Fit each / Lock line breaks choice is controlled once at the application boundary and passed into Simple pages and Studio Compare. Body Copy additionally derives one shared fitted reading size for every included page. Saving a Comparison Set records the comparison policy in the portable Study.
+- Adding local or installed Sources in either view runs the same bounded `ingest-sources` command. Simple assigns new Candidates to the active Headlines or Body Copy set; Sources and Faces are not duplicated merely because they are used in both sets.
+- Candidate set membership, casing, variable axes, order, review/include decisions, tray membership, Comparison Sets, and Typography Systems remain shared semantic state. Each Simple set stores its own copy and fit policy in the portable Study.
+- Duplicating a font or copying it into the other set deliberately creates a new Unreviewed Candidate with independent settings. Both Candidates retain a reference to the same Face; this is not background synchronization between views.
+- The active Same size / Fit each / Lock line breaks choice is passed into Simple pages and Studio Compare. A Simple set retains its own choice; Body Copy additionally derives one shared fitted reading size for every included page. Saving a Comparison Set records the comparison policy in the portable Study.
 - Interface mode, 80–140% UI scale, temporary stress visibility, index-page inclusion, and an unsaved Source-copy checkbox are presentation/export preferences, not a second Study authority.
 
-Simple is the low-friction front door. It offers four-up **Boards** and one-font **Body Copy** reading pages over the same Candidates. Studio remains the deeper Review → Compare → System → Handoff workspace.
+Simple is the low-friction front door. **Headlines + subheadlines** produces four-up Boards and optional index pages; **Body Copy** produces one-font reading pages from its independent Candidate set. Studio remains the deeper Review → Compare → System → Handoff workspace over all Candidates.
+
+Study v5 adds the two Simple set configurations and Candidate membership. A v4 migration preserves IDs, settings, and decisions, treats existing Candidates as Headlines, and leaves Body Copy empty. The new schema is retained on Save; older applications must reject it rather than silently dropping set data.
 
 ## Authority
 
@@ -76,6 +79,10 @@ An explicit Add action sends selected `ImportedSource` records through the seman
 
 Both current Hosts use the Studio’s CSS/`FontFace` interactive path with opaque Host-served font URLs. macOS uses CoreText for installed-font discovery and metadata; Linux uses Fontconfig plus bounded local inspection. The renderer declares its Host profile.
 
+Named styles are coordinates of one physical variable Face, not additional collection Faces. macOS collapses named descriptors for supported single-face formats and reads default axis values; Linux separates Fontconfig's encoded named-instance index from the physical face index. Named style selection applies the complete coordinate set in one semantic command. Historical nonzero Face indices may still preview only when the Source is a supported single-face variable format with a full-preview Binding; genuine collections do not gain a rendering fallback.
+
+The interactive registry keys resources by Source and Binding identity, so ordinary copy, casing, and axis edits do not reload font files. Simple Preview and Tune each expose 12 Candidates per batch. Their combined visible Faces need at most 24 Source resources, shared where Candidates use the same Source, with at most four concurrent loads. Leaving a batch releases resources no longer required. This bound applies to Simple's interactive registry, not to Studio or temporary export resources.
+
 The product claims semantic parity, not raster parity. WebKit/CoreText and Chromium may shape or rasterize differently. Complex-script coverage metadata is evidence, not a promise of typographic correctness. V1 gives full preview support to OTF/TTF/WOFF/WOFF2 and metadata-only support to TTC/OTC/DFONT.
 
 ## Recovery and intentional Save
@@ -96,7 +103,9 @@ The Host:
 6. atomically moves staging to a collision-safe final directory;
 7. removes staging on failure.
 
-When Simple is visible, the Studio exposes a bounded in-memory page-rendering capability to its Host. The manifest selects exactly one mutually exclusive format: four-up `Boards/` with optional `Index/`, or one-font `Body Copy/` pages. The Host validates candidate and page counts against the mirrored Study, requests each 5,152 × 2,160 PNG, checks PNG structure and decoded dimensions, and includes the files in the same transaction. Mixed or impossible manifests fail before commit. The capability is absent outside Simple mode.
+When Simple is visible, the Studio exposes a bounded in-memory page-rendering capability to its Host. Export scope selects Headlines, Body Copy, or both. Headlines produces four-up `Boards/` with optional `Index/`; Body Copy produces one page per included Body Candidate in `Body Copy/`. A combined manifest counts both sets without conflating their copy, fit policies, or Candidate membership. Rejected Candidates are excluded; preview pagination does not limit export.
+
+The Host validates scope and exact Candidate/page counts against the mirrored Study, requests each 5,152 × 2,160 PNG sequentially, checks PNG structure and decoded dimensions, and includes the files in the same transaction. The renderer preserves each Candidate's variation and feature settings, releases temporary export fonts and canvases, and computes the shared Body Copy size once for the immutable export runtime. Impossible, inconsistent, or out-of-scope manifests fail before commit. The capability is absent outside Simple mode.
 
 ## Host security
 

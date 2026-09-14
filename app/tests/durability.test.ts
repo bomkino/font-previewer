@@ -144,7 +144,7 @@ test("Simple Body Copy Handoff writes one verified page per included font", asyn
   const document = assertStudyDocument({
     ...fixture.document,
     title: "Simple Body Copy Evidence",
-    candidates: fixture.document.candidates.map((candidate, index) => ({ ...candidate, reviewState: index < 2 ? "keep" : "reject" })),
+    candidates: fixture.document.candidates.map((candidate, index) => ({ ...candidate, simpleSet: "body", reviewState: index < 2 ? "keep" : "reject" })),
     handoff: { profile: "internal", outputs: ["summary", "json", "csv"], includeSources: false },
   });
   const png = simpleBoardPng();
@@ -179,17 +179,40 @@ test("Simple Body Copy Handoff writes one verified page per included font", asyn
   assert.deepEqual(manifest.files.map((entry) => entry.path), ["Body Copy/Body_01.png", "Body Copy/Body_02.png", "README.md", "candidates.csv", "study.pitchfontstudy"]);
 });
 
-test("Simple Handoff refuses a mixed or impossible Body Copy manifest", async (context) => {
+test("Simple combined Handoff commits both sets and their index in one transaction", async (context) => {
   const targetDirectory = await temporaryDirectory(context);
   const fixture = createFixtureSession();
   const document = assertStudyDocument({
     ...fixture.document,
-    candidates: fixture.document.candidates.map((candidate, index) => ({ ...candidate, reviewState: index === 0 ? "keep" : "reject" })),
+    candidates: fixture.document.candidates.map((candidate, index) => ({ ...candidate, simpleSet: index === 1 ? "body" : "headlines", reviewState: index < 2 ? "keep" : "reject" })),
+    handoff: { profile: "internal", outputs: ["summary", "json", "csv"], includeSources: false },
+  });
+  const png = simpleBoardPng();
+  const rendered: string[] = [];
+  const window = { webContents: { executeJavaScript: async (script: string) => {
+    if (script.includes("runtime.manifest")) return { width: 5_152, height: 2_160, pageMode: "both", boardCount: 1, bodyCount: 1, indexCount: 1, fontCount: 2, includeIndex: true };
+    rendered.push(script);
+    return `data:image/png;base64,${png.toString("base64")}`;
+  } } } as unknown as BrowserWindow;
+  const exported = await exportTransactionalHandoff({ window, document, preferences: document.handoff, targetDirectory, sourcePaths: new Map(), sourcePermissionAcknowledged: false });
+  const root = join(targetDirectory, exported.displayName);
+  for (const path of ["Boards/Board_01.png", "Body Copy/Body_01.png", "Index/Index_01.png"]) assert.deepEqual(await readFile(join(root, path)), png);
+  assert.equal(rendered.length, 3);
+  for (const kind of ["board", "body", "index"]) assert.ok(rendered.some(script => script.includes(`render("${kind}"`)));
+  assert.deepEqual(await readdir(targetDirectory), [exported.displayName]);
+});
+
+test("Simple Handoff refuses impossible counts in an otherwise valid combined export", async (context) => {
+  const targetDirectory = await temporaryDirectory(context);
+  const fixture = createFixtureSession();
+  const document = assertStudyDocument({
+    ...fixture.document,
+    candidates: fixture.document.candidates.map((candidate, index) => ({ ...candidate, simpleSet: index === 1 ? "body" : "headlines", reviewState: index < 2 ? "keep" : "reject" })),
   });
   const window = {
     webContents: {
       executeJavaScript: async (script: string) => {
-        if (script.includes("runtime.manifest")) return { width: 5_152, height: 2_160, pageMode: "body", boardCount: 1, bodyCount: 1, indexCount: 0, fontCount: 1, includeIndex: false };
+        if (script.includes("runtime.manifest")) return { width: 5_152, height: 2_160, pageMode: "both", boardCount: 2, bodyCount: 1, indexCount: 1, fontCount: 2, includeIndex: true };
         throw new Error(`Unexpected renderer script: ${script}`);
       },
     },
@@ -201,7 +224,7 @@ test("Simple Handoff refuses a mixed or impossible Body Copy manifest", async (c
     targetDirectory,
     sourcePaths: new Map<string, string>(),
     sourcePermissionAcknowledged: false,
-  }), /Body Copy count does not match its fonts/);
+  }), /page counts do not match their font sets/);
   assert.deepEqual(await readdir(targetDirectory), []);
 });
 

@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import App from "../src/App.js";
+import { SimpleWorkspace, type AppActions } from "../src/components.js";
+import { applyStudyCommand, candidatesInSimpleSet, type StudySession } from "../src/domain.js";
+import { createFixtureSession } from "../src/fixture.js";
+import { createSimpleSetsExportRuntime, SIMPLE_BODY_COPY_SAMPLES } from "../src/simple-boards.js";
 import type { HostPort } from "../src/protocol.js";
 
 const inertHost: HostPort = {
@@ -94,14 +98,19 @@ test("Simple mode restores the original font-to-four-up-board pipeline", () => {
   assert.match(html, /Board 01/);
   assert.match(html, /Index 1 \/ 2/);
   assert.match(html, /5152 × 2160 export/);
+  assert.match(html, /Previewing fonts 1–12 of 20/);
+  assert.match(html, /Export 7 pages…/);
+  assert.equal((html.match(/class="simple-board"/gu) ?? []).length, 3);
+  assert.equal((html.match(/class="simple-index-board"/gu) ?? []).length, 1);
+  assert.equal((html.match(/class="simple-index-cell"/gu) ?? []).length, 12);
   assert.equal((html.match(/class="simple-font-card(?: |")/gu) ?? []).length, 0);
   assert.equal((html.match(/<main/g) ?? []).length, 1);
   assert.equal((html.match(/<aside/g) ?? []).length, 0);
-  assert.equal((html.match(/<nav/g) ?? []).length, 1);
+  assert.equal((html.match(/<nav/g) ?? []).length, 2);
   assert.doesNotMatch(html, /(?:file:\/\/|\/Users\/|\/home\/)/);
 });
 
-test("Simple Body Copy makes one complete reading page per included font", () => {
+test("Simple Body Copy starts as an independent empty set with a clear copy action", () => {
   globalThis.location.search = "?fixture=1&mode=simple&page=body";
   let html = "";
   try {
@@ -114,18 +123,66 @@ test("Simple Body Copy makes one complete reading page per included font", () =>
   assert.match(html, /Before the city wakes/);
   assert.match(html, /The useful quiet/);
   assert.match(html, /After the first rain/);
-  assert.match(html, /One font\. One reading page\./);
+  assert.match(html, /Add fonts\. Read them\./);
+  assert.match(html, /24 fonts · Four-up boards \+ index pages\./);
+  assert.match(html, /0 fonts · One reading page per font\./);
+  assert.match(html, /start with independent copies from Headlines/);
+  assert.match(html, /Copy included fonts here/);
   assert.match(html, /Matched reading size/);
   assert.match(html, /Edit once here; the same copy, casing, font order, styles, and variable axes stay with the Study in Studio\./);
   assert.match(html, /Good body type rarely asks to be admired\./);
-  assert.equal((html.match(/class="simple-page-wrap simple-body-page-wrap"/gu) ?? []).length, 20);
-  assert.equal((html.match(/class="simple-body-reading-copy simple-fitted-copy simple-fitted-body"/gu) ?? []).length, 20);
-  assert.equal((html.match(/5152 × 2160 export/gu) ?? []).length, 20);
+  assert.equal((html.match(/class="simple-page-wrap simple-body-page-wrap"/gu) ?? []).length, 0);
+  assert.equal((html.match(/class="simple-body-reading-copy simple-fitted-copy simple-fitted-body"/gu) ?? []).length, 0);
   assert.equal((html.match(/<main/g) ?? []).length, 1);
   assert.equal((html.match(/<aside/g) ?? []).length, 0);
-  assert.equal((html.match(/<nav/g) ?? []).length, 1);
+  assert.equal((html.match(/<nav/g) ?? []).length, 0);
   assert.doesNotMatch(html, /Stress test/);
   assert.doesNotMatch(html, /(?:file:\/\/|\/Users\/|\/home\/)/);
+});
+
+test("Simple Body Copy bounds previews to 12 while preserving all 20 exports and the headline set", () => {
+  const fixture = createFixtureSession();
+  const headlineIds = fixture.document.candidates.filter((candidate) => candidate.reviewState !== "reject").map((candidate) => candidate.id);
+  let session = applyStudyCommand(fixture, { type: "copy-to-simple-set", candidateIds: headlineIds, setId: "body" });
+  session = applyStudyCommand(session, { type: "select-simple-set", setId: "body" });
+  const noop = () => {};
+  const actions: AppActions = {
+    importSources: noop, scanInstalled: noop, cancelCatalog: noop, addCatalogSources: noop,
+    openStudy: noop, saveStudy: noop, exportHandoff: noop, exportBoards: noop,
+    relinkSource: noop, revealSource: noop, newStudy: noop, loadSample: noop,
+  };
+  const renderBody = (session: StudySession, browsePage: number) => renderToStaticMarkup(
+    <SimpleWorkspace
+      session={session} browsePage={browsePage} dispatch={noop}
+      fontStates={new Map(session.document.faces.map((face) => [face.id, "ready" as const]))}
+      headingRef={{ current: null }} actions={actions}
+      stressTest={false} onStressTestChange={noop} pageMode="body" onPageModeChange={noop}
+      bodySampleId={SIMPLE_BODY_COPY_SAMPLES[0]!.id} onBodySampleChange={noop}
+      fitPolicy="fit" onFitPolicyChange={noop} includeIndex={true} onIncludeIndexChange={noop}
+      includeSources={false} onIncludeSourcesChange={noop}
+      catalog={{ query: "", cursor: 0, imports: [], indexed: 0, total: 0, rejected: 0, truncated: false }}
+      catalogBusy={false} catalogOpenRequest={0}
+    />,
+  );
+  const firstPage = renderBody(session, 0);
+  assert.match(firstPage, /20 fonts\. 20 reading pages\./);
+  assert.match(firstPage, /24 fonts · Four-up boards \+ index pages\./);
+  assert.match(firstPage, /20 fonts · One reading page per font\./);
+  assert.match(firstPage, /Previewing fonts 1–12 of 20/);
+  assert.match(firstPage, /Export 20 pages…/);
+  assert.equal((firstPage.match(/class="simple-page-wrap simple-body-page-wrap"/gu) ?? []).length, 12);
+  assert.equal((firstPage.match(/class="simple-body-reading-copy simple-fitted-copy simple-fitted-body"/gu) ?? []).length, 12);
+  assert.equal((firstPage.match(/5152 × 2160 export/gu) ?? []).length, 12);
+  assert.doesNotMatch(firstPage, /Reading Page 13/);
+
+  const secondPage = renderBody(session, 1);
+  assert.match(secondPage, /Previewing fonts 13–20 of 20/);
+  assert.match(secondPage, /Reading Page 13/);
+  assert.match(secondPage, /Reading Page 20/);
+  assert.equal((secondPage.match(/class="simple-page-wrap simple-body-page-wrap"/gu) ?? []).length, 8);
+  assert.deepEqual(candidatesInSimpleSet(session.document, "headlines"), fixture.document.candidates);
+  assert.equal(createSimpleSetsExportRuntime(session, false, true, "body").manifest().bodyCount, 20);
+  assert.equal(createSimpleSetsExportRuntime(session, false, true, "boards").manifest().fontCount, 20);
 });
 
 test("welcome skip link has a focusable destination", () => {

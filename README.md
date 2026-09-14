@@ -2,10 +2,10 @@
 
 Font Previewer is a local typography decision tool for pitch-deck work. One shared Study now has two views inside a native AppKit/WKWebView Host on macOS and a sandboxed Electron Host on Linux:
 
-- **Simple:** add font files, folders, or installed families; choose styles; switch between four-up Boards and one-font Body Copy pages; tune; export.
+- **Simple:** keep a Headlines + subheadlines set and a Body Copy set; add font files, folders, or installed families; choose styles; see pages; export either set or both.
 - **Studio:** **Review → Compare → System → Handoff** for deeper decisions and packaging.
 
-Simple and Studio are not separate projects. Fonts, styles, copy, casing, variable-axis values, order, include/skip decisions, and comparison sizing move between them through the same session. Its dark-first interface and coral-loupe mark share one idea: attention reveals character; the tool does not choose a winner for you.
+Simple and Studio are not separate projects. They use the same Candidates and decisions in one Study. Each Simple set keeps its own fonts, copy, and sizing; duplicate a Candidate when the same font needs another case or style. The dark-first interface's new mark pairs a capital A with a lowercase a resting in its hammock crossbar: room for both.
 
 It imports and inspects fonts, maintains portable `.pitchfontstudy` documents, compares Candidates, assembles typography systems, and creates transactional Handoff packages. It does not install, transform, anonymise, slant, interpolate, or repackage fonts. Those are FontBlind concerns; the products share no implementation.
 
@@ -19,25 +19,31 @@ It imports and inspects fonts, maintains portable `.pitchfontstudy` documents, c
 
 Published `v0.1.0-rc.6` adds centered Phosphor carets, stable disclosure geometry, balanced icon controls, restrained motion, and exact cross-Host layout/motion gates on top of the pinned pitch.dog interface system introduced in `rc.5`. Published `rc.1` through `rc.5` history remains immutable.
 
+Current source is preparing `v0.1.0-rc.7`, not yet published. The features below describe that source; the download above remains `rc.6` until the next candidate passes its release gates.
+
 The exact current repository state, automated evidence, and remaining human gates live in [`docs/maintenance/REPOSITORY_STATE.md`](docs/maintenance/REPOSITORY_STATE.md).
 
 ## What works
 
 - Simple mode: local file/folder upload or an installed-font picker with family-first style selection.
+- Independent Headlines + subheadlines and Body Copy sets, with separate copy and sizing. Copy included fonts into the other set, or duplicate a font within its set; casing, axes, and later decisions remain independent.
 - Immediate four-font comparison boards, optional 12-font index pages, four-colour quadrants, stress text, five casing modes including AP Title, variable-axis tuning, reordering, include/skip, and full-size previews.
 - One-font Body Copy pages with three authored reading samples, custom copy, one matched reading size across the set, and full-text previews.
 - Shared Simple/Studio state for imported styles, copy, casing, axes, ordering, decisions, and comparison sizing.
-- Transactional 5,152 × 2,160 PNG export for either `Boards/` plus optional `Index/`, or `Body Copy/`, with manifest, checksums, Study JSON, CSV, summary, and optional explicitly authorised Source copies.
+- Transactional 5,152 × 2,160 PNG export for `Boards/` plus optional `Index/`, `Body Copy/`, or both sets together, with manifest, checksums, Study JSON, CSV, summary, and optional explicitly authorised Source copies.
+- Preview and Tune browse 12 Candidates at a time; export still includes every included Candidate in the chosen sets. Index specimens are centered by measured text bounds, including incomplete pages.
 - Interface scaling from 80–140%, with keyboard shortcuts, at least 44 px measured touch targets, and no title/candidate ellipsis in the verified states.
 - Host-local file and folder import without font installation or upload.
 - A searchable, paginated installed-font Catalog bounded to 10,000 entries; browsing cannot mutate a Study.
 - Separate Source, local Binding, Face, Candidate, Recipe, Comparison Set, Font Use, Typography System, and Handoff entities.
 - Exact Face indices, Host-reported metadata, independent Candidate settings, casing, tags, notes, rationale, and review decisions.
-- Variable axes and named instances: CoreText on macOS; a bounded child parser on Linux.
+- Variable axes and named styles: a single-face variable font imports once, with selectable named coordinates instead of extra broken Faces. Existing Candidates are retained; actual font collections remain metadata-only.
 - Family Groups, duplicate Candidates, Contact Sheet, Focus, Waterfall, live two-to-four-font comparison, saved comparison sets, the same sizing policies used by Simple, deck scenes, Role assignment, and Handoff preflight.
 - Host-owned recovery distinct from intentional Save, with stale-revision rejection and focus restoration.
 - Transactional Handoff staging, checksums, privacy-safe manifests, and explicitly acknowledged Source copying.
 - Native menus and panels, source reveal/relink, semantic undo/redo, and a closed path-free HostBridge.
+
+Study v5 stores the two Simple sets. Opening a v4 Study keeps its existing Candidates in Headlines and starts Body Copy empty. Save with the new app to retain v5; keep the original document if you need to return to `rc.6`.
 
 ## Platforms and artifacts
 
@@ -47,7 +53,7 @@ The exact current repository state, automated evidence, and remaining human gate
 | Ubuntu/Debian x64 | Electron 44 + Fontconfig | `.deb` and portable `.tar.gz` | Automated hosted X11/Wayland evidence; independent machines pending |
 | Browser | Development fallback | Renderer-only development server | No native Catalog, durable recovery, or transactional Handoff |
 
-The Mac package may trigger Gatekeeper warnings. Control-click **Open** only after verifying the release checksum and trusting this repository. No Apple notarisation, stapling, or Gatekeeper acceptance is claimed.
+The Mac package may trigger Gatekeeper warnings. After verifying the release checksum and trusting this repository, follow the app-specific exception in the installation guide. Do not disable Gatekeeper globally. No Apple notarisation, stapling, or Gatekeeper acceptance is claimed.
 
 See [`app/INSTALL.md`](app/INSTALL.md) before installing a release asset.
 

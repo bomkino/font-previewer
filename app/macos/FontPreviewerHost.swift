@@ -277,6 +277,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     private var evidenceRunner: MacEvidenceRunner?
     private var evidenceStarted = false
     private var terminationReplyPending = false
+    private var exportInProgress = false
     private var terminationTimeout: DispatchWorkItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -292,7 +293,9 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    func windowShouldClose(_ sender: NSWindow) -> Bool { !exportInProgress }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !exportInProgress else { return .terminateCancel }
         guard !terminationReplyPending else { return .terminateLater }
         terminationReplyPending = true
         sendMenu(["type": "flush-recovery"])
@@ -717,16 +720,19 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         }
         let token = full ? fontAssets.assign(canonical) : nil
         let fallbackName = canonical.deletingPathExtension().lastPathComponent.replacingOccurrences(of: "_", with: " ").replacingOccurrences(of: "-", with: " ")
-        let faceDescriptors: [CTFontDescriptor?] = descriptors.isEmpty ? [nil] : descriptors.map(Optional.some)
+        // CoreText enumerates named instances for a variable OTF/TTF/WOFF source.
+        // They are settings of its one physical Face, not collection face indexes.
+        let physicalDescriptors = full ? Array(descriptors.prefix(1)) : descriptors
+        let faceDescriptors: [CTFontDescriptor?] = physicalDescriptors.isEmpty ? [nil] : physicalDescriptors.map(Optional.some)
         let faces = faceDescriptors.prefix(256).enumerated().map { index, descriptor -> [String: Any] in
-            let family = (descriptor.flatMap { CTFontDescriptorCopyAttribute($0, kCTFontFamilyNameAttribute) as? String }) ?? fallbackName
-            let style = (descriptor.flatMap { CTFontDescriptorCopyAttribute($0, kCTFontStyleNameAttribute) as? String }) ?? "Regular"
-            let postScript = descriptor.flatMap { CTFontDescriptorCopyAttribute($0, kCTFontNameAttribute) as? String }
-            let font = descriptor.map { CTFontCreateWithFontDescriptor($0, 12, nil) }
+            let font = descriptor.map { full ? defaultVariableFont($0) : CTFontCreateWithFontDescriptor($0, 12, nil) }
+            let family = font.map { CTFontCopyFamilyName($0) as String } ?? fallbackName
+            let style = font.flatMap { CTFontCopyName($0, kCTFontStyleNameKey) as String? } ?? "Regular"
+            let postScript = font.map { CTFontCopyPostScriptName($0) as String }
             let axes = font.map(variableAxes) ?? []
             var face: [String: Any] = [
                 "id": "face:\(id):\(index)", "sourceId": id, "family": family, "style": style, "faceIndex": index,
-                "axes": axes, "namedInstances": [],
+                "axes": axes, "namedInstances": full ? namedVariableInstances(descriptors, axes: axes) : [],
                 "features": [["tag": "liga", "name": "Standard ligatures", "group": "ligatures", "defaultEnabled": true], ["tag": "kern", "name": "Kerning", "group": "other", "defaultEnabled": true]],
                 "coverage": ["supportedCodePointCount": 0, "scripts": [], "colorFormats": [], "evidenceLevel": "metadata"],
             ]
@@ -742,10 +748,49 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         ]
     }
 
+    private func defaultVariableFont(_ descriptor: CTFontDescriptor) -> CTFont {
+        let font = CTFontCreateWithFontDescriptor(descriptor, 12, nil)
+        let raw = CTFontCopyVariationAxes(font) as? [[AnyHashable: Any]] ?? []
+        var defaults: [NSNumber: NSNumber] = [:]
+        for axis in raw.prefix(64) {
+            if let identifier = axis[kCTFontVariationAxisIdentifierKey] as? NSNumber,
+               let value = axis[kCTFontVariationAxisDefaultValueKey] as? NSNumber,
+               value.doubleValue.isFinite { defaults[identifier] = value }
+        }
+        guard !defaults.isEmpty else { return font }
+        let base = CTFontDescriptorCreateCopyWithAttributes(descriptor, [kCTFontVariationAttribute: defaults] as CFDictionary)
+        return CTFontCreateWithFontDescriptor(base, 12, nil)
+    }
+
+    private func namedVariableInstances(_ descriptors: [CTFontDescriptor], axes: [[String: Any]]) -> [[String: Any]] {
+        guard !axes.isEmpty else { return [] }
+        var seen = Set<String>()
+        return descriptors.prefix(256).compactMap { descriptor in
+            let font = CTFontCreateWithFontDescriptor(descriptor, 12, nil)
+            let variation = CTFontCopyVariation(font) as? [NSNumber: NSNumber] ?? [:]
+            let coordinates: [[String: Any]] = axes.compactMap { axis in
+                guard let tag = axis["tag"] as? String, let initial = axis["defaultValue"] as? Double,
+                      let minimum = axis["minimum"] as? Double, let maximum = axis["maximum"] as? Double else { return nil }
+                let identifier = tag.utf8.reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+                let value = variation[NSNumber(value: identifier)]?.doubleValue ?? initial
+                guard value.isFinite, value >= minimum, value <= maximum else { return nil }
+                return ["tag": tag, "value": value]
+            }
+            guard coordinates.count == axes.count else { return nil }
+            let key = coordinates.map { "\($0["tag"]!):\($0["value"]!)" }.joined(separator: "|")
+            guard seen.insert(key).inserted else { return nil }
+            let rawName = (CTFontCopyName(font, kCTFontStyleNameKey) as String?)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let name = !rawName.isEmpty && rawName.count <= 512 && rawName.rangeOfCharacter(from: .controlCharacters) == nil ? rawName : "Instance"
+            return ["name": name, "coordinates": coordinates]
+        }
+    }
+
     private func variableAxes(_ font: CTFont) -> [[String: Any]] {
         guard let raw = CTFontCopyVariationAxes(font) as? [[AnyHashable: Any]] else { return [] }
-        return raw.enumerated().compactMap { index, axis in
+        return raw.prefix(64).enumerated().compactMap { index, axis in
             guard let minimum = axis[kCTFontVariationAxisMinimumValueKey] as? NSNumber, let maximum = axis[kCTFontVariationAxisMaximumValueKey] as? NSNumber, let initial = axis[kCTFontVariationAxisDefaultValueKey] as? NSNumber else { return nil }
+            guard minimum.doubleValue.isFinite, maximum.doubleValue.isFinite, initial.doubleValue.isFinite,
+                  minimum.doubleValue <= initial.doubleValue, initial.doubleValue <= maximum.doubleValue else { return nil }
             let number = (axis[kCTFontVariationAxisIdentifierKey] as? NSNumber)?.uint32Value
             let bytes = number.map { [UInt8(($0 >> 24) & 255), UInt8(($0 >> 16) & 255), UInt8(($0 >> 8) & 255), UInt8($0 & 255)] }
             let decoded = bytes.flatMap { String(bytes: $0, encoding: .ascii) }
@@ -774,7 +819,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
             guard let self else { reply(nil, "Host closed."); return }
             guard response == .OK, let url = panel.url else { self.panelCancelled += 1; reply(["type": "study-opened", "document": self.mirroredDocument ?? self.emptyDocument(), "bindings": [], "warnings": ["Open cancelled."]], nil); return }
             do {
-                let data = try Data(contentsOf: url, options: [.mappedIfSafe]); guard data.count <= self.maximumStudyBytes, let document = try JSONSerialization.jsonObject(with: data) as? [String: Any], document["schemaVersion"] as? Int == 4 else { throw HostError.invalidStudy("Only schema v4 Studies are accepted by this Host.") }
+                let data = try Data(contentsOf: url, options: [.mappedIfSafe]); guard data.count <= self.maximumStudyBytes, let document = try JSONSerialization.jsonObject(with: data) as? [String: Any], let schema = document["schemaVersion"] as? Int, [4, 5].contains(schema) else { throw HostError.invalidStudy("Only schema v4 and v5 Studies are accepted by this Host.") }
                 self.currentDocumentURL = url; self.addRecent(url); reply(["type": "study-opened", "document": document, "bindings": self.bindings(for: document), "warnings": []], nil)
             } catch { reply(nil, error.localizedDescription) }
         }
@@ -802,12 +847,26 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     private func presentExport(_ document: [String: Any], _ revision: Int, _ preferences: [String: Any], _ permission: Bool, _ reply: @escaping (Any?, String?) -> Void) {
         guard mirroredDocument?["id"] as? String == document["id"] as? String, mirroredRevision == revision else { reply(nil, "Recovery checkpoint must complete before export."); return }
         if preferences["includeSources"] as? Bool == true && !permission { reply(nil, "Source-copy permission was not acknowledged."); return }
+        guard !exportInProgress else { reply(nil, "An export is already in progress."); return }
+        exportInProgress = true
+        if let evidencePath = ProcessInfo.processInfo.environment[evidenceEnvironmentKey], !evidencePath.isEmpty {
+            let target = URL(fileURLWithPath: evidencePath, isDirectory: true).appendingPathComponent("simple-ui-exports", isDirectory: true)
+            Task { @MainActor in
+                defer { self.exportInProgress = false }
+                do {
+                    try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+                    let result = try await self.exportHandoff(document, preferences, permission, target)
+                    reply(["type": "export-result", "displayName": result.name, "exported": true, "fileCount": result.count], nil)
+                } catch { reply(nil, error.localizedDescription) }
+            }
+            return
+        }
         panelOpened += 1
         let panel = NSOpenPanel(); panel.title = "Choose Handoff destination"; panel.prompt = "Export Here"; panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.canCreateDirectories = true
         panel.beginSheetModal(for: window) { [weak self] response in
             guard let self else { reply(nil, "Host closed."); return }
-            guard response == .OK, let target = panel.url else { self.panelCancelled += 1; reply(["type": "export-result", "displayName": "", "exported": false, "fileCount": 0], nil); return }
-            Task { @MainActor in do { let result = try await self.exportHandoff(document, preferences, permission, target); reply(["type": "export-result", "displayName": result.name, "exported": true, "fileCount": result.count], nil) } catch { reply(nil, error.localizedDescription) } }
+            guard response == .OK, let target = panel.url else { self.exportInProgress = false; self.panelCancelled += 1; reply(["type": "export-result", "displayName": "", "exported": false, "fileCount": 0], nil); return }
+            Task { @MainActor in defer { self.exportInProgress = false }; do { let result = try await self.exportHandoff(document, preferences, permission, target); reply(["type": "export-result", "displayName": result.name, "exported": true, "fileCount": result.count], nil) } catch { reply(nil, error.localizedDescription) } }
         }
     }
 
@@ -837,7 +896,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
             }
             let files = recursiveFiles(staging); var entries: [[String: Any]] = []
             for file in files { let data = try Data(contentsOf: file); guard !data.isEmpty else { throw HostError.exportFailed("Empty output \(file.lastPathComponent)") }; entries.append(["path": try relativePath(file, staging), "bytes": data.count, "sha256": sha256(data)]) }
-            let manifest: [String: Any] = ["manifestVersion": 1, "generatedAt": ISO8601DateFormatter().string(from: Date()), "product": "Font Previewer", "studyId": document["id"] ?? "unknown", "schemaVersion": 4, "sourcesIncluded": preferences["includeSources"] as? Bool == true, "redistributionPermissionAcknowledged": preferences["includeSources"] as? Bool == true && permission, "files": entries]
+            let manifest: [String: Any] = ["manifestVersion": 1, "generatedAt": ISO8601DateFormatter().string(from: Date()), "product": "Font Previewer", "studyId": document["id"] ?? "unknown", "schemaVersion": document["schemaVersion"] ?? 5, "sourcesIncluded": preferences["includeSources"] as? Bool == true, "redistributionPermissionAcknowledged": preferences["includeSources"] as? Bool == true && permission, "files": entries]
             try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys]).write(to: staging.appendingPathComponent("manifest.json"), options: [.atomic])
             let checksums = entries.compactMap { entry -> String? in guard let hash = entry["sha256"] as? String, let path = entry["path"] as? String else { return nil }; return "\(hash)  \(path)" }.joined(separator: "\n") + "\n"
             try checksums.data(using: .utf8)!.write(to: staging.appendingPathComponent("checksums.sha256"), options: [.atomic])
@@ -857,9 +916,9 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         if raw == nil || raw is NSNull { return nil }
         guard let value = raw as? [String: Any] else { return nil }
         func integer(_ key: String) throws -> Int {
-            guard let number = value[key] as? NSNumber else { throw HostError.exportFailed("Simple export manifest has an invalid \(key).") }
+            guard let number = value[key] as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() else { throw HostError.exportFailed("Simple export manifest has an invalid \(key).") }
             let double = number.doubleValue
-            guard double.isFinite, double >= 0, double.rounded() == double, double <= Double(Int.max) else { throw HostError.exportFailed("Simple export manifest has an invalid \(key).") }
+            guard double.isFinite, double >= 0, double.rounded() == double, double < Double(Int.max) else { throw HostError.exportFailed("Simple export manifest has an invalid \(key).") }
             return Int(double)
         }
         let width = try integer("width")
@@ -868,18 +927,17 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
         let boardCount = try integer("boardCount")
         let bodyCount = try integer("bodyCount")
         let indexCount = try integer("indexCount")
-        guard let pageMode = value["pageMode"] as? String, ["boards", "body"].contains(pageMode) else { throw HostError.exportFailed("Simple export manifest has an invalid page mode.") }
-        guard let includeIndex = value["includeIndex"] as? Bool else { throw HostError.exportFailed("Simple export manifest has an invalid index setting.") }
+        guard let pageMode = value["pageMode"] as? String, ["boards", "body", "both"].contains(pageMode) else { throw HostError.exportFailed("Simple export manifest has an invalid page mode.") }
+        guard let indexSetting = value["includeIndex"] as? NSNumber, CFGetTypeID(indexSetting) == CFBooleanGetTypeID() else { throw HostError.exportFailed("Simple export manifest has an invalid index setting.") }
+        let includeIndex = indexSetting.boolValue
         guard width == 5_152, height == 2_160 else { throw HostError.exportFailed("Simple pages must be 5152 × 2160.") }
         guard fontCount >= 1, fontCount <= 8_192 else { throw HostError.exportFailed("Simple export font count is outside the Study limit.") }
-        let expectedFontCount = (document["candidates"] as? [[String: Any]] ?? []).filter { $0["reviewState"] as? String != "reject" }.count
-        guard fontCount == expectedFontCount else { throw HostError.exportFailed("Simple export font count does not match the mirrored Study.") }
-        if pageMode == "boards" {
-            guard boardCount == Int(ceil(Double(fontCount) / 4.0)), bodyCount == 0 else { throw HostError.exportFailed("Simple export board count does not match its fonts.") }
-            guard indexCount == (includeIndex ? Int(ceil(Double(fontCount) / 12.0)) : 0) else { throw HostError.exportFailed("Simple export index count does not match its fonts.") }
-        } else {
-            guard boardCount == 0, indexCount == 0, bodyCount == fontCount, !includeIndex else { throw HostError.exportFailed("Simple export Body Copy count does not match its fonts.") }
-        }
+        let included = (document["candidates"] as? [[String: Any]] ?? []).filter { $0["reviewState"] as? String != "reject" }
+        let headlines = pageMode == "body" ? 0 : included.filter { ($0["simpleSet"] as? String ?? "headlines") == "headlines" }.count
+        let body = pageMode == "boards" ? 0 : included.filter { $0["simpleSet"] as? String == "body" }.count
+        guard fontCount == headlines + body else { throw HostError.exportFailed("Simple export font count does not match the mirrored Study.") }
+        guard boardCount == Int(ceil(Double(headlines) / 4.0)), bodyCount == body else { throw HostError.exportFailed("Simple export page counts do not match their font sets.") }
+        guard !(pageMode == "body" && includeIndex), indexCount == (includeIndex ? Int(ceil(Double(headlines) / 12.0)) : 0) else { throw HostError.exportFailed("Simple export index count does not match its fonts.") }
         return SimpleExportManifest(width: width, height: height, pageMode: pageMode, boardCount: boardCount, bodyCount: bodyCount, indexCount: indexCount, fontCount: fontCount, includeIndex: includeIndex)
     }
 
@@ -964,7 +1022,7 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
             guard let bitmap = NSBitmapImageRep(data: data) else { decoded = false; continue }
             dimensions.insert("\(bitmap.pixelsWide)x\(bitmap.pixelsHigh)")
         }
-        let expected = (document["candidates"] as? [[String: Any]] ?? []).filter { $0["reviewState"] as? String != "reject" }.count
+        let expected = (document["candidates"] as? [[String: Any]] ?? []).filter { $0["reviewState"] as? String != "reject" && $0["simpleSet"] as? String == "body" }.count
         let manifestData = try Data(contentsOf: root.appendingPathComponent("manifest.json"))
         let manifest = try JSONSerialization.jsonObject(with: manifestData) as? [String: Any]
         let files = manifest?["files"] as? [[String: Any]] ?? []
@@ -979,6 +1037,39 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
             "indexAbsent": !manager.fileExists(atPath: root.appendingPathComponent("Index").path),
             "fileCount": committed.count,
         ]
+    }
+
+    fileprivate func verifySimpleUIExport(in target: URL) throws -> [String: Any] {
+        let manager = FileManager.default
+        let folders = try manager.contentsOfDirectory(at: target, includingPropertiesForKeys: [.isDirectoryKey])
+        guard folders.count == 1, let root = folders.first, !root.lastPathComponent.contains(".staging-") else { throw HostError.exportFailed("Combined Simple export did not commit exactly one folder.") }
+        let study = try JSONSerialization.jsonObject(with: Data(contentsOf: root.appendingPathComponent("study.pitchfontstudy"))) as? [String: Any]
+        let candidates = (study?["candidates"] as? [[String: Any]] ?? []).filter { $0["reviewState"] as? String != "reject" }
+        let bodyExpected = candidates.filter { $0["simpleSet"] as? String == "body" }.count
+        let headlineExpected = candidates.count - bodyExpected
+        let manifest = try JSONSerialization.jsonObject(with: Data(contentsOf: root.appendingPathComponent("manifest.json"))) as? [String: Any]
+        let files = manifest?["files"] as? [[String: Any]] ?? []
+        var counts = ["body": 0, "board": 0, "index": 0]
+        var dimensions = Set<String>()
+        for file in files {
+            guard let path = file["path"] as? String, !path.hasPrefix("Sources/") else { throw HostError.exportFailed("Unexpected Source copy in Simple export.") }
+            try autoreleasepool {
+                let bytes = try Data(contentsOf: root.appendingPathComponent(path))
+                let checksum = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+                guard bytes.count == file["bytes"] as? Int, checksum == file["sha256"] as? String else { throw HostError.exportFailed("Simple export checksum mismatch.") }
+                guard path.hasSuffix(".png") else { return }
+                guard let bitmap = NSBitmapImageRep(data: bytes) else { throw HostError.exportFailed("Simple export PNG cannot decode.") }
+                dimensions.insert("\(bitmap.pixelsWide)x\(bitmap.pixelsHigh)")
+                if path.hasPrefix("Body Copy/Body_") { counts["body", default: 0] += 1 }
+                else if path.hasPrefix("Boards/Board_") { counts["board", default: 0] += 1 }
+                else if path.hasPrefix("Index/Index_") { counts["index", default: 0] += 1 }
+                else { throw HostError.exportFailed("Unexpected PNG in Simple export.") }
+            }
+        }
+        guard bodyExpected == 20, headlineExpected == 20, counts["body"] == bodyExpected,
+              counts["board"] == Int(ceil(Double(headlineExpected) / 4)), counts["index"] == Int(ceil(Double(headlineExpected) / 12)),
+              dimensions == ["5152x2160"] else { throw HostError.exportFailed("Combined Simple export page counts or dimensions are incorrect.") }
+        return ["body": counts["body"]!, "board": counts["board"]!, "index": counts["index"]!, "decoded": true, "checksums": true, "sourceFontsAbsent": true]
     }
 
     fileprivate func evaluate(_ script: String) async throws -> Any? { try await withCheckedThrowingContinuation { continuation in webView.evaluateJavaScript(script) { value, error in if let error { continuation.resume(throwing: error) } else { continuation.resume(returning: value) } } } }
@@ -1001,10 +1092,10 @@ private final class FontPreviewerHostDelegate: NSObject, NSApplicationDelegate, 
     }
     private func sha256(_ data: Data) -> String { SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
 
-    private func emptyDocument() -> [String: Any] { let now = ISO8601DateFormatter().string(from: Date()); return ["schemaVersion": 4, "id": "study:\(UUID().uuidString.lowercased())", "title": "Untitled font study", "createdAt": now, "updatedAt": now, "sources": [], "faces": [], "candidates": [], "recipes": [["id": "recipe:blank", "pack": "blank", "name": "Custom specimen", "copy": "Type carries the argument before a word is read.", "language": "en", "direction": "auto", "casing": "exact", "sizePolicy": "fit", "size": 72, "lineHeight": 1.04, "tracking": -0.02, "alignment": "leading", "background": "split"]], "comparisonSets": [], "typographySystems": [["id": "system:primary", "name": "Primary system", "rationale": "", "fontUses": []]], "activeSystemId": "system:primary", "handoff": ["profile": "designer", "outputs": ["pdf", "summary", "json", "csv"], "includeSources": true]] }
+    private func emptyDocument() -> [String: Any] { let now = ISO8601DateFormatter().string(from: Date()); return ["schemaVersion": 5, "id": "study:\(UUID().uuidString.lowercased())", "title": "Untitled font study", "createdAt": now, "updatedAt": now, "sources": [], "faces": [], "candidates": [], "recipes": [["id": "recipe:blank", "pack": "blank", "name": "Custom specimen", "copy": "Type carries the argument before a word is read.", "language": "en", "direction": "auto", "casing": "exact", "sizePolicy": "fit", "size": 72, "lineHeight": 1.04, "tracking": -0.02, "alignment": "leading", "background": "split"]], "comparisonSets": [], "typographySystems": [["id": "system:primary", "name": "Primary system", "rationale": "", "fontUses": []]], "activeSystemId": "system:primary", "handoff": ["profile": "designer", "outputs": ["pdf", "summary", "json", "csv"], "includeSources": true]] }
 
     private func persistRecovery() throws { guard let document = mirroredDocument, let workspace = mirroredWorkspace else { return }; let value: [String: Any] = ["version": 1, "document": document, "workspace": workspace, "revision": mirroredRevision, "intentionallySavedRevision": intentionallySavedRevision]; try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]).write(to: recoveryURL, options: [.atomic]) }
-    private func loadRecovery() { guard let data = try? Data(contentsOf: recoveryURL), data.count <= maximumStudyBytes * 2, let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any], value["version"] as? Int == 1, let document = value["document"] as? [String: Any], document["schemaVersion"] as? Int == 4, let workspace = value["workspace"] as? [String: Any], let revision = value["revision"] as? Int else { return }; mirroredDocument = document; mirroredWorkspace = workspace; mirroredRevision = max(0, revision); intentionallySavedRevision = min(max(0, value["intentionallySavedRevision"] as? Int ?? 0), mirroredRevision) }
+    private func loadRecovery() { guard let data = try? Data(contentsOf: recoveryURL), data.count <= maximumStudyBytes * 2, let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any], value["version"] as? Int == 1, let document = value["document"] as? [String: Any], let schema = document["schemaVersion"] as? Int, [4, 5].contains(schema), let workspace = value["workspace"] as? [String: Any], let revision = value["revision"] as? Int else { return }; mirroredDocument = document; mirroredWorkspace = workspace; mirroredRevision = max(0, revision); intentionallySavedRevision = min(max(0, value["intentionallySavedRevision"] as? Int ?? 0), mirroredRevision) }
 
     private func persistLocalState() throws {
         let installedPaths = Set((CTFontManagerCopyAvailableFontURLs() as? [URL] ?? []).map { $0.resolvingSymlinksInPath().standardizedFileURL.path })
@@ -1101,6 +1192,7 @@ private final class MacEvidenceRunner {
         try await wait("Review restoration") { try await self.bool("document.querySelector('.candidate-row') && document.querySelector('.inspector .field-label select')") }
         trace["security"] = try await host.evaluateAsync("(async()=>{const bad=[{type:'open-import',path:'/tmp/x'},{type:'probe',serial:-1},{type:'read-file',path:'/etc/passwd'},{type:'scan-installed'},{type:'scan-installed',query:'',cursor:0,limit:10000,refresh:false}];let rejected=0;for(const r of bad){try{await window.fontPreviewerHost.request(r)}catch{rejected++}}return {attempts:bad.length,rejected,nodeUnavailable:typeof window.require==='undefined'&&typeof window.process==='undefined',hostKeys:Object.keys(window.fontPreviewerHost).sort()}})()") ?? NSNull()
         trace["invalidFullPreviewSource"] = try invalidFullPreviewSourceAudit()
+        trace["variableFontSource"] = try variableFontSourceAudit()
         trace["semantics"] = try await semanticAudit()
         trace["disclosureMotion"] = try await disclosureMotionAudit()
         trace["transactionalHandoffFault"] = try await host.verifyHandoffFaultInjection(in: output.appendingPathComponent("handoff-fault-target", isDirectory: true))
@@ -1108,11 +1200,13 @@ private final class MacEvidenceRunner {
         let beforeTerminationCallback = try await inspect(); let terminationsBefore = host.processTerminations; host.webViewWebContentProcessDidTerminate(host.webView); try await wait("simulated WebKit termination callback recovery") { try await self.bool("document.querySelector('#workspace-heading') && document.activeElement?.id==='workspace-heading' && document.querySelector('.candidate-row[aria-current=\"true\"]')?.dataset.reviewState==='keep'") }; let afterTerminationCallback = try await inspect(); trace["terminationCallbackRecovery"] = ["simulatedDelegateCallback": true, "counterAdvanced": host.processTerminations == terminationsBefore + 1, "before": beforeTerminationCallback, "after": afterTerminationCallback]
         let before = try await inspect(); host.webView.reload(); try await wait("Reload") { try await self.bool("document.querySelector('#workspace-heading') && document.activeElement?.id==='workspace-heading' && document.querySelector('.candidate-row[aria-current=\"true\"]')?.dataset.reviewState==='keep'") }; let after = try await inspect(); trace["reload"] = ["before": before, "after": after]
         try await host.snapshot(to: output.appendingPathComponent("05-recovered.png"))
+        trace["nativeVariableCanvas"] = try await nativeVariableCanvasAudit()
         trace["nativePanel"] = ["opened": host.panelOpened, "cancelled": host.panelCancelled]
         trace["hostCounters"] = ["rejectedRequests": host.rejectedRequests, "menuCommands": host.menuCommands, "navigationRejections": host.navigationRejections, "popupRejections": host.popupRejections, "processTerminations": host.processTerminations]
         try JSONSerialization.data(withJSONObject: trace, options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("run.json"), options: [.atomic])
         let security = trace["security"] as? [String: Any]; let invalidSource = trace["invalidFullPreviewSource"] as? [String: Any]; let semantics = trace["semantics"] as? [String: Any]; let semanticLayout = semantics?["layout"] as? [String: Any]; let disclosure = trace["disclosureMotion"] as? [String: Any]; let keyboard = trace["keyboardAccessibility"] as? [String: Any]; let catalog = trace["installedCatalog"] as? [String: Any]; let studioCatalogDetail = trace["studioCatalogDetail"] as? [String: Any]; let stageNavigation = trace["stageNavigation"] as? [String: Any]; let handoffFault = trace["transactionalHandoffFault"] as? [String: Any]; let termination = trace["terminationCallbackRecovery"] as? [String: Any]; let terminationAfter = termination?["after"] as? [String: Any]
         let cancellation = catalog?["cancellation"] as? [String: Any]
+        let variableSource = trace["variableFontSource"] as? [String: Any]
         let simpleCatalog = (trace["simpleVisual"] as? [String: Any])?["catalog"] as? [String: Any]
         let simpleDetail = (trace["simpleVisual"] as? [String: Any])?["detail"] as? [String: Any]
         let simpleStateTravel = (trace["simpleVisual"] as? [String: Any])?["stateTravel"] as? [String: Any]
@@ -1133,6 +1227,7 @@ private final class MacEvidenceRunner {
         let simpleStress = simpleBoards?["stress"] as? [String: Any]
         let simpleBody = (trace["simpleVisual"] as? [String: Any])?["bodyCopy"] as? [String: Any]
         let simpleBodyExport = simpleBody?["export"] as? [String: Any]
+        let simpleCombinedExport = simpleBody?["combinedExport"] as? [String: Any]
         let simpleBodyScale = simpleBody?["scale"] as? [String: Any]
         let simpleBodyScalePass = [80, 140].allSatisfy { target in
             guard let metrics = simpleBodyScale?[String(target)] as? [String: Any] else { return false }
@@ -1166,6 +1261,10 @@ private final class MacEvidenceRunner {
         let studioSystem = studioEvidence?["system"] as? [String: Any]
         let studioHandoff = studioEvidence?["handoff"] as? [String: Any]
         let checks: [(String, Bool)] = [
+            ("variable font import", variableSource?["singlePhysicalFace"] as? Bool == true
+                && variableSource?["defaultInstance"] as? Bool == true
+                && variableSource?["namedInstancesComplete"] as? Bool == true
+                && variableSource?["opaquePreview"] as? Bool == true),
             ("security", security?["attempts"] as? Int == security?["rejected"] as? Int
                 && security?["nodeUnavailable"] as? Bool == true
                 && invalidSource?["rejected"] as? Bool == true),
@@ -1208,8 +1307,13 @@ private final class MacEvidenceRunner {
                 && simpleStress?["copyright"] as? Bool == true
                 && simpleStress?["trademark"] as? Bool == true
                 && simpleStress?["numerals"] as? Bool == true),
-            ("simple body copy", simpleBody?["pageCount"] as? Int == simpleBody?["includedCount"] as? Int
-                && ((simpleBody?["pageCount"] as? Int) ?? 0) > 0
+            ("simple body copy", simpleBody?["pageCount"] as? Int == 12
+                && simpleBody?["includedCount"] as? Int == 20
+                && simpleBody?["lastPageCount"] as? Int == 8
+                && simpleBody?["paginationDistinct"] as? Bool == true
+                && simpleBody?["headlineIndependent"] as? Bool == true
+                && simpleBody?["duplicateIndependent"] as? Bool == true
+                && simpleBody?["lastControlCount"] as? Int == 8
                 && simpleBody?["sampleCount"] as? Int == 3
                 && simpleBody?["fullText"] as? Bool == true
                 && simpleBody?["twoParagraphs"] as? Bool == true
@@ -1226,8 +1330,13 @@ private final class MacEvidenceRunner {
                 && simpleBodyExport?["decoded"] as? Bool == true
                 && simpleBodyExport?["dimensions"] as? [String] == ["5152x2160"]
                 && simpleBodyExport?["boardsAbsent"] as? Bool == true
-                && simpleBodyExport?["indexAbsent"] as? Bool == true),
-            ("simple tuning", simpleTuning?["cards"] as? Int == 24
+                && simpleBodyExport?["indexAbsent"] as? Bool == true
+                && simpleCombinedExport?["body"] as? Int == 20
+                && simpleCombinedExport?["board"] as? Int == 5
+                && simpleCombinedExport?["index"] as? Int == 2
+                && simpleCombinedExport?["checksums"] as? Bool == true
+                && simpleCombinedExport?["decoded"] as? Bool == true),
+            ("simple tuning", simpleTuning?["cards"] as? Int == 12
                 && simpleTuning?["casingLabels"] as? String == "As is|UPPER|lower|Title|AP Title"
                 && simpleTuning?["apTitle"] as? Bool == true
                 && ((simpleTuning?["axisSliders"] as? Int) ?? 0) > 0
@@ -1250,7 +1359,7 @@ private final class MacEvidenceRunner {
                 && simpleDetail?["returnFocus"] as? Bool == true
                 && simpleDetail?["horizontalOverflow"] as? Bool == false),
             ("simple to Studio state", ((simpleStateTravel?["added"] as? Int) ?? 0) > 0
-                && simpleStateTravel?["simpleAfter"] as? Int == simpleStateTravel?["studioAfter"] as? Int
+                && simpleStateTravel?["expectedStudioCount"] as? Int == simpleStateTravel?["studioAfter"] as? Int
                 && simpleStateTravel?["fitPolicy"] as? String == "locked-lines"
                 && simpleStateTravel?["restored"] as? Bool == true),
             ("simple scaling", simpleScalePass),
@@ -1329,6 +1438,179 @@ private final class MacEvidenceRunner {
             catch { rejected += 1 }
         }
         return ["attempts": 4, "rejections": rejected, "rejected": rejected == 4]
+    }
+    private func variableFontSourceAudit() throws -> [String: Any] {
+        guard let assets = Bundle.main.resourceURL?.appendingPathComponent("Studio/assets"),
+              let url = try FileManager.default.contentsOfDirectory(at: assets, includingPropertiesForKeys: nil).first(where: {
+                  $0.lastPathComponent.hasPrefix("pd-head-") && !$0.lastPathComponent.hasPrefix("pd-head-alt-") && $0.pathExtension == "woff2"
+              }) else { throw HostError.unavailable("Bundled variable-font audit source is missing.") }
+        let descriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor] ?? []
+        let imported = try host.importedSource(url, catalogOnly: true)
+        let faces = imported["faces"] as? [[String: Any]] ?? []
+        let face = faces.first ?? [:]
+        let axes = face["axes"] as? [[String: Any]] ?? []
+        let instances = face["namedInstances"] as? [[String: Any]] ?? []
+        let source = imported["source"] as? [String: Any]
+        let hint = source?["hint"] as? [String: Any]
+        let binding = imported["binding"] as? [String: Any]
+        let complete = instances.count > 1 && instances.allSatisfy { instance in
+            let coordinates = instance["coordinates"] as? [[String: Any]] ?? []
+            return coordinates.count == axes.count && axes.allSatisfy { axis in
+                guard let tag = axis["tag"] as? String, let minimum = axis["minimum"] as? Double,
+                      let maximum = axis["maximum"] as? Double,
+                      let coordinate = coordinates.first(where: { $0["tag"] as? String == tag }),
+                      let value = coordinate["value"] as? Double else { return false }
+                return value.isFinite && value >= minimum && value <= maximum
+            }
+        }
+        return [
+            "descriptorCount": descriptors.count, "faceCount": faces.count, "axisCount": axes.count, "namedInstanceCount": instances.count,
+            "singlePhysicalFace": descriptors.count > 1 && faces.count == 1 && hint?["faceCount"] as? Int == 1 && face["faceIndex"] as? Int == 0,
+            "defaultInstance": face["style"] as? String == "Regular" && axes.contains { $0["tag"] as? String == "wght" && $0["defaultValue"] as? Double == 400 },
+            "namedInstancesComplete": complete,
+            "opaquePreview": (binding?["previewUrl"] as? String)?.hasPrefix("\(fontScheme)://\(fontHost)/") == true,
+        ]
+    }
+    private func nativeVariableCanvasAudit() async throws -> [String: Any] {
+        try await wait("real-font audit recovery checkpoint") { try await self.bool("document.querySelector('.app-shell')?.dataset.recoveryCheckpoint==='ready'") }
+        guard let launch = try await host.evaluateAsync("window.fontPreviewerHost.request({type:'get-launch-state'})") as? [String: Any],
+              let recovery = launch["recovery"] as? [String: Any], var document = recovery["document"] as? [String: Any],
+              var workspace = recovery["workspace"] as? [String: Any],
+              let assets = Bundle.main.resourceURL?.appendingPathComponent("Studio/assets"),
+              let url = try FileManager.default.contentsOfDirectory(at: assets, includingPropertiesForKeys: nil).first(where: { $0.lastPathComponent.hasPrefix("pd-eyebrow-") && $0.pathExtension == "woff2" })
+        else { throw HostError.unavailable("Real-font audit is missing its recovery snapshot or bundled font.") }
+        let originalDocument = document, originalWorkspace = workspace
+        let preferences = try await host.evaluate("({mode:localStorage.getItem('font-previewer-interface-mode'),pages:localStorage.getItem('font-previewer-simple-page-mode')})") as? [String: Any] ?? [:]
+        let imported = try host.importedSource(url, catalogOnly: true)
+        guard let source = imported["source"] as? [String: Any], let faces = imported["faces"] as? [[String: Any]], faces.count == 1,
+              let face = faces.first, let faceID = face["id"] as? String, let axes = face["axes"] as? [[String: Any]],
+              let widthAxis = axes.first(where: { $0["tag"] as? String == "wdth" }), let minimum = widthAxis["minimum"] as? Double,
+              let maximum = widthAxis["maximum"] as? Double, maximum > minimum,
+              let instances = face["namedInstances"] as? [[String: Any]], instances.count == 1, instances.first?["name"] as? String == "Regular"
+        else { throw HostError.unavailable("Native variable import did not produce one Face with styles and width coordinates.") }
+        // This site subset has three live axes but no fvar named variations;
+        // CoreText returns its Regular default. The pd-head audit above covers
+        // multiple genuine named styles separately.
+        let candidateID = "candidate:native-variable-canvas"
+        document["id"] = "study:native-variable-canvas"; document["title"] = "Native variable canvas evidence"
+        document["sources"] = [source]; document["faces"] = faces; document["comparisonSets"] = []
+        document["typographySystems"] = (document["typographySystems"] as? [[String: Any]] ?? []).map { system -> [String: Any] in var cleared = system; cleared["fontUses"] = []; return cleared }
+        document["candidates"] = [["id": candidateID, "faceId": faceID, "label": "Real variable source", "reviewState": "keep", "axes": axes.map { ["tag": $0["tag"]!, "value": $0["defaultValue"]!] }, "features": [["tag": "liga", "enabled": true], ["tag": "kern", "enabled": true]], "casing": "exact", "tags": [], "notes": "", "rationale": "", "provenance": ["kind": "import"], "simpleSet": "body"]]
+        document["simpleSets"] = ["headlines": ["copy": "Agjy", "fitPolicy": "nominal"], "body": ["copy": "Agjy", "fitPolicy": "nominal"]]
+        workspace["selectedCandidateId"] = candidateID; workspace["simpleSet"] = "body"; workspace["stage"] = "review"; workspace["trayIds"] = []
+        workspace.removeValue(forKey: "activeComparisonId"); workspace.removeValue(forKey: "copyOverride")
+        func replaceRecovery(_ document: [String: Any], _ workspace: [String: Any], revision: Int, mode: String, pages: String) async throws {
+            let request: [String: Any] = ["type": "mirror-study", "document": document, "workspace": workspace, "revision": revision]
+            let literal = String(decoding: try JSONSerialization.data(withJSONObject: request), as: UTF8.self)
+            let modes = String(decoding: try JSONSerialization.data(withJSONObject: [mode, pages]), as: UTF8.self)
+            _ = try await host.evaluateAsync("(async()=>{await window.fontPreviewerHost.request(\(literal));const modes=\(modes);localStorage.setItem('font-previewer-interface-mode',modes[0]);localStorage.setItem('font-previewer-simple-page-mode',modes[1]);return await window.fontPreviewerHost.request({type:'reload-studio'})})()")
+            try await Task.sleep(nanoseconds: 300_000_000)
+            let title = String(decoding: try JSONSerialization.data(withJSONObject: [document["title"] ?? ""]), as: UTF8.self)
+            try await wait("restored audit Study") { try await self.bool("document.querySelector('.document-title input')?.value === \(title)[0] && document.querySelector('.app-shell')?.dataset.recoveryCheckpoint==='ready'") }
+            // Fixture launches intentionally start in Studio; switch through the
+            // real control after recovery instead of relying on local preferences.
+            _ = try await host.evaluate("[...document.querySelectorAll('.interface-switch button')].find(button=>button.textContent?.trim()==='\(mode == "simple" ? "Simple" : "Studio")')?.click();true")
+            try await wait("audit interface mode") { try await self.bool("document.querySelector('.app-shell')?.dataset.interfaceMode==='\(mode)'") }
+        }
+        let target = output.appendingPathComponent("native-variable-canvas", isDirectory: true)
+        try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+        var metrics: [String: Any] = [:]
+        do {
+            try await replaceRecovery(document, workspace, revision: 0, mode: "simple", pages: "body")
+            let defaults = String(decoding: try JSONSerialization.data(withJSONObject: axes.map { ["tag": $0["tag"]!, "value": $0["tag"] as? String == "wdth" ? minimum : $0["defaultValue"]!] }), as: UTF8.self)
+            metrics = try await host.evaluateAsync(#"""
+            (async()=>{
+              const pause=()=>new Promise(resolve=>setTimeout(resolve,25));
+              const wait=async(label,predicate)=>{const end=performance.now()+15000;while(!predicate()&&performance.now()<end)await pause();if(!predicate())throw new Error(label)};
+              const cards=()=>[...document.querySelectorAll('.simple-font-card')];
+              const range=(card,tag)=>[...card.querySelectorAll('.simple-axes label')].find(label=>label.querySelector('strong')?.textContent===tag)?.querySelector('input');
+              const setRange=async(input,value)=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,String(value));input.dispatchEvent(new Event('input',{bubbles:true}));await pause()};
+              await wait('one real Body font',()=>window.__fontPreviewerSimpleExport?.manifest().bodyCount===1&&document.querySelectorAll('.simple-body-page-wrap').length===1);
+              document.querySelector('.simple-section-actions button[aria-expanded]').click();await wait('one real font control',()=>cards().length===1);
+              const style=cards()[0].querySelector('.simple-named-style select'),styleCount=style.options.length-1;
+              Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(style,String(styleCount-1));style.dispatchEvent(new Event('change',{bubbles:true}));await pause();
+              if(cards().length!==1||cards()[0].querySelector('.simple-named-style select').value!==String(styleCount-1))throw new Error('Named style created extra fonts or did not apply');
+              for(const coordinate of \#(defaults))await setRange(range(cards()[0],coordinate.tag),coordinate.value);
+              [...cards()[0].querySelectorAll('button')].find(button=>button.textContent==='Duplicate font').click();await wait('real variable duplicate',()=>cards().length===2&&window.__fontPreviewerSimpleExport.manifest().bodyCount===2);
+              [...cards()[1].querySelectorAll('.simple-casing button')].find(button=>button.textContent==='UPPER').click();
+              await wait('independent duplicate casing',()=>document.querySelectorAll('.simple-body-reading-copy')[1]?.textContent==='AGJY');
+              if(document.querySelector('.simple-body-reading-copy')?.textContent!=='Agjy')throw new Error('Duplicate changed original casing');
+              [...cards()[1].querySelectorAll('.simple-casing button')].find(button=>button.textContent==='As is').click();
+              await setRange(range(cards()[1],'wdth'),\#(maximum));
+              if(Number(range(cards()[0],'wdth').value)!==\#(minimum))throw new Error('Duplicate changed original width');
+              await wait('real font loaded',()=>[...document.querySelectorAll('.simple-body-reading-copy')].every(copy=>getComputedStyle(copy).fontFamily.includes('FontPreviewer_')&&copy.dataset.naturalFit));
+              return {faceCount:1,styleCount,bodyCount:window.__fontPreviewerSimpleExport.manifest().bodyCount,duplicateIndependent:true,widthValues:cards().map(card=>Number(range(card,'wdth').value)),bodyFamilies:[...document.querySelectorAll('.simple-body-reading-copy')].map(copy=>getComputedStyle(copy).fontFamily)}
+            })()
+            """#) as? [String: Any] ?? [:]
+            func render(_ kind: String, _ index: Int, _ filename: String) async throws -> Data {
+                guard let encoded = try await host.evaluateAsync("window.__fontPreviewerSimpleExport.render('\(kind)',\(index))") as? String, encoded.hasPrefix("data:image/png;base64,"), let data = Data(base64Encoded: String(encoded.dropFirst(22))) else { throw HostError.exportFailed("Real-font canvas PNG did not encode") }
+                try data.write(to: target.appendingPathComponent(filename), options: [.atomic]); return data
+            }
+            _ = try await render("body", 0, "body-condensed.png")
+            _ = try await render("body", 1, "body-wide.png")
+            _ = try await host.evaluateAsync(#"(async()=>{[...document.querySelectorAll('.simple-page-mode-choices button')].find(button=>button.textContent?.includes('Headlines')).click();await new Promise(resolve=>setTimeout(resolve,50));document.querySelector('.simple-set-empty button').click();await new Promise(resolve=>setTimeout(resolve,100));const checkbox=[...document.querySelectorAll('.simple-options input[type=checkbox]')].find(input=>input.closest('label')?.textContent?.includes('Index'));if(checkbox&&!checkbox.checked)checkbox.click();await document.fonts.ready;return true})()"#)
+            try await wait("real-font headline index") { try await self.bool("window.__fontPreviewerSimpleExport?.manifest().fontCount===2 && window.__fontPreviewerSimpleExport?.manifest().indexCount===1") }
+            let index = try await render("index", 0, "index-width-and-centering.png")
+            metrics["indexInk"] = try nativeIndexInkMetrics(index)
+            metrics["temporaryFontFacesAfterExport"] = try await host.evaluate("[...document.fonts].filter(face=>face.family.includes('FontPreviewerExport_')).length")
+            guard metrics["temporaryFontFacesAfterExport"] as? Int == 0 else { throw HostError.unavailable("Export retained temporary font instances.") }
+            try await host.snapshot(to: target.appendingPathComponent("native-preview.png"))
+            metrics["malformedManifests"] = try await nativeMalformedManifestAudit(target)
+        } catch {
+            try? await replaceRecovery(originalDocument, originalWorkspace, revision: recovery["revision"] as? Int ?? 0, mode: preferences["mode"] as? String ?? "studio", pages: preferences["pages"] as? String ?? "boards")
+            throw error
+        }
+        try await replaceRecovery(originalDocument, originalWorkspace, revision: recovery["revision"] as? Int ?? 0, mode: preferences["mode"] as? String ?? "studio", pages: preferences["pages"] as? String ?? "boards")
+        let restored = try await host.evaluateAsync("window.fontPreviewerHost.request({type:'get-launch-state'})") as? [String: Any]
+        let restoredDocument = (restored?["recovery"] as? [String: Any])?["document"] as? [String: Any] ?? [:]
+        guard try JSONSerialization.data(withJSONObject: restoredDocument, options: [.sortedKeys]) == JSONSerialization.data(withJSONObject: originalDocument, options: [.sortedKeys]) else { throw HostError.unavailable("Native variable audit did not restore the original Study.") }
+        metrics["studyRestored"] = true
+        try JSONSerialization.data(withJSONObject: metrics, options: [.prettyPrinted, .sortedKeys]).write(to: target.appendingPathComponent("metrics.json"), options: [.atomic])
+        return metrics
+    }
+    private func nativeMalformedManifestAudit(_ target: URL) async throws -> [String: Any] {
+        try await wait("malformed-manifest recovery checkpoint") { try await self.bool("document.querySelector('.app-shell')?.dataset.recoveryCheckpoint==='ready'") }
+        guard let state = try await host.evaluateAsync("window.fontPreviewerHost.request({type:'get-launch-state'})") as? [String: Any],
+              let recovery = state["recovery"] as? [String: Any], let document = recovery["document"] as? [String: Any]
+        else { throw HostError.unavailable("Malformed-manifest audit has no mirrored Study.") }
+        let manager = FileManager.default
+        let beforeNames = try manager.contentsOfDirectory(atPath: target.path).sorted()
+        let before = try beforeNames.map { try Data(contentsOf: target.appendingPathComponent($0)) }
+        let preferences: [String: Any] = ["profile": "internal", "outputs": ["json"], "includeSources": false]
+        var rejected = 0
+        for patch in ["{boardCount:true}", "{includeIndex:1}", "{fontCount:2**63}"] {
+            _ = try await host.evaluate("(()=>{const runtime=window.__fontPreviewerSimpleExport;window.__fontPreviewerEvidenceRuntime=runtime;window.__fontPreviewerSimpleExport={manifest:()=>({...runtime.manifest(),...\(patch)}),render:()=>{throw new Error('Malformed manifest reached rendering')}};return true})()")
+            do { _ = try await host.exportHandoff(document, preferences, false, target) }
+            catch { if error.localizedDescription.contains("Simple export manifest has an invalid") { rejected += 1 } }
+            _ = try await host.evaluate("window.__fontPreviewerSimpleExport=window.__fontPreviewerEvidenceRuntime;delete window.__fontPreviewerEvidenceRuntime;true")
+        }
+        let afterNames = try manager.contentsOfDirectory(atPath: target.path).sorted()
+        let after = try afterNames.map { try Data(contentsOf: target.appendingPathComponent($0)) }
+        guard rejected == 3, beforeNames == afterNames, before == after else { throw HostError.exportFailed("Malformed manifest was accepted, retained staging, or changed prior PNG evidence.") }
+        return ["rejected": rejected, "attempts": 3, "stagingClean": true, "priorPngsByteIdentical": true]
+    }
+    private func nativeIndexInkMetrics(_ data: Data) throws -> [String: Any] {
+        guard let bitmap = NSBitmapImageRep(data: data), bitmap.pixelsWide == 5_152, bitmap.pixelsHigh == 2_160,
+              bitmap.bitsPerSample == 8, !bitmap.isPlanar, bitmap.samplesPerPixel >= 3, let bytes = bitmap.bitmapData
+        else { throw HostError.exportFailed("Native index PNG could not be decoded into RGB pixels.") }
+        var widths: [Int] = [], centers: [[String: Double]] = []
+        for slot in 0..<2 {
+            let start = slot * 1_288
+            var left = start + 1_288, right = start, top = 560, bottom = 180
+            for y in 180..<560 { for x in start..<(start + 1_288) {
+                let pixel = bytes + y * bitmap.bytesPerRow + x * bitmap.samplesPerPixel
+                if pixel[0] > 170 && pixel[1] > 170 && pixel[2] > 170 { left = min(left, x); right = max(right, x); top = min(top, y); bottom = max(bottom, y) }
+            } }
+            guard right > left, bottom > top else { throw HostError.exportFailed("Native index has no specimen ink.") }
+            widths.append(right - left + 1)
+            let xError = abs(Double(left + right + 1) / 2 - Double(start + 644)), yError = abs(Double(top + bottom + 1) / 2 - 360)
+            // Hosted WebKit can move one antialiased edge column across the RGB
+            // threshold: the same wide specimen measured 1.5 px locally, 2 px in CI.
+            guard xError <= 2, yError <= 1.5 else { throw HostError.exportFailed("Native index ink is not centered: \(xError), \(yError)") }
+            centers.append(["xError": xError, "yError": yError])
+        }
+        guard widths[1] > widths[0] + 20 else { throw HostError.exportFailed("Native width-axis PNGs have indistinguishable ink widths: \(widths)") }
+        return ["widths": widths, "centers": centers, "axisChangesPixels": true, "decoded": true]
     }
     private func performMenu(_ menuTitle: String, _ itemTitle: String) throws {
         guard let menu = NSApp.mainMenu?.item(withTitle: menuTitle)?.submenu, let item = menu.item(withTitle: itemTitle) else { throw HostError.unavailable("Missing native menu item \(menuTitle) → \(itemTitle)") }
@@ -1463,6 +1745,7 @@ private final class MacEvidenceRunner {
         (async () => {
           const count = () => Number(document.querySelector('.simple-font-summary > span:first-child')?.textContent ?? -1);
           const before = count();
+          const bodyCount = Number([...document.querySelectorAll('.simple-page-mode-choices button')].find(item => item.textContent?.includes('Body Copy'))?.querySelector('small')?.textContent?.match(/^\d+/)?.[0] ?? -1);
           document.querySelector('.simple-catalog-family header > div button:last-child:not(:disabled)')?.click();
           const deadline = performance.now() + 10000;
           while (count() <= before && performance.now() < deadline) {
@@ -1484,7 +1767,7 @@ private final class MacEvidenceRunner {
               ?.querySelector('span')?.textContent ?? -1
           );
           while (
-            (studioCount() !== simpleAfter
+            (studioCount() !== simpleAfter + bodyCount
               || !document.querySelector('input[name="fit-policy"][value="locked-lines"]:checked'))
             && performance.now() < deadline
           ) {
@@ -1492,7 +1775,9 @@ private final class MacEvidenceRunner {
           }
           return {
             before,
+            bodyCount,
             simpleAfter,
+            expectedStudioCount: simpleAfter + bodyCount,
             studioAfter: studioCount(),
             added: simpleAfter - before,
             fitPolicy: document.querySelector('input[name="fit-policy"]:checked')?.value ?? null,
@@ -1501,17 +1786,21 @@ private final class MacEvidenceRunner {
         """#) as? [String: Any] ?? [:]
         try await wait("Studio restore") { try await self.bool("document.querySelector('.stage-nav') && document.querySelector('.candidate-row')") }
         host.sendMenu(["type": "undo-study"])
-        let originalCount = stateTravel["before"] as? Int ?? -1
+        try await wait("Undo fit workspace restoration") { try await self.bool("document.querySelector('.review-workspace')") }
+        _ = try await host.evaluate("[...document.querySelectorAll('.stage-nav button')].find(item=>item.textContent?.includes('Compare'))?.click();true")
+        try await wait("Undo comparison fit policy") { try await self.bool("document.querySelector('input[name=\"fit-policy\"][value=\"fit\"]:checked')") }
+        host.sendMenu(["type": "undo-study"])
+        let originalCount = (stateTravel["before"] as? Int ?? -1) + (stateTravel["bodyCount"] as? Int ?? -1)
         try await wait("Simple-to-Studio state cleanup") { try await self.bool("Number([...document.querySelectorAll('.catalog-switcher button')].find(item=>item.textContent?.trim().startsWith('Study'))?.querySelector('span')?.textContent??-1)===\(originalCount)") }
         var verifiedStateTravel = stateTravel
         verifiedStateTravel["restored"] = true
         return ["boards": boards, "bodyCopy": bodyCopy, "catalog": catalog, "detail": detail, "stateTravel": verifiedStateTravel, "scale": scale, "tuning": tuning]
     }
     private func simpleBoardAudit() async throws -> [String: Any] {
-        _ = try await host.evaluateAsync(#"(async()=>{const field=document.querySelector('.simple-copy-field textarea');const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;setter.call(field,'THE UNREASONABLY LONG TITLE THAT MUST NEVER BE CUT OFF OR TURN INTO DOTS');field.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('input[name="simple-fit-policy"][value="fit"]')?.click();const deadline=performance.now()+10000;while(!([...document.querySelectorAll('.simple-quadrant-copy')].length===4&&[...document.querySelectorAll('.simple-quadrant-copy')].every(item=>item.dataset.naturalFit))&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,16));document.querySelector('.simple-pages-section')?.scrollIntoView({block:'start'});await new Promise(resolve=>setTimeout(resolve,32));return true})()"#)
+        _ = try await host.evaluateAsync(#"(async()=>{const field=document.querySelector('.simple-copy-field textarea');const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;setter.call(field,'THE UNREASONABLY LONG TITLE THAT MUST NEVER BE CUT OFF OR TURN INTO DOTS');field.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('input[name="simple-fit-policy"][value="fit"]')?.click();const deadline=performance.now()+10000;while(!([...document.querySelector('.simple-board').querySelectorAll('.simple-quadrant-copy')].length===4&&[...document.querySelector('.simple-board').querySelectorAll('.simple-quadrant-copy')].every(item=>item.dataset.naturalFit))&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,16));document.querySelector('.simple-pages-section')?.scrollIntoView({block:'start'});await new Promise(resolve=>setTimeout(resolve,32));return true})()"#)
         try await host.snapshot(to: output.appendingPathComponent("12-simple-long-copy.png"))
         let longCopy = try await host.evaluate(#"(()=>{const expected='THE UNREASONABLY LONG TITLE THAT MUST NEVER BE CUT OFF OR TURN INTO DOTS';const board=document.querySelector('.simple-board');const quadrants=[...board.querySelectorAll('.simple-quadrant')];const copies=quadrants.map(item=>item.querySelector('.simple-quadrant-copy'));return {quadrants:quadrants.length,fullText:copies.every(item=>item?.textContent===expected),withinFrames:copies.every((item,index)=>{const copy=item.getBoundingClientRect(),frame=quadrants[index].getBoundingClientRect();return copy.left>=frame.left-1&&copy.right<=frame.right+1&&copy.top>=frame.top-1&&copy.bottom<=frame.bottom+1}),noEllipsis:copies.every(item=>getComputedStyle(item).textOverflow!=='ellipsis'),paletteCount:new Set(quadrants.map(item=>getComputedStyle(item).backgroundColor)).size}})()"#) as? [String: Any] ?? [:]
-        _ = try await host.evaluateAsync(#"(async()=>{const field=document.querySelector('.simple-copy-field textarea');const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;setter.call(field,'A House\nWith No Doors');field.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('input[name="simple-fit-policy"][value="locked-lines"]')?.click();const deadline=performance.now()+10000;while(!(()=>{const copies=[...document.querySelectorAll('.simple-quadrant-copy')];const sizes=copies.map(item=>getComputedStyle(item).fontSize);return copies.length===4&&copies.every(item=>item.dataset.naturalFit&&getComputedStyle(item).whiteSpace==='pre')&&new Set(sizes).size===1})()&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,16));return true})()"#)
+        _ = try await host.evaluateAsync(#"(async()=>{const field=document.querySelector('.simple-copy-field textarea');const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;setter.call(field,'A House\nWith No Doors');field.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('input[name="simple-fit-policy"][value="locked-lines"]')?.click();const deadline=performance.now()+10000;while(!(()=>{const copies=[...document.querySelector('.simple-board').querySelectorAll('.simple-quadrant-copy')];const sizes=copies.map(item=>getComputedStyle(item).fontSize);return copies.length===4&&copies.every(item=>item.dataset.naturalFit&&getComputedStyle(item).whiteSpace==='pre')&&new Set(sizes).size===1})()&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,16));return true})()"#)
         let lockedLines = try await host.evaluate(#"(()=>{const board=document.querySelector('.simple-board');const copies=[...board.querySelectorAll('.simple-quadrant-copy')];const sizes=copies.map(item=>Number.parseFloat(getComputedStyle(item).fontSize));return {count:copies.length,fullText:copies.every(item=>item.textContent==='A House\nWith No Doors'),whiteSpace:copies.every(item=>getComputedStyle(item).whiteSpace==='pre'),sharedSize:new Set(sizes.map(value=>value.toFixed(3))).size===1}})()"#) as? [String: Any] ?? [:]
         try await host.snapshot(to: output.appendingPathComponent("13-simple-locked-lines.png"))
         let stress = try await host.evaluateAsync(#"(async()=>{const checkbox=[...document.querySelectorAll('.simple-options input[type="checkbox"]')].find(item=>item.closest('label')?.textContent?.includes('Stress test'));checkbox?.click();const deadline=performance.now()+10000;while(!document.querySelector('.simple-quadrant-copy')?.textContent?.includes('₹')&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,16));const text=document.querySelector('.simple-quadrant-copy')?.textContent??'';return {rupee:text.includes('₹'),copyright:text.includes('©'),trademark:text.includes('™'),numerals:text.includes('0123456789')}})()"#) as? [String: Any] ?? [:]
@@ -1519,62 +1808,95 @@ private final class MacEvidenceRunner {
         return ["lockedLines": lockedLines, "longCopy": longCopy, "stress": stress]
     }
     private func simpleBodyAudit() async throws -> [String: Any] {
-        _ = try await host.evaluateAsync(#"""
+        var metrics = try await host.evaluateAsync(#"""
         (async () => {
-          [...document.querySelectorAll('.simple-page-mode-choices button')]
-            .find(item => item.textContent?.includes('Body Copy'))?.click();
-          const deadline = performance.now() + 10000;
-          while (!document.querySelector('.simple-body-page-list') && performance.now() < deadline) {
-            await new Promise(resolve => setTimeout(resolve, 25));
-          }
-          const second = [...document.querySelectorAll('.simple-body-samples button')][1];
-          second?.click();
-          while (
-            (!document.querySelector('.simple-body-reading-copy')?.textContent?.startsWith('The workshop is quiet')
-              || [...document.querySelectorAll('.simple-body-reading-copy')].some(item => !item.dataset.naturalFit))
-            && performance.now() < deadline
-          ) {
-            await new Promise(resolve => setTimeout(resolve, 25));
-          }
-          document.querySelector('.simple-body-compose')?.scrollIntoView({block: 'start'});
-          await new Promise(resolve => setTimeout(resolve, 64));
-          return true;
-        })()
-        """#)
-        try await host.snapshot(to: output.appendingPathComponent("17-simple-body-compose.png"))
-        var metrics = try await host.evaluate(#"""
-        (() => {
+          const pause = () => new Promise(resolve => setTimeout(resolve, 25));
+          const wait = async (label, predicate) => { const end = performance.now() + 10000; while (!predicate() && performance.now() < end) await pause(); if (!predicate()) throw new Error(label); };
+          const mode = label => [...document.querySelectorAll('.simple-page-mode-choices button')].find(item => item.textContent?.includes(label));
+          const count = label => Number(mode(label)?.querySelector('small')?.textContent?.match(/^\d+/)?.[0] ?? -1);
+          const headlineCopy = document.querySelector('.simple-copy-field textarea')?.value;
+          const headlineCount = count('Headlines');
+          const expectedCount = window.__fontPreviewerSimpleExport.manifest().fontCount;
+          mode('Body Copy').click();
+          await wait('Body Copy empty independent set', () => Boolean(document.querySelector('.simple-set-empty')) && count('Body Copy') === 0);
+          document.querySelector('.simple-set-empty button').click();
+          await wait('Body Copy cloned included fonts', () => window.__fontPreviewerSimpleExport?.manifest().bodyCount === expectedCount && document.querySelectorAll('.simple-body-page-wrap').length === 12);
+          document.querySelectorAll('.simple-body-samples button')[1].click();
+          await wait('Body sample fit', () => document.querySelector('.simple-body-reading-copy')?.textContent?.startsWith('The workshop is quiet') && [...document.querySelectorAll('.simple-body-reading-copy')].every(item => item.dataset.naturalFit));
+          const expected = document.querySelector('#simple-body-copy').value;
+          const firstIds = [...document.querySelectorAll('.simple-body-page-wrap')].map(item => item.dataset.candidateId);
+          [...document.querySelectorAll('[aria-label="Browse font previews"] button')].find(item => item.textContent === 'Next').click();
+          await wait('Body last preview batch', () => document.querySelector('[aria-label="Preview batch"]')?.value === '1' && document.querySelectorAll('.simple-body-page-wrap').length === expectedCount - 12);
+          const lastIds = [...document.querySelectorAll('.simple-body-page-wrap')].map(item => item.dataset.candidateId);
+          const lastPageCount = lastIds.length;
+          const paginationDistinct = firstIds.length === 12 && lastIds.every(id => !firstIds.includes(id)) && new Set([...firstIds, ...lastIds]).size === expectedCount;
+          [...document.querySelectorAll('[aria-label="Browse font previews"] button')].find(item => item.textContent === 'Previous').click();
+          await wait('Body first batch restored', () => document.querySelector('[aria-label="Preview batch"]')?.value === '0' && document.querySelectorAll('.simple-body-page-wrap').length === 12);
+          const tune = document.querySelector('.simple-section-actions button[aria-expanded]');
+          if (tune.getAttribute('aria-expanded') !== 'true') tune.click();
+          await wait('Body controls bounded', () => document.querySelectorAll('.simple-font-card').length === 12);
+          const cards = () => [...document.querySelectorAll('.simple-font-card')];
+          [...cards()[0].querySelectorAll('button')].find(item => item.textContent?.trim() === 'Duplicate font').click();
+          await wait('Independent duplicate added', () => window.__fontPreviewerSimpleExport.manifest().bodyCount === expectedCount + 1 && cards()[1]?.querySelector('header small')?.textContent?.includes('copy'));
+          [...cards()[1].querySelectorAll('.simple-casing button')].find(item => item.textContent === 'UPPER').click();
+          await wait('Duplicate casing changed alone', () => cards()[1].querySelector('.simple-card-copy').textContent === expected.toLocaleUpperCase() && cards()[0].querySelector('.simple-card-copy').textContent === expected);
+          const originalAxis = cards()[0].querySelector('input[type="range"]');
+          const duplicateAxis = cards()[1].querySelector('input[type="range"]');
+          const originalAxisValue = originalAxis?.value;
+          if (!duplicateAxis || !originalAxis) throw new Error('Variable fixture axis controls missing');
+          const changedAxisValue = duplicateAxis.value === duplicateAxis.max ? duplicateAxis.min : duplicateAxis.max;
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(duplicateAxis, changedAxisValue);
+          duplicateAxis.dispatchEvent(new Event('input', { bubbles: true }));
+          await wait('Duplicate axes changed alone', () => cards()[1].querySelector('input[type="range"]').value === changedAxisValue && cards()[0].querySelector('input[type="range"]').value === originalAxisValue);
+          const duplicateIndependent = cards()[0].querySelector('.simple-card-copy').textContent === expected && cards()[1].querySelector('.simple-card-copy').textContent === expected.toLocaleUpperCase();
+          cards()[1].querySelector('.remove-font').click();
+          await wait('Temporary duplicate removed', () => window.__fontPreviewerSimpleExport.manifest().bodyCount === expectedCount);
+          [...document.querySelectorAll('[aria-label="Browse font controls"] button')].find(item => item.textContent === 'Next fonts').click();
+          await wait('Last controls batch reachable', () => document.querySelectorAll('.simple-font-card').length === expectedCount - 12 && document.querySelector('.simple-font-number')?.textContent === '13');
+          const lastControlCount = cards().length;
+          [...document.querySelectorAll('[aria-label="Browse font controls"] button')].find(item => item.textContent === 'Previous fonts').click();
+          await wait('First controls batch restored', () => document.querySelector('.simple-font-number')?.textContent === '01');
+          document.querySelector('.simple-section-actions button[aria-expanded]').click();
+          mode('Headlines').click();
+          await wait('Headlines restored unchanged', () => document.querySelector('.simple-copy-field textarea')?.value === headlineCopy);
+          const headlineIndependent = count('Headlines') === headlineCount && window.__fontPreviewerSimpleExport.manifest().fontCount === expectedCount;
+          mode('Body Copy').click();
+          await wait('Body set survives switching', () => document.querySelector('#simple-body-copy')?.value === expected && document.querySelectorAll('.simple-body-page-wrap').length === 12 && [...document.querySelectorAll('.simple-body-reading-copy')].every(item => item.dataset.naturalFit));
           const pages = [...document.querySelectorAll('.simple-body-page-wrap')];
           const copies = pages.map(page => page.querySelector('.simple-body-reading-copy'));
           const frames = pages.map(page => page.querySelector('.simple-body-reading'));
-          const expected = document.querySelector('#simple-body-copy')?.value ?? '';
           const sizes = copies.map(item => Number.parseFloat(getComputedStyle(item).fontSize));
-          const touch = [...document.querySelectorAll('.simple-page-mode-choices button,.simple-body-samples button')]
-            .map(item => item.getBoundingClientRect().height)
-            .filter(value => value > 0);
+          const touch = [...document.querySelectorAll('.simple-page-mode-choices button,.simple-body-samples button')].map(item => item.getBoundingClientRect().height).filter(value => value > 0);
+          document.querySelector('.simple-body-compose').scrollIntoView({block:'start'});
+          await new Promise(resolve => setTimeout(resolve, 80));
           return {
-            pageCount: pages.length,
-            includedCount: Number(document.querySelector('.simple-body-page-topline span')?.textContent?.match(/\/\s*(\d+)/)?.[1] ?? -1),
+            headlineCount, expectedCount, headlineIndependent, duplicateIndependent, lastControlCount,
+            pageCount: pages.length, includedCount: window.__fontPreviewerSimpleExport.manifest().bodyCount, lastPageCount, paginationDistinct,
             sampleCount: document.querySelectorAll('.simple-body-samples button').length,
-            fullText: copies.every(item => item?.textContent === expected),
-            twoParagraphs: expected.includes('\n\n') && copies.every(item => item?.textContent?.includes('\n\n')),
+            fullText: copies.every(item => item.textContent === expected),
+            twoParagraphs: expected.includes('\n\n') && copies.every(item => item.textContent.includes('\n\n')),
             sharedSize: sizes.length === pages.length && new Set(sizes.map(value => value.toFixed(3))).size === 1,
-            withinFrames: copies.every((item, index) => {
-              const copy = item?.getBoundingClientRect();
-              const frame = frames[index]?.getBoundingClientRect();
-              return Boolean(copy && frame && copy.left >= frame.left - 1 && copy.right <= frame.right + 1 && copy.top >= frame.top - 1 && copy.bottom <= frame.bottom + 1);
-            }),
+            withinFrames: copies.every((item, index) => { const copy=item.getBoundingClientRect(), frame=frames[index].getBoundingClientRect(); return copy.left>=frame.left-1 && copy.right<=frame.right+1 && copy.top>=frame.top-1 && copy.bottom<=frame.bottom+1; }),
             noEllipsis: copies.every(item => getComputedStyle(item).textOverflow !== 'ellipsis'),
-            metadataTruncation: [...document.querySelectorAll('.simple-body-page-meta h3,.simple-body-page-meta p,.simple-body-page-wrap > header span')]
-              .filter(item => getComputedStyle(item).textOverflow === 'ellipsis').length,
-            minTouchHeight: Math.min(...touch),
-            horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+            metadataTruncation: [...document.querySelectorAll('.simple-body-page-meta h3,.simple-body-page-meta p,.simple-body-page-wrap > header span')].filter(item=>getComputedStyle(item).textOverflow === 'ellipsis').length,
+            minTouchHeight: Math.min(...touch), horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+            manifest: window.__fontPreviewerSimpleExport.manifest(),
           };
         })()
         """#) as? [String: Any] ?? [:]
+        try await host.snapshot(to: output.appendingPathComponent("17-simple-body-compose.png"))
         _ = try await host.evaluateAsync(#"(async()=>{document.querySelector('.simple-body-page-wrap')?.scrollIntoView({block:'start'});await new Promise(resolve=>setTimeout(resolve,64));return true})()"#)
         try await host.snapshot(to: output.appendingPathComponent("18-simple-body-page.png"))
+        try await wait("Body Copy recovery checkpoint") { try await self.bool("document.querySelector('.app-shell')?.dataset.recoveryCheckpoint === 'ready'") }
         metrics["export"] = try await host.verifySimpleBodyExport(in: output.appendingPathComponent("body-handoff-target", isDirectory: true))
+        _ = try await host.evaluate("[...document.querySelectorAll('.simple-hero-actions button')].find(item=>item.textContent?.includes('Export both sets'))?.click(); true")
+        let exportDeadline = Date().addingTimeInterval(120)
+        while Date() < exportDeadline {
+            if try await bool("!document.querySelector('.task-status') && [...document.querySelectorAll('[aria-live=polite]')].some(item=>item.textContent?.startsWith('Exported '))") { break }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        guard try await bool("!document.querySelector('.task-status') && [...document.querySelectorAll('[aria-live=polite]')].some(item=>item.textContent?.startsWith('Exported '))") else { throw HostError.unavailable("Combined Simple export did not finish.") }
+        metrics["combinedExport"] = try host.verifySimpleUIExport(in: output.appendingPathComponent("simple-ui-exports", isDirectory: true))
         var scale: [String: Any] = [:]
         for target in [80, 140] {
             try await setInterfaceScale(target)
@@ -1588,7 +1910,7 @@ private final class MacEvidenceRunner {
         metrics["studioShared"] = true
         _ = try await host.evaluate("[...document.querySelectorAll('.interface-switch button')].find(item=>item.textContent?.trim()==='Simple')?.click(); true")
         try await wait("Body Copy Simple restore") { try await self.bool("document.querySelector('.simple-body-page-list')") }
-        _ = try await host.evaluateAsync(#"(async()=>{[...document.querySelectorAll('.simple-page-mode-choices button')].find(item=>item.textContent?.includes('Boards'))?.click();const deadline=performance.now()+10000;while(!document.querySelector('.simple-copy-field textarea')&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,25));const field=document.querySelector('.simple-copy-field textarea');const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;setter.call(field,'A House With No Doors');field.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('.simple-hero')?.scrollIntoView({block:'start'});await new Promise(resolve=>setTimeout(resolve,64));return true})()"#)
+        _ = try await host.evaluateAsync(#"(async()=>{[...document.querySelectorAll('.simple-page-mode-choices button')].find(item=>item.textContent?.includes('Headlines'))?.click();const deadline=performance.now()+10000;while(!document.querySelector('.simple-copy-field textarea')&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,25));document.querySelector('.simple-hero')?.scrollIntoView({block:'start'});await new Promise(resolve=>setTimeout(resolve,64));return true})()"#)
         return metrics
     }
     private func waitForSimpleBodyFit(_ label: String) async throws {

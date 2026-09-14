@@ -1,15 +1,17 @@
 # Font Previewer icon source
 
-The icon is one pitch.dog editorial visual poem: a coral loupe passes over one lowercase `a`; the sans construction becomes serif only inside the lens. Close attention reveals character without ranking a winner.
+The icon is **Room for both**: a serif capital `A` softens its crossbar into a coral hammock for a lowercase `a`. The two forms share one silhouette, reflecting Simple's independent headline and body-copy font sets. The illustrated glyphs are objects rather than application-interface typography.
 
 ## Assets
 
-- `font-previewer-icon-master.png` — 1024 × 1024 full composition; SHA-256 `7a460e17e4c10d7fcb892ed995f790a50be0d521db78c8879b7b4ac48f935c39`
-- `font-previewer-icon-square.png` — 1024 × 1024 responsive crop for macOS icon sizes; SHA-256 `dde20a7ea7e366f8ece67333ef3b56815f01448eb03a417f9ea01736592a8a51`
-- `font-previewer-icon-512.png` — 512 × 512 Linux/browser derivative; SHA-256 `421e662f1af8eb085e6bdff39d34edd88d3df6e60bfa64787a1b03e2efc952d6`
+- `font-previewer-icon-master.png` — 1024 × 1024 full composition; SHA-256 `006559d6c692fe683732d8635f7eec162b62806fba354746925bff8d6bfdcd59`
+- `font-previewer-icon-square.png` — 1024 × 1024 responsive crop for macOS icon sizes; SHA-256 `cfc5d11b9b430f46d2113b42a63beaa15a74b73faa8202b8d1e788cbb96864ab`
+- `font-previewer-icon-512.png` — 512 × 512 Linux/browser derivative; SHA-256 `024057a86f33b4c3586d5a80d6bef0ddfbc14fbc85ed8e48378230d22afc2ae1`
 
-The candidate was generated on 2026-08-28 from the project-specific `pitchdog-illustration` visual law using owner-authorized pitch.dog reference art. The master was inspected at full size and at 256, 64, 32, and 16 px. Responsive files are deterministic crops/resizes of the same promoted pixels, stripped to opaque sRGB.
+The candidate was generated with the built-in image tool on 2026-09-14, guided by the `pitchdog-illustration` visual law and owner-authorized pitch.dog style references. One field-cleanup revision preserved the letter forms and hammock relationship. The full composition retains a small lower-middle motif and extensive powder-blue negative space; the responsive crop enlarges that same motif for the Dock and browser chrome.
 
-Status: agent-checked, introduced in `v0.1.0-rc.2`, and retained for the `v0.1.0-rc.3` interface rebuild; not described as separately owner-accepted. The generated source remains preserved outside the public package. No reference image, private path, prompt, generation ID, EXIF, or restricted source material is embedded in these assets.
+The master was inspected at full size, and the responsive family at actual 256, 64, 32, and 16 px. The public PNGs at 16, 32, 64, 180, 192, and 512 px are deterministic resizes of the same responsive source. `favicon.ico` contains matching 16, 32, and 64 px images. All exported PNGs are opaque, 8-bit sRGB with nonessential metadata removed.
 
-Alt text when the illustration itself carries meaning: “A coral magnifying glass changes a lowercase a from sans to serif inside the lens.” In the application titlebar it is decorative because the adjacent text names Font Previewer.
+Status: agent-checked and promoted for the next release; not separately owner-accepted or yet claimed as published. This family supersedes the coral-loupe icon; its prior pixels remain in Git history. Generated candidates and edit lineage remain outside the public package. No reference image, private path, prompt, generation ID, EXIF, or restricted source material is embedded in the distributed assets.
+
+Caption: “There is room for both.” Alt text when the illustration itself carries meaning: “A capital A cradles a lowercase a in its coral hammock crossbar.” In the application titlebar it is decorative because the adjacent text names Font Previewer.

@@ -3,7 +3,7 @@ import { copyFile, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 
 import { basename, dirname, extname, join } from "node:path";
 import { inflateSync } from "node:zlib";
 import type { BrowserWindow } from "electron";
-import { activeTypographySystem, faceForCandidate, sourceForCandidate, type HandoffPreferences, type StudyDocument } from "../src/domain.js";
+import { activeTypographySystem, candidateSimpleSet, faceForCandidate, sourceForCandidate, type HandoffPreferences, type StudyDocument } from "../src/domain.js";
 import { csvCell, safeFileStem } from "./host-storage.js";
 
 interface HandoffOptions {
@@ -24,7 +24,7 @@ interface ManifestEntry {
 interface SimpleExportManifest {
   readonly width: 5_152;
   readonly height: 2_160;
-  readonly pageMode: "boards" | "body";
+  readonly pageMode: "boards" | "body" | "both";
   readonly boardCount: number;
   readonly bodyCount: number;
   readonly indexCount: number;
@@ -131,17 +131,16 @@ async function simpleExportManifest(window: BrowserWindow, document: StudyDocume
   const boardCount = integerField(value.boardCount, "board count");
   const bodyCount = integerField(value.bodyCount, "body count");
   const indexCount = integerField(value.indexCount, "index count");
-  if (value.pageMode !== "boards" && value.pageMode !== "body") throw new Error("Simple export manifest has an invalid page mode.");
+  if (value.pageMode !== "boards" && value.pageMode !== "body" && value.pageMode !== "both") throw new Error("Simple export manifest has an invalid page mode.");
   if (value.includeIndex !== true && value.includeIndex !== false) throw new Error("Simple export manifest has an invalid index setting.");
   if (width !== simpleBoardWidth || height !== simpleBoardHeight) throw new Error(`Simple pages must be ${simpleBoardWidth} × ${simpleBoardHeight}.`);
   if (fontCount < 1 || fontCount > maximumSimpleFonts) throw new Error("Simple export font count is outside the Study limit.");
-  if (fontCount !== document.candidates.filter((candidate) => candidate.reviewState !== "reject").length) throw new Error("Simple export font count does not match the mirrored Study.");
-  if (value.pageMode === "boards") {
-    if (boardCount !== Math.ceil(fontCount / 4) || bodyCount !== 0) throw new Error("Simple export board count does not match its fonts.");
-    if (indexCount !== (value.includeIndex ? Math.ceil(fontCount / 12) : 0)) throw new Error("Simple export index count does not match its fonts.");
-  } else if (boardCount !== 0 || indexCount !== 0 || bodyCount !== fontCount || value.includeIndex) {
-    throw new Error("Simple export Body Copy count does not match its fonts.");
-  }
+  const included = document.candidates.filter((candidate) => candidate.reviewState !== "reject");
+  const headlines = value.pageMode === "body" ? 0 : included.filter((candidate) => candidateSimpleSet(candidate) === "headlines").length;
+  const body = value.pageMode === "boards" ? 0 : included.filter((candidate) => candidateSimpleSet(candidate) === "body").length;
+  if (fontCount !== headlines + body) throw new Error("Simple export font count does not match the mirrored Study.");
+  if (boardCount !== Math.ceil(headlines / 4) || bodyCount !== body) throw new Error("Simple export page counts do not match their font sets.");
+  if ((value.pageMode === "body" && value.includeIndex) || indexCount !== (value.includeIndex ? Math.ceil(headlines / 12) : 0)) throw new Error("Simple export index count does not match its fonts.");
   return { width: simpleBoardWidth, height: simpleBoardHeight, pageMode: value.pageMode, fontCount, boardCount, bodyCount, indexCount, includeIndex: value.includeIndex };
 }
 

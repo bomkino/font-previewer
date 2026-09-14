@@ -28,6 +28,7 @@ const FIELD_SEPARATOR = "\u001f";
 const RECORD_SEPARATOR = "\u001e";
 const MAXIMUM_METADATA_OUTPUT = 1024 * 1024;
 const MAXIMUM_FACES_PER_SOURCE = 256;
+const MAXIMUM_FONTCONFIG_RECORDS = 4096;
 const MAXIMUM_NAME_LENGTH = 512;
 const MAXIMUM_INSPECTION_MILLISECONDS = 3_000;
 
@@ -93,20 +94,29 @@ export function parseFontconfigQuery(output: string): readonly InspectedFaceMeta
   const records = output.split(RECORD_SEPARATOR);
   if (records.at(-1) !== "") throw new Error("Font metadata output is truncated.");
   records.pop();
-  if (records.length === 0 || records.length > MAXIMUM_FACES_PER_SOURCE) {
+  if (records.length === 0 || records.length > MAXIMUM_FONTCONFIG_RECORDS) {
     throw new Error("Font metadata has an invalid face count.");
   }
   const faces: InspectedFaceMetadata[] = [];
   const facesByIndex = new Map<number, InspectedFaceMetadata>();
+  const variableFaceIndexes = new Set<number>();
   for (const record of records) {
     const fields = record.split(FIELD_SEPARATOR);
-    if (fields.length !== 5 || !/^\d{1,6}$/u.test(fields[0]) || !["True", "False"].includes(fields[4])) throw new Error("Font metadata record is malformed.");
-    const faceIndex = Number(fields[0]);
-    if (!Number.isSafeInteger(faceIndex)) throw new Error("Font metadata has an invalid face index.");
-    const variable = fields[4] === "True";
+    if (fields.length !== 5 || !/^\d{1,10}$/u.test(fields[0]) || !["True", "False"].includes(fields[4])) throw new Error("Font metadata record is malformed.");
+    const encodedIndex = Number(fields[0]);
+    if (!Number.isSafeInteger(encodedIndex) || encodedIndex > 0x7fffffff) throw new Error("Font metadata has an invalid face index.");
+    // FreeType/Fontconfig reserve bits 16–30 for a named instance; only the
+    // lower 16 bits identify a physical Face in a collection.
+    const faceIndex = encodedIndex & 0xffff;
+    const namedInstance = encodedIndex > 0xffff;
+    const variable = fields[4] === "True" || namedInstance;
     const family = parseMetadataName(fields[1], "family");
     const style = parseMetadataName(fields[2], "style", variable) ?? "Variable";
     const postScriptName = parseMetadataName(fields[3], "PostScript name", true);
+    if (namedInstance) {
+      variableFaceIndexes.add(faceIndex);
+      continue;
+    }
     const face: InspectedFaceMetadata = {
       faceIndex,
       family: family!,
@@ -128,7 +138,10 @@ export function parseFontconfigQuery(output: string): readonly InspectedFaceMeta
     facesByIndex.set(faceIndex, face);
     faces.push(face);
   }
-  return faces;
+  if (faces.length === 0 || faces.length > MAXIMUM_FACES_PER_SOURCE || [...variableFaceIndexes].some((index) => !facesByIndex.has(index))) {
+    throw new Error("Font metadata has an invalid physical face count.");
+  }
+  return faces.map((face) => variableFaceIndexes.has(face.faceIndex) ? { ...face, variable: true } : face);
 }
 
 export async function inspectFontFile(canonicalPath: string): Promise<readonly InspectedFaceMetadata[]> {

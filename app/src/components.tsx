@@ -16,8 +16,11 @@ import {
   FIT_POLICIES,
   REVIEW_STATES,
   SYSTEM_ROLES,
+  STUDY_LIMITS,
   TEXT_CASINGS,
   activeRecipe,
+  candidatesInSimpleSet,
+  simpleFontSets,
   activeTypographySystem,
   bindingForSource,
   faceForCandidate,
@@ -35,6 +38,7 @@ import {
   type SystemRole,
 } from "./domain.js";
 import {
+  fittedTextSize,
   rendererStatusLabel,
   specimenCopy,
   specimenStyle,
@@ -48,10 +52,10 @@ import {
   SIMPLE_BODY_COPY_LIMIT,
   SIMPLE_BODY_COPY_SAMPLES,
   SIMPLE_INDEX_PAGE_SIZE,
+  SIMPLE_PREVIEW_PAGE_SIZE,
   SIMPLE_QUADRANTS,
   SIMPLE_STRESS_COPY,
   chunked,
-  includedCandidates,
   simpleBodyCopyLabel,
   simpleBodyCopySample,
   simpleBodyDisplayCopy,
@@ -137,7 +141,7 @@ export interface AppActions {
   readonly openStudy: () => void;
   readonly saveStudy: (saveAs: boolean) => void;
   readonly exportHandoff: (sourcePermissionAcknowledged: boolean) => void;
-  readonly exportBoards: (includeSources: boolean) => void;
+  readonly exportBoards: (includeSources: boolean, scope?: "boards" | "body" | "both") => void;
   readonly relinkSource: (sourceId: string) => void;
   readonly revealSource: (sourceId: string) => void;
   readonly newStudy: () => void;
@@ -203,6 +207,10 @@ const simpleCasingLabels: Record<Candidate["casing"], string> = {
 };
 
 interface SimpleWorkspaceProps {
+  readonly browsePage?: number;
+  readonly onBrowsePageChange?: (page: number) => void;
+  readonly tunePage?: number;
+  readonly onTunePageChange?: (page: number) => void;
   readonly session: StudySession;
   readonly dispatch: Dispatch<StudyCommand>;
   readonly fontStates: ReadonlyMap<string, "loading" | "ready" | "failed" | "unavailable">;
@@ -254,6 +262,8 @@ function SimpleCandidateCopy({
   const rawCopy = displayCopy ?? simpleDisplayCopy(session, candidate, stressTest);
   const copy = (fit === "board" || fit === "compare") && policy !== "locked-lines" ? rawCopy.replace(/\s*\r?\n\s*/gu, " ") : rawCopy;
   const axisKey = candidate.axes.map((axis) => `${axis.tag}:${axis.value}`).join(";");
+  const featureKey = candidate.features.map((feature) => `${feature.tag}:${feature.enabled}`).join(";");
+  const fontFamily = specimenStyle(session.document, candidate, recipe, state).fontFamily;
 
   useEffect(() => {
     const element = elementRef.current;
@@ -267,14 +277,19 @@ function SimpleCandidateCopy({
       index: { minimum: 7, maximum: 34, width: 0.82, height: 0.48 },
       compare: { minimum: 10, maximum: 96, width: 0.84, height: 0.64 },
     }[fit];
-    let frame = 0;
+    let frame: number | undefined;
     let cancelled = false;
+    let measuredWidth = -1;
+    let measuredHeight = -1;
     const fitCopy = () => {
+      frame = undefined;
       if (cancelled) return;
       // UI scale transforms visual bounds; fitting must use untransformed layout pixels before writing CSS sizes.
       const frameWidth = container.clientWidth;
       const frameHeight = container.clientHeight;
       if (frameWidth <= 0 || frameHeight <= 0) return;
+      measuredWidth = frameWidth;
+      measuredHeight = frameHeight;
       const maximumWidth = frameWidth * configuration.width;
       const maximumHeight = frameHeight * configuration.height;
       const wrappingFit = fit === "body" || (fit === "compare" && policy === "fit");
@@ -286,16 +301,11 @@ function SimpleCandidateCopy({
       element.style.transform = "none";
       element.style.transformOrigin = "center center";
       element.style.justifySelf = fit === "compare" ? "center" : "auto";
-      let low = configuration.minimum;
-      let high = configuration.maximum;
-      for (let iteration = 0; iteration < 15; iteration += 1) {
-        const size = (low + high) / 2;
+      const naturalSize = fittedTextSize(configuration.minimum, configuration.maximum, (size) => {
         element.style.fontSize = `${size}px`;
         const widthFits = wrappingFit ? element.scrollWidth <= element.clientWidth + 1 : element.scrollWidth <= maximumWidth;
-        if (widthFits && element.scrollHeight <= maximumHeight + 1) low = size;
-        else high = size;
-      }
-      const naturalSize = Math.floor(low * 10) / 10;
+        return widthFits && element.scrollHeight <= maximumHeight + 1;
+      });
       element.style.fontSize = `${naturalSize}px`;
       element.dataset.naturalFit = String(naturalSize);
       element.dataset.fitFrame = `${frameWidth}x${frameHeight}`;
@@ -319,23 +329,21 @@ function SimpleCandidateCopy({
       }
     };
     const schedule = () => {
+      if (cancelled || frame !== undefined) return;
+      if (container.clientWidth === measuredWidth && container.clientHeight === measuredHeight) return;
       delete element.dataset.naturalFit;
       delete element.dataset.fitFrame;
-      cancelAnimationFrame(frame);
       frame = requestAnimationFrame(fitCopy);
     };
     const observer = new ResizeObserver(schedule);
     observer.observe(container);
     schedule();
-    void document.fonts.ready.then(schedule);
-    document.fonts.addEventListener("loadingdone", schedule);
     return () => {
       cancelled = true;
-      cancelAnimationFrame(frame);
+      if (frame !== undefined) cancelAnimationFrame(frame);
       observer.disconnect();
-      document.fonts.removeEventListener("loadingdone", schedule);
     };
-  }, [axisKey, candidate.casing, copy, fit, policy, state]);
+  }, [axisKey, featureKey, fontFamily, copy, fit, policy, state, recipe.tracking, recipe.lineHeight, recipe.language, recipe.direction]);
 
   return (
     <p
@@ -352,6 +360,10 @@ function SimpleCandidateCopy({
 }
 
 export function SimpleWorkspace({
+  browsePage = 0,
+  onBrowsePageChange = () => {},
+  tunePage = 0,
+  onTunePageChange = () => {},
   session,
   dispatch,
   fontStates,
@@ -386,21 +398,33 @@ export function SimpleWorkspace({
   const installedDialogRef = useRef<HTMLElement>(null);
   const installedFamilyBackRef = useRef<HTMLButtonElement>(null);
   const installedReturnFocusRef = useRef<HTMLElement | null>(null);
-  const candidates = session.document.candidates;
-  const included = includedCandidates(session);
-  const boards = useMemo(() => chunked(included, 4), [included]);
-  const indexPages = useMemo(() => includeIndex ? chunked(included, SIMPLE_INDEX_PAGE_SIZE) : [], [includeIndex, included]);
+  const setId = pageMode === "body" ? "body" : "headlines";
+  const otherSetId = setId === "body" ? "headlines" : "body";
+  const candidates = useMemo(() => candidatesInSimpleSet(session.document, setId), [session.document.candidates, setId]);
+  const included = useMemo(() => candidates.filter((candidate) => candidate.reviewState !== "reject"), [candidates]);
+  const otherCandidates = useMemo(() => candidatesInSimpleSet(session.document, otherSetId), [session.document.candidates, otherSetId]);
+  const sets = simpleFontSets(session.document);
+  const allIncluded = session.document.candidates.filter((candidate) => candidate.reviewState !== "reject");
+  const availableFontSlots = STUDY_LIMITS.candidates - session.document.candidates.length;
+  const pageStart = browsePage * SIMPLE_PREVIEW_PAGE_SIZE;
+  const browseCount = Math.ceil(included.length / SIMPLE_PREVIEW_PAGE_SIZE);
+  const tuneCount = Math.ceil(candidates.length / SIMPLE_PREVIEW_PAGE_SIZE);
+  const visibleCandidates = candidates.slice(tunePage * SIMPLE_PREVIEW_PAGE_SIZE, (tunePage + 1) * SIMPLE_PREVIEW_PAGE_SIZE);
+  const visibleIncluded = included.slice(pageStart, pageStart + SIMPLE_PREVIEW_PAGE_SIZE);
+  const boards = useMemo(() => chunked(visibleIncluded, 4), [visibleIncluded]);
+  const indexPages = useMemo(() => includeIndex && visibleIncluded.length ? [visibleIncluded] : [], [includeIndex, visibleIncluded]);
+  const exportBoardCount = Math.ceil(included.length / 4);
+  const exportIndexCount = includeIndex ? Math.ceil(included.length / SIMPLE_INDEX_PAGE_SIZE) : 0;
   const recipe = activeRecipe(session);
-  const copy = session.workspace.copyOverride ?? recipe.copy;
-  const bodySample = simpleBodyCopySample(bodySampleId);
-  const bodyCopy = session.workspace.copyOverride ?? bodySample.copy;
+  const copy = sets.headlines.copy;
+  const bodyCopy = sets.body.copy;
   const bodyCopyLabel = simpleBodyCopyLabel(session, bodySampleId);
   const bodyCopyEmpty = !bodyCopy.trim();
   const bodyCopyTooLong = bodyCopy.length > SIMPLE_BODY_COPY_LIMIT;
   const bodyCopyInvalid = bodyCopyEmpty || bodyCopyTooLong;
-  const pageCount = pageMode === "body" ? included.length : boards.length + indexPages.length;
+  const pageCount = pageMode === "body" ? included.length : exportBoardCount + exportIndexCount;
   const previewCandidate = candidates.find((candidate) => candidate.id === previewCandidateId);
-  const studySourceIds = useMemo(() => new Set(session.document.sources.map((source) => source.id)), [session.document.sources]);
+  const studySourceIds = useMemo(() => new Set(candidates.map((candidate) => faceForCandidate(session.document, candidate).sourceId)), [candidates, session.document.faces]);
   const installedGroups = useMemo(() => groupByFamily(catalog.imports, (item) => item.faces[0]?.family ?? item.source.displayName), [catalog.imports]);
   const selectedInstalledGroup = installedGroups.find((group) => group.key === selectedInstalledFamilyKey);
 
@@ -509,21 +533,28 @@ export function SimpleWorkspace({
 
   const closeCandidatePreview = () => setPreviewCandidateId(undefined);
 
+  const browseFromBottom = (page: number) => {
+    onBrowsePageChange(page);
+    requestAnimationFrame(() => {
+      const heading = document.getElementById("simple-pages-heading");
+      heading?.scrollIntoView({ block: "start" });
+      heading?.focus({ preventScroll: true });
+    });
+  };
+
   const setAll = (reviewState: ReviewState) => {
     if (candidates.length) dispatch({ type: "set-review-state", candidateIds: candidates.map((candidate) => candidate.id), reviewState });
   };
 
   const changePageMode = (mode: SimplePageMode) => {
     onPageModeChange(mode);
-    if (mode === "body" && pageMode !== "body" && session.workspace.copyOverride === undefined) {
-      dispatch({ type: "set-copy-override", copy: simpleBodyCopySample(bodySampleId || DEFAULT_SIMPLE_BODY_COPY_SAMPLE_ID).copy });
-    }
+    setPreviewCandidateId(undefined);
   };
 
   const chooseBodySample = (sampleId: string) => {
     const sample = simpleBodyCopySample(sampleId);
     onBodySampleChange(sample.id);
-    dispatch({ type: "set-copy-override", copy: sample.copy });
+    dispatch({ type: "edit-simple-set", setId: "body", patch: { copy: sample.copy } });
   };
 
   return (
@@ -535,12 +566,12 @@ export function SimpleWorkspace({
             {candidates.length
               ? pageMode === "body"
                 ? `${included.length} fonts. ${included.length} reading ${included.length === 1 ? "page" : "pages"}.`
-                : `${included.length} fonts. ${boards.length} ${boards.length === 1 ? "board" : "boards"}.`
+                : `${included.length} fonts. ${exportBoardCount} ${exportBoardCount === 1 ? "board" : "boards"}.`
               : pageMode === "body" ? "Add fonts. Read them." : "Add fonts. Get boards."}
           </h1>
           <p>{candidates.length
             ? pageMode === "body"
-              ? "One generous reading page per font. Every page shares the same honest text size."
+              ? "One generous reading page per font. Export matches the text size across your whole set."
               : "Tune the fonts once. The four-up pages update immediately."
             : "Choose font files or a folder. Nothing is installed or uploaded."}</p>
           {candidates.length ? (
@@ -554,23 +585,26 @@ export function SimpleWorkspace({
           <button id="simple-add-fonts" type="button" className="quiet-button has-icon" onClick={actions.importSources}><InterfaceIcon name="add" />Add Fonts…</button>
           {capabilities?.installedCatalog ? <button type="button" className="quiet-button has-icon" onClick={openInstalledCatalog}><InterfaceIcon name="library" />Installed Fonts…</button> : null}
           <button type="button" className="primary-button has-icon" disabled={!included.length || !capabilities?.transactionalHandoff || (pageMode === "body" && bodyCopyInvalid)} onClick={() => actions.exportBoards(includeSources)}><InterfaceIcon name="export" />{pageMode === "body" ? "Export Body Copy…" : "Export Boards…"}</button>
+          <button type="button" className="quiet-button has-icon" disabled={!allIncluded.length || !capabilities?.transactionalHandoff || (allIncluded.some((candidate) => candidate.simpleSet === "body") && bodyCopyInvalid)} onClick={() => actions.exportBoards(includeSources, "both")}><InterfaceIcon name="export" />Export both sets…</button>
         </div>
       </section>
 
       <section className="simple-page-mode" aria-labelledby="simple-page-mode-heading">
         <div>
-          <p className="section-kicker">Choose the page</p>
-          <h2 id="simple-page-mode-heading">What are we making?</h2>
+          <p className="section-kicker">Two font sets · one study</p>
+          <h2 id="simple-page-mode-heading">Big words. Long reads.</h2>
         </div>
         <div className="simple-page-mode-choices" role="group" aria-label="Simple page format">
           <button type="button" className={pageMode === "boards" ? "is-active" : ""} aria-pressed={pageMode === "boards"} onClick={() => changePageMode("boards")}>
-            <span aria-hidden="true"><InterfaceIcon name="boards" size={48} /></span><strong>Boards</strong><small>Four fonts per page. Fast visual comparison.</small>
+            <span aria-hidden="true"><InterfaceIcon name="boards" size={48} /></span><strong>Headlines + subheadlines</strong><small>{candidatesInSimpleSet(session.document, "headlines").length} fonts · Four-up boards + index pages.</small>
           </button>
           <button type="button" className={pageMode === "body" ? "is-active" : ""} aria-pressed={pageMode === "body"} onClick={() => changePageMode("body")}>
-            <span aria-hidden="true"><InterfaceIcon name="body-copy" size={48} /></span><strong>Body Copy</strong><small>One font per page. Real reading texture.</small>
+            <span aria-hidden="true"><InterfaceIcon name="body-copy" size={48} /></span><strong>Body Copy</strong><small>{candidatesInSimpleSet(session.document, "body").length} fonts · One reading page per font.</small>
           </button>
         </div>
       </section>
+
+      {browseCount > 1 ? <nav className="simple-browse" aria-label="Browse font previews"><div><strong>Previewing fonts {pageStart + 1}–{Math.min(pageStart + SIMPLE_PREVIEW_PAGE_SIZE, included.length)} of {included.length}</strong><span>Previews stay light. Export includes every included font.</span></div><div><button type="button" className="quiet-button" disabled={browsePage === 0} onClick={() => onBrowsePageChange(browsePage - 1)}>Previous</button><label><span className="sr-only">Preview batch</span><SelectControl aria-label="Preview batch" value={browsePage} onChange={(event) => onBrowsePageChange(Number(event.target.value))}>{Array.from({ length: browseCount }, (_, page) => <option key={page} value={page}>{page + 1} / {browseCount}</option>)}</SelectControl></label><button type="button" className="quiet-button" disabled={browsePage + 1 >= browseCount} onClick={() => onBrowsePageChange(browsePage + 1)}>Next</button></div></nav> : null}
 
       {pageMode === "boards" ? (
         <section className="simple-compose" aria-label="Board copy and export options">
@@ -578,7 +612,7 @@ export function SimpleWorkspace({
             <span>What should the fonts say?</span>
             <textarea
               value={copy}
-              onChange={(event) => dispatch({ type: "set-copy-override", copy: event.target.value })}
+              onChange={(event) => dispatch({ type: "edit-simple-set", setId: "headlines", patch: { copy: event.target.value } })}
               placeholder="Your Headline"
               spellCheck={false}
               rows={2}
@@ -618,7 +652,7 @@ export function SimpleWorkspace({
             <textarea
               id="simple-body-copy"
               value={bodyCopy}
-              onChange={(event) => dispatch({ type: "set-copy-override", copy: event.target.value })}
+              onChange={(event) => dispatch({ type: "edit-simple-set", setId: "body", patch: { copy: event.target.value } })}
               aria-invalid={bodyCopyInvalid || undefined}
               aria-describedby="simple-body-copy-note simple-body-copy-count"
               spellCheck
@@ -637,7 +671,7 @@ export function SimpleWorkspace({
               ))}
             </div>
             <div className="simple-body-export-options">
-              <div><span className="simple-body-equal" aria-hidden="true"><InterfaceIcon name="equal" /></span><span><strong>Matched reading size</strong><small>All pages use the same fitted size, so differences stay honest.</small></span></div>
+              <div><span className="simple-body-equal" aria-hidden="true"><InterfaceIcon name="equal" /></span><span><strong>Matched reading size</strong><small>Visible previews match each other. Export matches the whole set.</small></span></div>
               <label title="Copies the original source font files into the export folder.">
                 <input type="checkbox" checked={includeSources} onChange={(event) => onIncludeSourcesChange(event.target.checked)} />
                 <span><strong>Copy source fonts</strong><small>I have permission to share them</small></span>
@@ -647,6 +681,7 @@ export function SimpleWorkspace({
         </section>
       )}
 
+      {!candidates.length && otherCandidates.length ? <div className="simple-set-empty"><p>This set is yours to build. Add fonts, or start with independent copies from {otherSetId === "body" ? "Body Copy" : "Headlines"}.</p><button type="button" className="quiet-button has-icon" disabled={!allIncluded.length || allIncluded.length > availableFontSlots} title={allIncluded.length > availableFontSlots ? "Study limit reached. Remove fonts before copying this set." : undefined} onClick={() => dispatch({ type: "copy-to-simple-set", candidateIds: otherCandidates.filter((candidate) => candidate.reviewState !== "reject").map((candidate) => candidate.id), setId })}><InterfaceIcon name="add" />Copy included fonts here</button></div> : null}
       {!candidates.length ? (
         <button type="button" className="simple-empty-drop" onClick={actions.importSources}>
           <span aria-hidden="true">Aa</span>
@@ -658,14 +693,14 @@ export function SimpleWorkspace({
           {pageMode === "boards" ? (
             <section className="simple-pages-section" aria-labelledby="simple-pages-heading">
               <div className="simple-section-heading">
-                <div><p className="section-kicker">01 · Boards</p><h2 id="simple-pages-heading">Your boards. Already made.</h2></div>
-                <button type="button" className="primary-button has-icon" disabled={!included.length || !capabilities?.transactionalHandoff} onClick={() => actions.exportBoards(includeSources)}><InterfaceIcon name="export" />Export {boards.length + indexPages.length} pages…</button>
+                <div><p className="section-kicker">01 · Boards</p><h2 id="simple-pages-heading" tabIndex={-1}>Your boards. Already made.</h2></div>
+                <button type="button" className="primary-button has-icon" disabled={!included.length || !capabilities?.transactionalHandoff} onClick={() => actions.exportBoards(includeSources)}><InterfaceIcon name="export" />Export {pageCount} pages…</button>
               </div>
               <div className="simple-page-list">
                 {boards.map((board, boardIndex) => (
                   <article className="simple-page-wrap" key={`board-${boardIndex}`}>
-                    <header><strong>Board {String(boardIndex + 1).padStart(2, "0")}</strong><span>{board.map((candidate) => String(included.indexOf(candidate) + 1).padStart(2, "0")).join(" · ")} · 5152 × 2160 export</span></header>
-                    <div className="simple-board" aria-label={`Board ${boardIndex + 1}`}>
+                    <header><strong>Board {String(browsePage * 3 + boardIndex + 1).padStart(2, "0")}</strong><span>{board.map((candidate) => String(included.indexOf(candidate) + 1).padStart(2, "0")).join(" · ")} · 5152 × 2160 export</span></header>
+                    <div className="simple-board" aria-label={`Board ${browsePage * 3 + boardIndex + 1}`}>
                       {Array.from({ length: 4 }, (_, slot) => {
                         const candidate = board[slot];
                         const palette = SIMPLE_QUADRANTS[slot];
@@ -685,8 +720,8 @@ export function SimpleWorkspace({
                 ))}
                 {indexPages.map((page, pageIndex) => (
                   <article className="simple-page-wrap" key={`index-${pageIndex}`}>
-                    <header><strong>Index {pageIndex + 1} / {indexPages.length}</strong><span>{page.length} fonts · 5152 × 2160 export</span></header>
-                    <div className="simple-index-board" aria-label={`Index page ${pageIndex + 1}`}>
+                    <header><strong>Index {browsePage + 1} / {exportIndexCount}</strong><span>{page.length} fonts · 5152 × 2160 export</span></header>
+                    <div className="simple-index-board" aria-label={`Index page ${browsePage + 1}`}>
                       {page.map((candidate) => {
                         const face = faceForCandidate(session.document, candidate);
                         return (
@@ -704,12 +739,13 @@ export function SimpleWorkspace({
           ) : (
             <section className="simple-pages-section" aria-labelledby="simple-pages-heading">
               <div className="simple-section-heading">
-                <div><p className="section-kicker">01 · Body Copy</p><h2 id="simple-pages-heading">One font. One reading page.</h2></div>
+                <div><p className="section-kicker">01 · Body Copy</p><h2 id="simple-pages-heading" tabIndex={-1}>One font. One reading page.</h2></div>
                 <button type="button" className="primary-button has-icon" disabled={!included.length || !capabilities?.transactionalHandoff || bodyCopyInvalid} onClick={() => actions.exportBoards(includeSources)}><InterfaceIcon name="export" />Export {included.length} {included.length === 1 ? "page" : "pages"}…</button>
               </div>
               {included.length ? (
                 <div className="simple-body-page-list">
-                  {included.map((candidate, candidateIndex) => {
+                  {visibleIncluded.map((candidate) => {
+                    const candidateIndex = included.indexOf(candidate);
                     const face = faceForCandidate(session.document, candidate);
                     const source = sourceForCandidate(session.document, candidate);
                     const state = fontStates.get(face.id);
@@ -737,6 +773,8 @@ export function SimpleWorkspace({
             </section>
           )}
 
+          {browseCount > 1 ? <div className="simple-browse" role="group" aria-label="Continue browsing previews"><strong>Batch {browsePage + 1} of {browseCount} · {included.length} fonts in this set</strong><div><button type="button" className="quiet-button has-icon" disabled={browsePage === 0} onClick={() => browseFromBottom(browsePage - 1)}><InterfaceIcon name="arrow-left" />Previous previews</button><button type="button" className="quiet-button has-icon" disabled={browsePage + 1 >= browseCount} onClick={() => browseFromBottom(browsePage + 1)}>Next previews<InterfaceIcon name="arrow-right" /></button></div></div> : null}
+
           <section className="simple-font-section" aria-labelledby="simple-fonts-heading">
             <div className="simple-section-heading">
               <div><p className="section-kicker">02 · Fonts</p><h2 id="simple-fonts-heading">Tune only when you need to.</h2></div>
@@ -746,9 +784,11 @@ export function SimpleWorkspace({
                 <button type="button" className="quiet-button has-icon" aria-expanded={showFontControls} onClick={() => setShowFontControls((current) => !current)}><InterfaceIcon name="tune" />{showFontControls ? "Done tuning" : `Tune ${candidates.length} fonts`}</button>
               </div>
             </div>
+            {showFontControls && tuneCount > 1 ? <nav className="simple-browse" aria-label="Browse font controls"><strong>Fonts {tunePage * SIMPLE_PREVIEW_PAGE_SIZE + 1}–{Math.min((tunePage + 1) * SIMPLE_PREVIEW_PAGE_SIZE, candidates.length)} of {candidates.length}</strong><div><button type="button" className="quiet-button" disabled={tunePage === 0} onClick={() => onTunePageChange(tunePage - 1)}>Previous fonts</button><label><span className="sr-only">Font controls batch</span><SelectControl aria-label="Font controls batch" value={tunePage} onChange={(event) => onTunePageChange(Number(event.target.value))}>{Array.from({ length: tuneCount }, (_, page) => <option key={page} value={page}>{page + 1} / {tuneCount}</option>)}</SelectControl></label><button type="button" className="quiet-button" disabled={tunePage + 1 >= tuneCount} onClick={() => onTunePageChange(tunePage + 1)}>Next fonts</button></div></nav> : null}
             {showFontControls ? (
               <div className="simple-font-grid">
-                {candidates.map((candidate, candidateIndex) => {
+                {visibleCandidates.map((candidate) => {
+                  const candidateIndex = candidates.indexOf(candidate);
                   const face = faceForCandidate(session.document, candidate);
                   const source = sourceForCandidate(session.document, candidate);
                   const skipped = candidate.reviewState === "reject";
@@ -762,7 +802,7 @@ export function SimpleWorkspace({
                       onDragOver={(event) => event.preventDefault()}
                       onDrop={() => {
                         if (!draggedCandidateId || draggedCandidateId === candidate.id) return;
-                        dispatch({ type: "move-candidate", candidateId: draggedCandidateId, toIndex: candidateIndex });
+                        dispatch({ type: "move-candidate", candidateId: draggedCandidateId, toIndex: session.document.candidates.indexOf(candidate) });
                         setDraggedCandidateId(undefined);
                       }}
                     >
@@ -786,6 +826,7 @@ export function SimpleWorkspace({
                           >{simpleCasingLabels[casing]}</button>
                         ))}
                       </div>
+                      {face.namedInstances.length ? <label className="simple-named-style"><span>Style</span><SelectControl aria-label={`Style for ${face.family}`} value={face.namedInstances.findIndex((instance) => face.axes.every((axis) => (candidate.axes.find((value) => value.tag === axis.tag)?.value ?? axis.defaultValue) === (instance.coordinates.find((value) => value.tag === axis.tag)?.value ?? axis.defaultValue)))} onChange={(event) => dispatch({ type: "set-named-instance", candidateId: candidate.id, instanceIndex: Number(event.target.value) })}><option value={-1} disabled>Custom axes</option>{face.namedInstances.map((instance, instanceIndex) => <option key={instanceIndex} value={instanceIndex}>{instance.name}</option>)}</SelectControl></label> : null}
                       {face.axes.length ? (
                         <div className="simple-axes">
                           {face.axes.map((axis) => {
@@ -805,11 +846,15 @@ export function SimpleWorkspace({
                           <button type="button" className={skipped ? "is-active is-reject" : ""} aria-pressed={skipped} onClick={() => dispatch({ type: "set-review-state", candidateIds: [candidate.id], reviewState: "reject" })}>Skip</button>
                         </div>
                         <div className="simple-order" role="group" aria-label={`Order ${face.family}`}>
-                          <button type="button" disabled={candidateIndex === 0} onClick={() => dispatch({ type: "move-candidate", candidateId: candidate.id, toIndex: candidateIndex - 1 })}>Earlier</button>
-                          <button type="button" disabled={candidateIndex === candidates.length - 1} onClick={() => dispatch({ type: "move-candidate", candidateId: candidate.id, toIndex: candidateIndex + 1 })}>Later</button>
+                          <button type="button" disabled={candidateIndex === 0} onClick={() => dispatch({ type: "move-candidate", candidateId: candidate.id, toIndex: session.document.candidates.indexOf(candidates[candidateIndex - 1]!) })}>Earlier</button>
+                          <button type="button" disabled={candidateIndex === candidates.length - 1} onClick={() => dispatch({ type: "move-candidate", candidateId: candidate.id, toIndex: session.document.candidates.indexOf(candidates[candidateIndex + 1]!) })}>Later</button>
                           <button type="button" className="remove-font" onClick={() => dispatch({ type: "remove-candidate", candidateId: candidate.id })}>Remove</button>
                         </div>
                       </footer>
+                      <div className="simple-instance-actions">
+                        <button type="button" className="quiet-button has-icon" disabled={availableFontSlots < 1} onClick={() => dispatch({ type: "duplicate-candidate", candidateId: candidate.id })}><InterfaceIcon name="add" />Duplicate font</button>
+                        <button type="button" className="quiet-button" disabled={availableFontSlots < 1} onClick={() => dispatch({ type: "copy-to-simple-set", candidateIds: [candidate.id], setId: otherSetId })}>Copy to {otherSetId === "body" ? "Body Copy" : "Headlines"}</button>
+                      </div>
                     </article>
                   );
                 })}
@@ -1229,7 +1274,7 @@ function CompareWorkspace({ session, dispatch, fontStates, headingRef, compariso
       revealed,
       rationale: activeSet?.rationale ?? "",
     };
-    dispatch({ type: "upsert-comparison", comparison });
+    dispatch({ type: "upsert-comparison", comparison, displayedCopy: copy });
   };
   return (
     <main className="workspace compare-workspace" id="workspace" aria-labelledby="workspace-heading">
@@ -1349,7 +1394,7 @@ export function Inspector({ session, dispatch, fontStates, actions, blindIdentit
       <label className="field-label"><span>Instance label</span><input value={candidate.label} onChange={(event) => dispatch({ type: "edit-candidate", candidateId: candidate.id, patch: { label: event.target.value } })} /></label>
       <label className="field-label"><span>Role</span><SelectControl value={use?.role ?? ""} onChange={(event) => dispatch({ type: "assign-role", candidateId: candidate.id, role: (event.target.value || undefined) as SystemRole | undefined })}><option value="">Unassigned</option>{SYSTEM_ROLES.map((role) => <option value={role} key={role}>{roleLabels[role]}</option>)}</SelectControl><small>Role creates a distinct Font Use. Candidate remains unchanged.</small></label>
       <div className="inspector-actions"><button type="button" className="quiet-button" onClick={() => dispatch({ type: "toggle-tray", candidateId: candidate.id })}>{session.workspace.trayIds.includes(candidate.id) ? "Remove from Compare" : "Add to Compare"}</button><button type="button" className="quiet-button" onClick={() => dispatch({ type: "duplicate-candidate", candidateId: candidate.id })}>Duplicate instance</button></div>
-      {face.namedInstances.length ? <label className="field-label"><span>Named instance</span><SelectControl value="" onChange={(event) => { const instance = face.namedInstances.find((item) => item.name === event.target.value); instance?.coordinates.forEach((axis) => dispatch({ type: "set-axis", candidateId: candidate.id, tag: axis.tag, value: axis.value })); }}><option value="">Custom</option>{face.namedInstances.map((instance) => <option key={instance.name}>{instance.name}</option>)}</SelectControl></label> : null}
+      {face.namedInstances.length ? <label className="field-label"><span>Named instance</span><SelectControl value={face.namedInstances.findIndex((instance) => face.axes.every((axis) => (candidate.axes.find((value) => value.tag === axis.tag)?.value ?? axis.defaultValue) === (instance.coordinates.find((value) => value.tag === axis.tag)?.value ?? axis.defaultValue)))} onChange={(event) => dispatch({ type: "set-named-instance", candidateId: candidate.id, instanceIndex: Number(event.target.value) })}><option value={-1} disabled>Custom axes</option>{face.namedInstances.map((instance, index) => <option key={index} value={index}>{instance.name}</option>)}</SelectControl></label> : null}
       {face.axes.map((axis) => { const value = candidate.axes.find((item) => item.tag === axis.tag)?.value ?? axis.defaultValue; return <label className="axis-control" key={axis.tag}><span><strong>{axis.name}</strong><code>{axis.tag}</code><output>{Math.round(value * 100) / 100}</output></span><input type="range" min={axis.minimum} max={axis.maximum} step={(axis.maximum - axis.minimum) / 200 || 1} value={value} onChange={(event) => dispatch({ type: "set-axis", candidateId: candidate.id, tag: axis.tag, value: Number(event.target.value) })} /><small>{axis.minimum} · default {axis.defaultValue} · {axis.maximum}</small></label>; })}
       {face.features.length ? <fieldset className="feature-list"><legend>OpenType features</legend>{face.features.map((feature) => { const enabled = candidate.features.find((item) => item.tag === feature.tag)?.enabled ?? feature.defaultEnabled; return <label key={feature.tag}><input type="checkbox" checked={enabled} onChange={(event) => dispatch({ type: "set-feature", candidateId: candidate.id, tag: feature.tag, enabled: event.target.checked })} /><span>{feature.name}<code>{feature.tag}</code></span></label>; })}</fieldset> : null}
       <label className="field-label"><span>Casing</span><SelectControl value={candidate.casing} onChange={(event) => dispatch({ type: "edit-candidate", candidateId: candidate.id, patch: { casing: event.target.value as Candidate["casing"] } })}><option value="exact">Exact</option><option value="uppercase">UPPERCASE</option><option value="lowercase">lowercase</option><option value="title">Title Case</option><option value="ap-title">AP Title Case</option></SelectControl></label>

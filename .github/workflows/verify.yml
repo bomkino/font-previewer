@@ -480,7 +480,7 @@ jobs:
             .disclosureMotion.closeIntermediate == true and
             .disclosureMotion.caretRotates == true and
             .simpleVisual.stateTravel.added > 0 and
-            .simpleVisual.stateTravel.simpleAfter == .simpleVisual.stateTravel.studioAfter and
+            (.simpleVisual.stateTravel.simpleAfter + .simpleVisual.stateTravel.bodyCount) == .simpleVisual.stateTravel.studioAfter and
             .simpleVisual.stateTravel.fitPolicy == "locked-lines" and
             .simpleVisual.stateTravel.restored == true and
             .simpleVisual.scale["80"].minTouchHeight >= 44 and
